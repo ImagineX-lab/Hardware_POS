@@ -96,6 +96,15 @@ const DB = {
   },
   getCustomer(id){ return this.data.customers.find(c=>c.id===id); },
   allCustomers(){ return this.data.customers.slice().sort((a,b)=>a.name.localeCompare(b.name)); },
+  getHardwareCustomers(){ return this.data.customers.filter(c => c.customerType === 'hardware').sort((a,b)=>a.name.localeCompare(b.name)); },
+  getRetailCustomers(){ return this.data.customers.filter(c => c.customerType !== 'hardware').sort((a,b)=>a.name.localeCompare(b.name)); },
+  searchCustomers(q){
+    q = (q || '').trim().toLowerCase();
+    if(!q) return this.allCustomers();
+    return this.data.customers.filter(c => 
+      c.name.toLowerCase().includes(q) || (c.phone || '').includes(q)
+    ).sort((a,b)=>a.name.localeCompare(b.name));
+  },
 
   async recordPayment(custId, amount, note){
     const res = await fetch(`/api/customers/${custId}/payment`, {

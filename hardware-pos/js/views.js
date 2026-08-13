@@ -101,10 +101,13 @@ Views.dashboard = {
 /* ================= SALE / BILLING ================= */
 Views.sale = {
   currentCategory: 'All',
+  payType: 'cash',
+  selectedCustomer: null,
+  amountPaid: '',
 
   render(){
     cart = cart || [];
-    Views.sale.payType = 'cash'; // reset UI/state each time the sale view is (re)opened
+    if(!Views.sale.payType) Views.sale.payType = 'cash';
     return `
       <div class="sale-layout">
         <div class="card" style="display:flex; flex-direction:column; overflow:hidden;">
@@ -127,27 +130,66 @@ Views.sale = {
           <div class="cart-list-wrap" id="cartBox">${Views.sale.cartHTML()}</div>
 
           <div class="totals-box" id="totalsBox" style="margin-top:auto; padding-top:10px; border-top:none;">${Views.sale.totalsHTML()}</div>
-          
-          <div class="field mt-14" style="margin-bottom:6px;">
-            <div class="pay-toggle" style="margin:0;">
-              <button type="button" id="payCashBtn" class="active">${t('sale_cash')}</button>
-              <button type="button" id="payCreditBtn" class="credit">${t('sale_credit')}</button>
+
+          <!-- Customer Selection Box (For Cash or Credit) -->
+          <div class="field mt-8" style="margin-bottom:6px;">
+            <label class="field-label" style="margin-bottom:4px;">${t('sale_customer')} <small class="text-muted">(${Views.sale.payType==='credit'?'අවශ්‍යයි':'විකල්පයි'})</small></label>
+            <div id="customerSelectionWrap">
+              ${Views.sale.customerWidgetHTML()}
             </div>
           </div>
-          <div class="field" id="customerPickWrap" style="display:none; margin-bottom:6px;">
-            <select class="input" id="saleCustomer">
-              <option value="">${t('sale_select_customer')}</option>
-              ${DB.allCustomers().map(c=>`<option value="${c.id}">${escapeHTML(c.name)} ${c.balance>0?`(${t('word_due')} ${fmt(c.balance)})`:''}</option>`).join('')}
-            </select>
+          
+          <div class="field mt-8" style="margin-bottom:6px;">
+            <div class="pay-toggle" style="margin:0;">
+              <button type="button" id="payCashBtn" class="${Views.sale.payType==='cash'?'active':''}">${t('sale_cash')}</button>
+              <button type="button" id="payCreditBtn" class="credit ${Views.sale.payType==='credit'?'active':''}">${t('sale_credit')}</button>
+            </div>
           </div>
-          <div class="field" style="margin-bottom:12px; display:flex; align-items:center; gap:10px;">
+
+          <!-- Amount Paid & Change Due for Cash -->
+          <div class="field mt-8" id="amountPaidWrap" style="display:${Views.sale.payType==='cash'?'block':'none'}; margin-bottom:6px;">
+            <label class="field-label" style="margin-bottom:4px;">${t('sale_amount_paid')}</label>
+            <input class="input" id="saleAmountPaid" type="number" min="0" step="any" placeholder="0.00" value="${Views.sale.amountPaid || ''}">
+            <div id="changeDueWrap" class="change-due-box" style="display:${(Number(Views.sale.amountPaid) > 0)?'flex':'none'};">
+              <span>${t('sale_change_due')}</span>
+              <span id="changeDueAmount" style="font-size:16px;">${fmt(Math.max(0, (Number(Views.sale.amountPaid) || 0) - Views.sale.calcTotal()))}</span>
+            </div>
+          </div>
+
+          <div class="field" style="margin-bottom:12px; display:flex; align-items:center; gap:10px; margin-top:4px;">
             <label class="field-label" style="margin:0;">${t('sale_discount')}</label>
-            <input class="input" id="saleDiscount" type="number" min="0" value="0" style="flex:1;">
+            <input class="input" id="saleDiscount" type="number" min="0" step="any" value="0" style="flex:1;">
           </div>
 
           <button class="btn btn-primary btn-block" id="completeSaleBtn" style="padding:13px; font-size:15px;">${t('sale_complete_btn')}</button>
           <button class="btn btn-outline btn-block mt-8" id="clearCartBtn">${t('sale_clear_cart')}</button>
         </div>
+      </div>
+    `;
+  },
+
+  customerWidgetHTML(){
+    if (Views.sale.selectedCustomer) {
+      const c = Views.sale.selectedCustomer;
+      const isHardware = c.customerType === 'hardware';
+      return `
+        <div class="selected-cust-card">
+          <div>
+            <div class="cust-name-title">👤 ${escapeHTML(c.name)} ${isHardware ? `<span class="pill pill-ok" style="font-size:10px; margin-left:4px;">${t('cust_tab_hardwares')}</span>` : ''}</div>
+            <div class="cust-meta">
+              ${c.phone ? `📞 ${escapeHTML(c.phone)}` : ''} 
+              ${c.balance > 0 ? ` • <span style="color:var(--danger); font-weight:700;">${t('word_due')}: ${fmt(c.balance)}</span>` : ''}
+              ${isHardware && c.discountPercent > 0 ? ` • <span style="color:var(--orange-dark); font-weight:700;">${t('cust_hardware_discount_badge')}: ${c.discountPercent}%</span>` : ''}
+            </div>
+          </div>
+          <button type="button" class="icon-btn" id="unselectCustBtn" style="font-size:18px;" title="Unselect">&times;</button>
+        </div>
+      `;
+    }
+    return `
+      <div style="position:relative;">
+        <input class="input" id="saleCustomerSearch" placeholder="${t('cust_search_ph')}" autocomplete="off">
+        <div id="custSuggestBox" class="cust-suggest" style="display:none;"></div>
       </div>
     `;
   },
@@ -189,18 +231,29 @@ Views.sale = {
           <div class="cart-item-name">${escapeHTML(l.name)}</div>
           <div class="cart-item-meta">${fmt(l.unitPrice)} / ${escapeHTML(l.unit)} • ${t('word_qty')}: ${l.maxQty}</div>
         </div>
-        <input type="number" min="1" max="${l.maxQty}" value="${l.qty}" data-qty-idx="${idx}" class="input">
+        <input type="number" min="0.01" step="any" max="${l.maxQty}" value="${l.qty}" data-qty-idx="${idx}" class="input">
         <div class="num" style="text-align:right; font-weight:700;">${fmt(l.qty*l.unitPrice)}</div>
         <button class="icon-btn" data-remove-idx="${idx}" title="${t('delete')}">✕</button>
       </div>
     `).join('');
   },
 
-  totalsHTML(){
-    const subtotal = cart.reduce((s,l)=>s+l.qty*l.unitPrice,0);
+  calcSubtotal(){
+    return cart.reduce((s,l)=>s+l.qty*l.unitPrice,0);
+  },
+
+  calcTotal(){
+    const subtotal = Views.sale.calcSubtotal();
     const discountEl = document.getElementById('saleDiscount');
     const discount = discountEl ? Number(discountEl.value)||0 : 0;
-    const total = Math.max(0, subtotal-discount);
+    return Math.max(0, subtotal - discount);
+  },
+
+  totalsHTML(){
+    const subtotal = Views.sale.calcSubtotal();
+    const discountEl = document.getElementById('saleDiscount');
+    const discount = discountEl ? Number(discountEl.value)||0 : 0;
+    const total = Math.max(0, subtotal - discount);
     return `
       <div class="totals-line"><span>${t('sale_subtotal')}</span><span>${fmt(subtotal)}</span></div>
       <div class="totals-line"><span>${t('sale_discount')}</span><span>- ${fmt(discount)}</span></div>
@@ -211,17 +264,45 @@ Views.sale = {
   refreshCart(){
     document.getElementById('cartBox').innerHTML = Views.sale.cartHTML();
     document.getElementById('totalsBox').innerHTML = Views.sale.totalsHTML();
+    Views.sale.updateChangeDue();
     Views.sale.bindCartRows();
+  },
+
+  updateChangeDue(){
+    const paid = Number(document.getElementById('saleAmountPaid')?.value) || Number(Views.sale.amountPaid) || 0;
+    Views.sale.amountPaid = paid > 0 ? paid : '';
+    const total = Views.sale.calcTotal();
+    const change = Math.max(0, paid - total);
+    const wrap = document.getElementById('changeDueWrap');
+    const amtEl = document.getElementById('changeDueAmount');
+    if (wrap && amtEl) {
+      wrap.style.display = paid > 0 ? 'flex' : 'none';
+      amtEl.textContent = fmt(change);
+    }
+  },
+
+  applyCustomerHardwareDiscount(){
+    if (Views.sale.selectedCustomer && Views.sale.selectedCustomer.customerType === 'hardware' && Views.sale.selectedCustomer.discountPercent > 0) {
+      const subtotal = Views.sale.calcSubtotal();
+      const disc = Math.round((subtotal * (Views.sale.selectedCustomer.discountPercent / 100)) * 100) / 100;
+      const discountEl = document.getElementById('saleDiscount');
+      if (discountEl) {
+        discountEl.value = disc;
+        Views.sale.refreshCart();
+      }
+    }
   },
 
   bindCartRows(){
     document.querySelectorAll('[data-qty-idx]').forEach(inp=>{
       inp.addEventListener('change', (e)=>{
         const idx = Number(e.target.dataset.qtyIdx);
-        let v = Math.floor(Number(e.target.value))||1;
-        v = Math.max(1, Math.min(v, cart[idx].maxQty));
+        let v = Number(e.target.value) || 0.01;
+        v = Math.max(0.01, Math.min(v, cart[idx].maxQty));
+        v = Math.round(v * 100) / 100;
         cart[idx].qty = v;
         Views.sale.refreshCart();
+        Views.sale.applyCustomerHardwareDiscount();
       });
     });
     document.querySelectorAll('[data-remove-idx]').forEach(btn=>{
@@ -229,6 +310,7 @@ Views.sale = {
         const idx = Number(e.target.dataset.removeIdx);
         cart.splice(idx,1);
         Views.sale.refreshCart();
+        Views.sale.applyCustomerHardwareDiscount();
       });
     });
   },
@@ -238,75 +320,93 @@ Views.sale = {
     const suggestBox = document.getElementById('saleSuggest');
     let selectedIndex = -1;
 
-    searchInp.addEventListener('input', ()=>{
-      selectedIndex = -1;
-      const q = searchInp.value.trim().toLowerCase();
-      if(!q){ suggestBox.innerHTML=''; return; }
-      const matches = DB.allItems().filter(i=>i.name.toLowerCase().includes(q) || (i.category||'').toLowerCase().includes(q)).slice(0,8);
-      if(!matches.length){
-        suggestBox.innerHTML = `<div class="search-suggest"><div class="suggest-row text-muted">${t('sale_no_matches')}</div></div>`;
-        return;
-      }
-      suggestBox.innerHTML = `<div class="search-suggest">${matches.map(i=>`
-        <div class="suggest-row" data-add-item="${i.id}">
-          <div>
-            <div class="s-name">${escapeHTML(i.name)}</div>
-            <div class="s-meta">${escapeHTML(i.category)} • ${t('word_qty')}: ${i.qty} ${escapeHTML(i.unit)}</div>
+    if (searchInp) {
+      searchInp.addEventListener('input', ()=>{
+        selectedIndex = -1;
+        const q = searchInp.value.trim().toLowerCase();
+        if(!q){ suggestBox.innerHTML=''; return; }
+        const matches = DB.allItems().filter(i=>i.name.toLowerCase().includes(q) || (i.category||'').toLowerCase().includes(q)).slice(0,8);
+        if(!matches.length){
+          suggestBox.innerHTML = `<div class="search-suggest"><div class="suggest-row text-muted">${t('sale_no_matches')}</div></div>`;
+          return;
+        }
+        suggestBox.innerHTML = `<div class="search-suggest">${matches.map(i=>`
+          <div class="suggest-row" data-add-item="${i.id}">
+            <div>
+              <div class="s-name">${escapeHTML(i.name)}</div>
+              <div class="s-meta">${escapeHTML(i.category)} • ${t('word_qty')}: ${i.qty} ${escapeHTML(i.unit)}</div>
+            </div>
+            <div style="font-weight:700">${fmt(i.sellPrice)}</div>
           </div>
-          <div style="font-weight:700">${fmt(i.sellPrice)}</div>
-        </div>
-      `).join('')}</div>`;
-      suggestBox.querySelectorAll('[data-add-item]').forEach(row=>{
-        row.addEventListener('click', ()=>{
-          const id = Number(row.dataset.addItem);
-          Views.sale.addToCart(id);
-          searchInp.value=''; suggestBox.innerHTML=''; searchInp.focus();
+        `).join('')}</div>`;
+        suggestBox.querySelectorAll('[data-add-item]').forEach(row=>{
+          row.addEventListener('click', ()=>{
+            const id = Number(row.dataset.addItem);
+            Views.sale.addToCart(id);
+            searchInp.value=''; suggestBox.innerHTML=''; searchInp.focus();
+          });
         });
       });
-    });
 
-    searchInp.addEventListener('keydown', (e) => {
-      const rows = suggestBox.querySelectorAll('[data-add-item]');
-      if (!rows.length) return;
-      
-      if (e.key === 'ArrowDown') {
-        e.preventDefault();
-        selectedIndex = (selectedIndex + 1) % rows.length;
-        updateSelection();
-      } else if (e.key === 'ArrowUp') {
-        e.preventDefault();
-        selectedIndex = selectedIndex - 1;
-        if (selectedIndex < 0) selectedIndex = rows.length - 1;
-        updateSelection();
-      } else if (e.key === 'Enter') {
-        e.preventDefault();
-        if (selectedIndex >= 0 && selectedIndex < rows.length) {
-          rows[selectedIndex].click();
-        } else if (rows.length > 0) {
-          rows[0].click(); // default to first if none selected
-        }
-      }
-
-      function updateSelection() {
-        rows.forEach((r, idx) => {
-          if (idx === selectedIndex) {
-            r.classList.add('selected-row');
-            r.style.background = 'var(--bg-hover)'; // Highlight inline
-            r.style.borderColor = 'var(--primary)';
-          } else {
-            r.classList.remove('selected-row');
-            r.style.background = '';
-            r.style.borderColor = '';
+      searchInp.addEventListener('keydown', (e) => {
+        const rows = suggestBox.querySelectorAll('[data-add-item]');
+        if (!rows.length) return;
+        
+        if (e.key === 'ArrowDown') {
+          e.preventDefault();
+          selectedIndex = (selectedIndex + 1) % rows.length;
+          updateSelection();
+        } else if (e.key === 'ArrowUp') {
+          e.preventDefault();
+          selectedIndex = selectedIndex - 1;
+          if (selectedIndex < 0) selectedIndex = rows.length - 1;
+          updateSelection();
+        } else if (e.key === 'Enter') {
+          e.preventDefault();
+          if (selectedIndex >= 0 && selectedIndex < rows.length) {
+            rows[selectedIndex].click();
+          } else if (rows.length > 0) {
+            rows[0].click();
           }
-        });
-      }
-    });
+        }
+
+        function updateSelection() {
+          rows.forEach((r, idx) => {
+            if (idx === selectedIndex) {
+              r.classList.add('selected-row');
+              r.style.background = 'var(--bg-hover)';
+              r.style.borderColor = 'var(--primary)';
+            } else {
+              r.classList.remove('selected-row');
+              r.style.background = '';
+              r.style.borderColor = '';
+            }
+          });
+        }
+      });
+    }
+
+    Views.sale.bindCustomerSearch();
 
     document.getElementById('payCashBtn').addEventListener('click', ()=>Views.sale.setPayType('cash'));
     document.getElementById('payCreditBtn').addEventListener('click', ()=>Views.sale.setPayType('credit'));
-    document.getElementById('saleDiscount').addEventListener('input', ()=>{
-      document.getElementById('totalsBox').innerHTML = Views.sale.totalsHTML();
-    });
+    
+    const discEl = document.getElementById('saleDiscount');
+    if (discEl) {
+      discEl.addEventListener('input', ()=>{
+        document.getElementById('totalsBox').innerHTML = Views.sale.totalsHTML();
+        Views.sale.updateChangeDue();
+      });
+    }
+
+    const paidEl = document.getElementById('saleAmountPaid');
+    if (paidEl) {
+      paidEl.addEventListener('input', (e)=>{
+        Views.sale.amountPaid = e.target.value;
+        Views.sale.updateChangeDue();
+      });
+    }
+
     document.getElementById('clearCartBtn').addEventListener('click', ()=>{
       cart = [];
       Views.sale.refreshCart();
@@ -315,16 +415,150 @@ Views.sale = {
 
     Views.sale.bindCartRows();
     Views.sale.bindGrid();
-    setTimeout(() => searchInp.focus(), 100);
+    if(searchInp) setTimeout(() => searchInp.focus(), 100);
+  },
+
+  bindCustomerSearch(){
+    const custWrap = document.getElementById('customerSelectionWrap');
+    if(!custWrap) return;
+
+    const unselectBtn = document.getElementById('unselectCustBtn');
+    if (unselectBtn) {
+      unselectBtn.addEventListener('click', ()=>{
+        Views.sale.selectedCustomer = null;
+        custWrap.innerHTML = Views.sale.customerWidgetHTML();
+        Views.sale.bindCustomerSearch();
+      });
+      return;
+    }
+
+    const searchInp = document.getElementById('saleCustomerSearch');
+    const suggestBox = document.getElementById('custSuggestBox');
+    if (!searchInp || !suggestBox) return;
+
+    searchInp.addEventListener('input', ()=>{
+      const q = searchInp.value.trim();
+      if (!q) {
+        suggestBox.style.display = 'none';
+        suggestBox.innerHTML = '';
+        return;
+      }
+
+      const matches = DB.searchCustomers(q).slice(0, 6);
+      let html = matches.map(c => {
+        const isHardware = c.customerType === 'hardware';
+        return `
+          <div class="cust-suggest-item" data-select-cust="${c.id}">
+            <div>
+              <div style="font-weight:700;">${escapeHTML(c.name)} ${isHardware ? `<span class="pill pill-ok" style="font-size:10px;">${t('cust_tab_hardwares')}</span>` : ''}</div>
+              <div class="small text-muted">${c.phone ? `📞 ${escapeHTML(c.phone)}` : ''} ${c.balance > 0 ? ` • ${t('word_due')} ${fmt(c.balance)}` : ''}</div>
+            </div>
+            ${isHardware && c.discountPercent > 0 ? `<div style="font-weight:700; font-size:11px; color:var(--orange-dark);">${c.discountPercent}% off</div>` : ''}
+          </div>
+        `;
+      }).join('');
+
+      html += `
+        <div class="cust-suggest-item quick-add-item" id="quickAddCustRow">
+          ${t('cust_quick_add')} ("${escapeHTML(q)}")
+        </div>
+      `;
+
+      suggestBox.innerHTML = html;
+      suggestBox.style.display = 'block';
+
+      suggestBox.querySelectorAll('[data-select-cust]').forEach(row => {
+        row.addEventListener('click', ()=>{
+          const id = Number(row.dataset.selectCust);
+          const c = DB.getCustomer(id);
+          if (c) {
+            Views.sale.selectedCustomer = c;
+            custWrap.innerHTML = Views.sale.customerWidgetHTML();
+            Views.sale.bindCustomerSearch();
+            Views.sale.applyCustomerHardwareDiscount();
+          }
+        });
+      });
+
+      const quickBtn = document.getElementById('quickAddCustRow');
+      if (quickBtn) {
+        quickBtn.addEventListener('click', ()=>{
+          suggestBox.style.display = 'none';
+          Views.sale.openQuickAddModal(q);
+        });
+      }
+    });
+  },
+
+  openQuickAddModal(initialText){
+    const isPhone = /^[0-9+\s-]{4,}$/.test(initialText);
+    const initialName = isPhone ? '' : initialText;
+    const initialPhone = isPhone ? initialText : '';
+
+    openModal({
+      title: t('cust_quick_add_title'),
+      bodyHTML:`
+        <div class="field"><label class="field-label">${t('cust_form_name')}</label><input class="input" id="qc_name" value="${escapeHTML(initialName)}" placeholder="${t('cust_form_name_ph')}"></div>
+        <div class="grid grid-2">
+          <div class="field"><label class="field-label">${t('cust_form_phone')}</label><input class="input" id="qc_phone" value="${escapeHTML(initialPhone)}" placeholder="${t('cust_form_phone_ph')}"></div>
+          <div class="field"><label class="field-label">${t('cust_form_type')}</label>
+            <select class="input" id="qc_type">
+              <option value="customer">${t('cust_type_retail')}</option>
+              <option value="hardware">${t('cust_type_hardware')}</option>
+            </select>
+          </div>
+        </div>
+        <div class="field" id="qc_discount_wrap" style="display:none;"><label class="field-label">${t('cust_form_discount')}</label><input class="input" id="qc_discount" type="number" min="0" max="100" value="0"></div>
+        <div class="field"><label class="field-label">${t('cust_form_address')}</label><input class="input" id="qc_address"></div>
+      `,
+      footHTML:`<button class="btn btn-outline" data-close>${t('cancel')}</button><button class="btn btn-primary" id="saveQCustBtn">${t('confirm')}</button>`,
+      onMount:(wrap)=>{
+        const typeSelect = wrap.querySelector('#qc_type');
+        const discWrap = wrap.querySelector('#qc_discount_wrap');
+        typeSelect.addEventListener('change', ()=>{
+          discWrap.style.display = typeSelect.value === 'hardware' ? 'block' : 'none';
+        });
+
+        wrap.querySelector('#saveQCustBtn').addEventListener('click', async ()=>{
+          const name = wrap.querySelector('#qc_name').value.trim();
+          if(!name){ toast(t('cust_err_name'),'err'); return; }
+          const newC = await DB.addCustomer({
+            name,
+            phone: wrap.querySelector('#qc_phone').value,
+            address: wrap.querySelector('#qc_address').value,
+            customerType: typeSelect.value,
+            discountPercent: Number(wrap.querySelector('#qc_discount')?.value) || 0
+          });
+          closeModal();
+          toast(t('cust_added'),'ok');
+          Views.sale.selectedCustomer = newC;
+          const custWrap = document.getElementById('customerSelectionWrap');
+          if (custWrap) {
+            custWrap.innerHTML = Views.sale.customerWidgetHTML();
+            Views.sale.bindCustomerSearch();
+            Views.sale.applyCustomerHardwareDiscount();
+          }
+        });
+      }
+    });
   },
 
   bindGrid() {
+    const categorySelect = document.getElementById('posCategorySelect');
+    if (categorySelect) {
+      categorySelect.addEventListener('change', (e) => {
+        Views.sale.currentCategory = e.target.value;
+        document.getElementById('posItemGrid').innerHTML = Views.sale.posGridHTML();
+        Views.sale.bindGrid();
+      });
+    }
+
     document.querySelectorAll('.cat-btn').forEach(btn => {
       btn.addEventListener('click', (e) => {
         Views.sale.currentCategory = e.target.dataset.cat;
         document.getElementById('posCategories').innerHTML = Views.sale.categoriesHTML();
         document.getElementById('posItemGrid').innerHTML = Views.sale.posGridHTML();
-        Views.sale.bindGrid(); // rebind after rewriting innerHTML
+        Views.sale.bindGrid();
       });
     });
 
@@ -332,16 +566,17 @@ Views.sale = {
       card.addEventListener('click', (e) => {
         const id = Number(e.currentTarget.dataset.gridItem);
         Views.sale.addToCart(id);
+        Views.sale.applyCustomerHardwareDiscount();
       });
     });
   },
 
-  payType: 'cash',
   setPayType(type){
     Views.sale.payType = type;
     document.getElementById('payCashBtn').classList.toggle('active', type==='cash');
     document.getElementById('payCreditBtn').classList.toggle('active', type==='credit');
-    document.getElementById('customerPickWrap').style.display = type==='credit' ? 'block' : 'none';
+    const paidWrap = document.getElementById('amountPaidWrap');
+    if (paidWrap) paidWrap.style.display = type === 'cash' ? 'block' : 'none';
   },
 
   addToCart(itemId){
@@ -350,7 +585,7 @@ Views.sale = {
     if(item.qty <= 0){ toast(t('sale_out_of_stock'), 'err'); return; }
     const existing = cart.find(l=>l.itemId===itemId);
     if(existing){
-      if(existing.qty < existing.maxQty){ existing.qty++; }
+      if(existing.qty < existing.maxQty){ existing.qty += 1; }
       else { toast(t('sale_exceeds_stock'), 'err'); }
     } else {
       cart.push({ itemId, name:item.name, unit:item.unit, unitPrice:item.sellPrice, qty:1, maxQty:item.qty });
@@ -362,17 +597,30 @@ Views.sale = {
     if(!cart.length){ toast(t('sale_empty_cart'), 'err'); return; }
     const payType = Views.sale.payType;
     let customerId = null;
+    let customerName = '';
+
+    if (Views.sale.selectedCustomer) {
+      customerId = Views.sale.selectedCustomer.id;
+      customerName = Views.sale.selectedCustomer.name;
+    }
+
     if(payType==='credit'){
-      customerId = Number(document.getElementById('saleCustomer').value) || null;
       if(!customerId){ toast(t('sale_select_credit_customer'), 'err'); return; }
     }
+
     const discount = Number(document.getElementById('saleDiscount').value)||0;
+    const amountPaid = Number(document.getElementById('saleAmountPaid')?.value) || Number(Views.sale.amountPaid) || 0;
+    const total = Views.sale.calcTotal();
+    const changeAmount = Math.max(0, amountPaid - total);
+
     const lines = cart.map(l=>({ itemId:l.itemId, name:l.name, unit:l.unit, qty:l.qty, unitPrice:l.unitPrice }));
 
-    const sale = await DB.createSale({ lines, paymentType:payType, customerId, discount });
+    const sale = await DB.createSale({ lines, paymentType:payType, customerId, customerName, discount, amountPaid, changeAmount });
     toast(`${t('sale_success')}#${sale.id}`, 'ok');
     cart = [];
     document.getElementById('saleDiscount').value = 0;
+    Views.sale.amountPaid = '';
+    Views.sale.selectedCustomer = null;
     Views.sale.setPayType('cash');
     Views.sale.refreshCart();
     Views.sale.showReceipt(sale);
@@ -391,7 +639,7 @@ Views.sale = {
             ${sale.lines.map(l=>`
               <tr>
                 <td>${escapeHTML(l.name)}</td>
-                <td class="num">${l.qty}</td>
+                <td class="num">${l.qty} ${escapeHTML(l.unit||'')}</td>
                 <td class="num">${fmt(l.qty*l.unitPrice)}</td>
               </tr>
             `).join('')}
@@ -402,6 +650,10 @@ Views.sale = {
         <div style="display:flex; justify-content:space-between;"><span>${t('sale_discount')}</span><span>${fmt(sale.discount)}</span></div>
         <div style="display:flex; justify-content:space-between; font-weight:700; font-size:14px;"><span>${t('sale_total')}</span><span>${fmt(sale.total)}</span></div>
         <div style="display:flex; justify-content:space-between; margin-top:4px;"><span>${t('sale_payment')}</span><span>${sale.paymentType==='credit' ? `${t('word_credit')} - ${escapeHTML(sale.customerName)}` : t('word_cash')}</span></div>
+        ${sale.paymentType==='cash' && sale.amountPaid > 0 ? `
+          <div style="display:flex; justify-content:space-between; margin-top:4px;"><span>${t('sale_amount_paid')}</span><span>${fmt(sale.amountPaid)}</span></div>
+          <div style="display:flex; justify-content:space-between; font-weight:700;"><span>${t('sale_change_due')}</span><span>${fmt(sale.changeAmount)}</span></div>
+        ` : ''}
         <hr>
         <div class="r-center">${t('receipt_thanks')}</div>
       </div>
@@ -484,16 +736,20 @@ Views.items = {
       <div class="grid grid-2">
         <div class="field"><label class="field-label">${t('items_form_unit')}</label>
           <select class="input" id="f_unit">
-            ${['pcs','kg','g','L','ml','bag','box','m','ft','set'].map(u=>`<option value="${u}" ${v.unit===u?'selected':''}>${u}</option>`).join('')}
+            ${['pcs','kg','g','L','ml','bag','box','m','ft','set','roll','sheet','bundle'].map(u=>`<option value="${u}" ${v.unit===u?'selected':''}>${u}</option>`).join('')}
           </select>
         </div>
-        <div class="field"><label class="field-label">${t('items_form_reorder')}</label><input class="input" id="f_reorder" type="number" min="0" value="${v.reorderLevel}"></div>
+        <div class="field"><label class="field-label">${t('items_form_reorder')}</label><input class="input" id="f_reorder" type="number" min="0" step="any" value="${v.reorderLevel}"></div>
       </div>
       <div class="grid grid-2">
         <div class="field"><label class="field-label">${t('items_form_cost')}</label><input class="input" id="f_cost" type="number" min="0" step="0.01" value="${v.costPrice}"></div>
         <div class="field"><label class="field-label">${t('items_form_sell')}</label><input class="input" id="f_sell" type="number" min="0" step="0.01" value="${v.sellPrice}"></div>
       </div>
-      <div class="field"><label class="field-label">${t('items_form_qty')}</label><input class="input" id="f_qty" type="number" min="0" value="${v.qty}"></div>
+      <div class="field">
+        <label class="field-label">${t('items_form_qty')}</label>
+        <input class="input" id="f_qty" type="number" min="0" step="any" value="${v.qty}">
+        <div class="small text-muted" style="margin-top:4px;">* කොටස්/ලිහිල් (loose) වශයෙන් විකිණීමට decimal values (උදා: 0.5kg, 2.5m) භාවිතා කළ හැක.</div>
+      </div>
     `;
   },
 
@@ -514,7 +770,7 @@ Views.items = {
             name, category:document.getElementById('f_category').value,
             unit:document.getElementById('f_unit').value,
             costPrice:document.getElementById('f_cost').value,
-            sellPrice:sell, qty, reorderLevel:document.getElementById('f_reorder').value
+            sellPrice:sell, qty:Number(qty)||0, reorderLevel:document.getElementById('f_reorder').value
           });
           closeModal();
           toast(t('items_added'),'ok');
@@ -656,7 +912,7 @@ Views.lowstock = {
           title:`"${escapeHTML(item.name)}" ${t('ls_add_stock_title')}`,
           bodyHTML:`
             <div class="field"><label class="field-label">${t('ls_current')}</label><input class="input" value="${item.qty} ${escapeHTML(item.unit)}" disabled></div>
-            <div class="field"><label class="field-label">${t('ls_add_qty')}</label><input class="input" id="restockQty" type="number" min="1" value="10"></div>
+            <div class="field"><label class="field-label">${t('ls_add_qty')}</label><input class="input" id="restockQty" type="number" min="0.01" step="any" value="10"></div>
           `,
           footHTML:`<button class="btn btn-outline" data-close>${t('cancel')}</button><button class="btn btn-primary" id="restockSaveBtn">${t('ls_add_btn')}</button>`,
           onMount:()=>{
@@ -678,7 +934,12 @@ Views.lowstock = {
 /* ================= CUSTOMERS (CREDIT / NAYATA) ================= */
 Views.customers = {
   searchQ:'',
+  activeTab: 'hardwares', // 'hardwares' | 'retail'
+
   render(){
+    const hardwaresCount = DB.getHardwareCustomers().length;
+    const retailCount = DB.getRetailCustomers().length;
+
     return `
       <div class="section-head">
         <h2>${t('cust_title')} (${DB.allCustomers().length})</h2>
@@ -687,25 +948,45 @@ Views.customers = {
           <button class="btn btn-primary" id="addCustBtn">${t('cust_add_btn')}</button>
         </div>
       </div>
+
+      <div class="cust-subtabs">
+        <button class="cust-tab-btn ${Views.customers.activeTab==='hardwares'?'active':''}" data-cust-tab="hardwares">
+          🏢 ${t('cust_tab_hardwares')} (${hardwaresCount})
+        </button>
+        <button class="cust-tab-btn ${Views.customers.activeTab==='retail'?'active':''}" data-cust-tab="retail">
+          👤 ${t('cust_tab_customers')} (${retailCount})
+        </button>
+      </div>
+
       <div id="custTableWrap">${Views.customers.tableHTML()}</div>
     `;
   },
 
   tableHTML(){
-    let list = DB.allCustomers();
+    let list = Views.customers.activeTab === 'hardwares' ? DB.getHardwareCustomers() : DB.getRetailCustomers();
     const q = Views.customers.searchQ.toLowerCase();
     if(q) list = list.filter(c=>c.name.toLowerCase().includes(q) || (c.phone||'').includes(q));
     if(!list.length) return `<div class="card"><div class="empty-state"><div class="em-ico">👤</div><h3>${t('cust_no_cust')}</h3><div class="small">${t('cust_no_cust_sub')}</div></div></div>`;
     return `
       <div class="table-wrap">
         <table>
-          <thead><tr><th>${t('cust_name')}</th><th>${t('cust_phone')}</th><th>${t('cust_address')}</th><th class="num">${t('cust_due')}</th><th></th></tr></thead>
+          <thead>
+            <tr>
+              <th>${t('cust_name')}</th>
+              <th>${t('cust_phone')}</th>
+              <th>${t('cust_address')}</th>
+              ${Views.customers.activeTab==='hardwares' ? `<th>${t('cust_hardware_discount_badge')}</th>` : ''}
+              <th class="num">${t('cust_due')}</th>
+              <th></th>
+            </tr>
+          </thead>
           <tbody>
             ${list.map(c=>`
               <tr>
                 <td><b>${escapeHTML(c.name)}</b></td>
                 <td>${escapeHTML(c.phone)||'-'}</td>
                 <td class="text-muted">${escapeHTML(c.address)||'-'}</td>
+                ${Views.customers.activeTab==='hardwares' ? `<td><span class="pill pill-ok">${c.discountPercent||0}% Discount</span></td>` : ''}
                 <td class="num">${c.balance>0 ? `<span style="color:var(--danger); font-weight:700">${fmt(c.balance)}</span>` : `<span class="pill pill-ok">${t('cust_zero')}</span>`}</td>
                 <td>
                   <button class="btn btn-sm btn-outline" data-view-cust="${c.id}">${t('cust_details')}</button>
@@ -726,21 +1007,39 @@ Views.customers = {
         <div class="field"><label class="field-label">${t('cust_form_name')}</label><input class="input" id="c_name" placeholder="${t('cust_form_name_ph')}"></div>
         <div class="grid grid-2">
           <div class="field"><label class="field-label">${t('cust_form_phone')}</label><input class="input" id="c_phone" placeholder="${t('cust_form_phone_ph')}"></div>
-          <div class="field"><label class="field-label">${t('cust_form_nic')}</label><input class="input" id="c_nic"></div>
+          <div class="field"><label class="field-label">${t('cust_form_type')}</label>
+            <select class="input" id="c_type">
+              <option value="hardware" ${Views.customers.activeTab==='hardwares'?'selected':''}>${t('cust_type_hardware')}</option>
+              <option value="customer" ${Views.customers.activeTab==='retail'?'selected':''}>${t('cust_type_retail')}</option>
+            </select>
+          </div>
+        </div>
+        <div class="grid grid-2">
+          <div class="field" id="c_discount_wrap"><label class="field-label">${t('cust_form_discount')}</label><input class="input" id="c_discount" type="number" min="0" max="100" value="0"></div>
+          <div class="field"><label class="field-label">${t('cust_form_limit')}</label><input class="input" id="c_limit" type="number" min="0" value="0"></div>
         </div>
         <div class="field"><label class="field-label">${t('cust_form_address')}</label><input class="input" id="c_address"></div>
-        <div class="field"><label class="field-label">${t('cust_form_limit')}</label><input class="input" id="c_limit" type="number" min="0" value="0"></div>
+        <div class="field"><label class="field-label">${t('cust_form_nic')}</label><input class="input" id="c_nic"></div>
       `,
       footHTML:`<button class="btn btn-outline" data-close>${t('cancel')}</button><button class="btn btn-primary" id="saveCustBtn">${t('confirm')}</button>`,
-      onMount:()=>{
-        document.getElementById('saveCustBtn').addEventListener('click', async ()=>{
-          const name = document.getElementById('c_name').value.trim();
+      onMount:(wrap)=>{
+        const typeSelect = wrap.querySelector('#c_type');
+        const discWrap = wrap.querySelector('#c_discount_wrap');
+        const toggleDisc = () => { discWrap.style.display = typeSelect.value === 'hardware' ? 'block' : 'none'; };
+        toggleDisc();
+        typeSelect.addEventListener('change', toggleDisc);
+
+        wrap.querySelector('#saveCustBtn').addEventListener('click', async ()=>{
+          const name = wrap.querySelector('#c_name').value.trim();
           if(!name){ toast(t('cust_err_name'),'err'); return; }
           await DB.addCustomer({
-            name, phone:document.getElementById('c_phone').value,
-            nic:document.getElementById('c_nic').value,
-            address:document.getElementById('c_address').value,
-            creditLimit:document.getElementById('c_limit').value
+            name,
+            phone: wrap.querySelector('#c_phone').value,
+            nic: wrap.querySelector('#c_nic').value,
+            address: wrap.querySelector('#c_address').value,
+            creditLimit: wrap.querySelector('#c_limit').value,
+            customerType: typeSelect.value,
+            discountPercent: Number(wrap.querySelector('#c_discount').value)||0
           });
           closeModal();
           toast(t('cust_added'),'ok');
@@ -762,7 +1061,9 @@ Views.customers = {
             <div class="small text-muted">${t('cust_phone')}</div>
             <div style="font-weight:600; margin-bottom:8px;">${escapeHTML(c.phone)||'-'}</div>
             <div class="small text-muted">${t('cust_address')}</div>
-            <div style="font-weight:600;">${escapeHTML(c.address)||'-'}</div>
+            <div style="font-weight:600; margin-bottom:8px;">${escapeHTML(c.address)||'-'}</div>
+            <div class="small text-muted">${t('cust_form_type')}</div>
+            <div style="font-weight:600;">${c.customerType==='hardware'? `${t('cust_type_hardware')} (${c.discountPercent||0}% discount)` : t('cust_type_retail')}</div>
           </div>
           <div>
             <div class="small text-muted">${t('cust_curr_due')}</div>
@@ -814,15 +1115,28 @@ Views.customers = {
 
   bind(){
     document.getElementById('addCustBtn').addEventListener('click', Views.customers.openAddModal);
-    const search = document.getElementById('custSearch');
-    search.addEventListener('input', ()=>{
-      Views.customers.searchQ = search.value;
-      document.getElementById('custTableWrap').innerHTML = Views.customers.tableHTML();
-      Views.customers.bindRowActions();
+
+    document.querySelectorAll('[data-cust-tab]').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        Views.customers.activeTab = e.currentTarget.dataset.custTab;
+        document.querySelectorAll('[data-cust-tab]').forEach(b=>b.classList.toggle('active', b===e.currentTarget));
+        document.getElementById('custTableWrap').innerHTML = Views.customers.tableHTML();
+        Views.customers.bindRowActions();
+      });
     });
+
+    const search = document.getElementById('custSearch');
+    if (search) {
+      search.addEventListener('input', ()=>{
+        Views.customers.searchQ = search.value;
+        document.getElementById('custTableWrap').innerHTML = Views.customers.tableHTML();
+        Views.customers.bindRowActions();
+      });
+      setTimeout(() => search.focus(), 100);
+    }
     Views.customers.bindRowActions();
-    setTimeout(() => search.focus(), 100);
   },
+
   bindRowActions(){
     document.querySelectorAll('[data-view-cust]').forEach(b=>{
       b.addEventListener('click', ()=>Views.customers.openDetailModal(Number(b.dataset.viewCust)));
