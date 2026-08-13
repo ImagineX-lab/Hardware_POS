@@ -47,7 +47,9 @@ module.exports = {
             nic TEXT,
             creditLimit REAL,
             balance REAL,
-            createdAt INTEGER
+            createdAt INTEGER,
+            customerType TEXT DEFAULT 'customer',
+            discountPercent REAL DEFAULT 0
         )`);
         await run(`CREATE TABLE IF NOT EXISTS customer_ledger (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -67,8 +69,15 @@ module.exports = {
             total REAL,
             paymentType TEXT,
             customerId INTEGER,
-            customerName TEXT
+            customerName TEXT,
+            amountPaid REAL DEFAULT 0,
+            changeAmount REAL DEFAULT 0
         )`);
+
+        try { await run(`ALTER TABLE customers ADD COLUMN customerType TEXT DEFAULT 'customer'`); } catch(e) {}
+        try { await run(`ALTER TABLE customers ADD COLUMN discountPercent REAL DEFAULT 0`); } catch(e) {}
+        try { await run(`ALTER TABLE sales ADD COLUMN amountPaid REAL DEFAULT 0`); } catch(e) {}
+        try { await run(`ALTER TABLE sales ADD COLUMN changeAmount REAL DEFAULT 0`); } catch(e) {}
 
         const settings = await get(`SELECT * FROM settings WHERE key = 'shopName'`);
         if (!settings) {
@@ -128,16 +137,18 @@ module.exports = {
         return customers;
     },
     addCustomer: async (c) => {
-        const res = await run(`INSERT INTO customers (name, phone, address, nic, creditLimit, balance, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?)`,
-            [c.name.trim(), c.phone?.trim()||"", c.address?.trim()||"", c.nic?.trim()||"", Number(c.creditLimit)||0, 0, Date.now()]);
-        return { id: res.lastID, ...c, balance: 0, ledger: [] };
+        const type = c.customerType || 'customer';
+        const discount = Number(c.discountPercent) || 0;
+        const res = await run(`INSERT INTO customers (name, phone, address, nic, creditLimit, balance, createdAt, customerType, discountPercent) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [c.name.trim(), c.phone?.trim()||"", c.address?.trim()||"", c.nic?.trim()||"", Number(c.creditLimit)||0, 0, Date.now(), type, discount]);
+        return { id: res.lastID, ...c, customerType: type, discountPercent: discount, balance: 0, ledger: [] };
     },
     updateCustomer: async (id, patch) => {
         const c = await get(`SELECT * FROM customers WHERE id = ?`, [id]);
         if (!c) return null;
         const merged = { ...c, ...patch };
-        await run(`UPDATE customers SET name=?, phone=?, address=?, nic=?, creditLimit=?, balance=? WHERE id=?`,
-            [merged.name, merged.phone, merged.address, merged.nic, merged.creditLimit, merged.balance, id]);
+        await run(`UPDATE customers SET name=?, phone=?, address=?, nic=?, creditLimit=?, balance=?, customerType=?, discountPercent=? WHERE id=?`,
+            [merged.name, merged.phone, merged.address, merged.nic, merged.creditLimit, merged.balance, merged.customerType || 'customer', Number(merged.discountPercent)||0, id]);
         return merged;
     },
     deleteCustomer: async (id) => {
@@ -166,16 +177,18 @@ module.exports = {
         const subtotal = sale.lines.reduce((s,l) => s + l.qty * l.unitPrice, 0);
         const discount = Number(sale.discount)||0;
         const total = Math.max(0, subtotal - discount);
+        const amountPaid = Number(sale.amountPaid) || 0;
+        const changeAmount = Number(sale.changeAmount) || 0;
         const date = Date.now();
         
-        let custName = '';
-        if(sale.paymentType === 'credit' && sale.customerId) {
+        let custName = sale.customerName || '';
+        if(sale.customerId) {
             const c = await get(`SELECT name FROM customers WHERE id = ?`, [sale.customerId]);
             if(c) custName = c.name;
         }
 
-        const res = await run(`INSERT INTO sales (date, lines, subtotal, discount, total, paymentType, customerId, customerName) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-            [date, JSON.stringify(sale.lines), subtotal, discount, total, sale.paymentType, sale.customerId || null, custName]);
+        const res = await run(`INSERT INTO sales (date, lines, subtotal, discount, total, paymentType, customerId, customerName, amountPaid, changeAmount) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [date, JSON.stringify(sale.lines), subtotal, discount, total, sale.paymentType, sale.customerId || null, custName, amountPaid, changeAmount]);
         
         const saleId = res.lastID;
 
@@ -197,7 +210,7 @@ module.exports = {
             }
         }
 
-        return { id: saleId, date, lines: sale.lines, subtotal, discount, total, paymentType: sale.paymentType, customerId: sale.customerId, customerName: custName };
+        return { id: saleId, date, lines: sale.lines, subtotal, discount, total, paymentType: sale.paymentType, customerId: sale.customerId, customerName: custName, amountPaid, changeAmount };
     },
     deleteSale: async (id) => {
         const s = await get(`SELECT * FROM sales WHERE id = ?`, [id]);
@@ -243,8 +256,8 @@ module.exports = {
         }
         if(data.customers) {
             for(let c of data.customers) {
-                await run(`INSERT INTO customers (id, name, phone, address, nic, creditLimit, balance, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-                [c.id, c.name, c.phone, c.address, c.nic, c.creditLimit, c.balance, c.createdAt]);
+                await run(`INSERT INTO customers (id, name, phone, address, nic, creditLimit, balance, createdAt, customerType, discountPercent) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                [c.id, c.name, c.phone, c.address, c.nic, c.creditLimit, c.balance, c.createdAt, c.customerType || 'customer', c.discountPercent || 0]);
                 if(c.ledger) {
                     for(let l of c.ledger) {
                         await run(`INSERT INTO customer_ledger (id, customerId, date, type, amount, note, saleId) VALUES (?, ?, ?, ?, ?, ?, ?)`,
@@ -255,8 +268,8 @@ module.exports = {
         }
         if(data.sales) {
             for(let s of data.sales) {
-                await run(`INSERT INTO sales (id, date, lines, subtotal, discount, total, paymentType, customerId, customerName) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-                [s.id, s.date, JSON.stringify(s.lines), s.subtotal, s.discount, s.total, s.paymentType, s.customerId, s.customerName]);
+                await run(`INSERT INTO sales (id, date, lines, subtotal, discount, total, paymentType, customerId, customerName, amountPaid, changeAmount) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                [s.id, s.date, JSON.stringify(s.lines), s.subtotal, s.discount, s.total, s.paymentType, s.customerId, s.customerName, s.amountPaid || 0, s.changeAmount || 0]);
             }
         }
     },
