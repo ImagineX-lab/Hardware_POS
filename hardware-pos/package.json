@@ -1,0 +1,18 @@
+{
+  "name": "hardware-pos",
+  "version": "1.0.0",
+  "description": "Hardware (කඩේ) සාප්පුවක් සඳහා නිර්මාණය කළ, සරලවම browser එකේ ක්‍රියාත්මක වන, සම්පූර්ණ POS (Point of Sale) පද්ධතියක්. Server එකක්, ඉන්ටර්නෙට් සම්බන්ධතාවයක්, හෝ install කිරීමක් අවශ්‍ය නොවේ.",
+  "main": "index.js",
+  "scripts": {
+    "start": "node server.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "cors": "^2.8.6",
+    "express": "^5.2.1",
+    "sqlite3": "^6.0.1"
+  }
+}

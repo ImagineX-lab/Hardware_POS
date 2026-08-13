@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="si">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HardwarePOS — කඩේ පරිගණක ක්‍රමය</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<div class="app" id="app">
+
+  <!-- ===== SIDEBAR ===== -->
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="brand-mark">H<span>P</span></div>
+      <div class="brand-text">
+        <strong id="shopNameLabel">HardwarePOS</strong>
+        <small data-i18n="brand_sub">කඩේ කළමනාකරණය</small>
+      </div>
+    </div>
+
+    <nav class="nav">
+      <button class="nav-btn active" data-view="dashboard" data-i18n="nav_dashboard">
+        <span class="nav-ico">▣</span> උපකරණ පුවරුව
+      </button>
+      <button class="nav-btn" data-view="sale" data-i18n="nav_sale">
+        <span class="nav-ico">🛒</span> විකුණුම් / බිල්පත
+      </button>
+      <button class="nav-btn" data-view="items" data-i18n="nav_items">
+        <span class="nav-ico">📦</span> භාණ්ඩ (Items)
+      </button>
+      <button class="nav-btn" data-view="stock" data-i18n="nav_stock">
+        <span class="nav-ico">🗄</span> තොග වාර්තාව
+      </button>
+      <button class="nav-btn" data-view="lowstock" data-i18n="nav_lowstock">
+        <span class="nav-ico">⚠</span> අඩු තොග
+        <span class="badge-count" id="lowStockCount">0</span>
+      </button>
+      <button class="nav-btn" data-view="customers" data-i18n="nav_customers">
+        <span class="nav-ico">👤</span> නායට ගනුදෙනුකරුවන්
+      </button>
+      <button class="nav-btn" data-view="history" data-i18n="nav_history">
+        <span class="nav-ico">🧾</span> විකුණුම් ඉතිහාසය
+      </button>
+      <button class="nav-btn" data-view="settings" data-i18n="nav_settings">
+        <span class="nav-ico">⚙</span> සැකසුම් / Backup
+      </button>
+    </nav>
+
+    <div class="lang-switcher">
+      <button class="lang-btn" data-lang-btn="si" onclick="setLanguage('si')">සිං</button>
+      <button class="lang-btn" data-lang-btn="en" onclick="setLanguage('en')">EN</button>
+    </div>
+
+    <div class="sidebar-foot">
+      <div data-i18n="sidebar_msg1">දත්ත ගබඩා වන්නේ මෙම බ්‍රවුසරයේ පමණි.</div>
+      <div data-i18n="sidebar_msg2">නිතර <b>Backup</b> එකක් ගන්න.</div>
+    </div>
+  </aside>
+
+  <!-- ===== MAIN ===== -->
+  <main class="main">
+    <header class="topbar">
+      <div class="topbar-title" id="viewTitle">උපකරණ පුවරුව</div>
+      <div class="topbar-right">
+        <span id="todayDate"></span>
+      </div>
+    </header>
+
+    <section class="view-wrap" id="viewWrap">
+      <!-- views injected here by JS -->
+    </section>
+  </main>
+</div>
+
+<!-- Toast -->
+<div id="toast" class="toast"></div>
+
+<!-- Modal root -->
+<div id="modalRoot"></div>
+
+<script src="js/i18n.js"></script>
+<script src="js/db.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/views.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
