@@ -11,6 +11,7 @@ const App = {
       dashboard: t('nav_dashboard'),
       sale: t('nav_sale'),
       items: t('nav_items'),
+      purchases: t('nav_purchases'),
       stock: t('nav_stock'),
       lowstock: t('nav_lowstock'),
       customers: t('nav_customers'),
@@ -93,7 +94,15 @@ const App = {
 
   setDate(){
     const el = document.getElementById('todayDate');
-    if(el) el.textContent = new Date().toLocaleDateString('en-GB', { weekday:'long', year:'numeric', month:'long', day:'numeric' });
+    if(!el) return;
+    const update = () => {
+      const d = new Date();
+      const dateStr = d.toLocaleDateString('en-GB', { weekday:'long', year:'numeric', month:'long', day:'numeric' });
+      const timeStr = d.toLocaleTimeString('en-US', { hour:'2-digit', minute:'2-digit', second:'2-digit', hour12:true });
+      el.innerHTML = `<span style="font-weight:500;">${dateStr}</span> <span style="margin:0 6px; color:var(--border);">|</span> <b style="color:var(--orange-dark); font-weight:700; font-family:monospace; font-size:14px;">⏰ ${timeStr}</b>`;
+    };
+    update();
+    setInterval(update, 1000);
   },
 
   render(){
@@ -115,6 +124,7 @@ const App = {
 
   updateSidebarCounts(){
     const el = document.getElementById('lowStockCount');
+    if (!el) return;
     const n = DB.lowStockItems().length;
     el.textContent = n;
     el.style.display = n>0 ? 'flex' : 'none';

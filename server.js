@@ -5,7 +5,8 @@ const db = require('./backend/database');
 
 const app = express();
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
 // Serve static files
 app.use('/css', express.static(path.join(__dirname, 'css')));
@@ -80,6 +81,30 @@ app.post('/api/sales', async (req, res) => {
 app.delete('/api/sales/:id', async (req, res) => {
     await db.deleteSale(req.params.id);
     res.json({ success: true });
+});
+
+// Purchases (කඩේට ගත් බිල්පත්)
+app.get('/api/purchases', async (req, res) => {
+    res.json(await db.getAllPurchases());
+});
+app.post('/api/purchases', async (req, res) => {
+    const newPurchase = await db.addPurchase(req.body);
+    res.json(newPurchase);
+});
+app.put('/api/purchases/:id', async (req, res) => {
+    const updated = await db.updatePurchase(req.params.id, req.body);
+    if(updated) res.json(updated);
+    else res.status(404).json({error: "Purchase bill not found"});
+});
+app.delete('/api/purchases/:id', async (req, res) => {
+    await db.deletePurchase(req.params.id);
+    res.json({ success: true });
+});
+app.post('/api/purchases/:id/payment', async (req, res) => {
+    const { amount } = req.body;
+    const updated = await db.recordPurchasePayment(req.params.id, amount);
+    if(updated) res.json(updated);
+    else res.status(404).json({error: "Purchase bill not found"});
 });
 
 // Backup

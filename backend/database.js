@@ -78,6 +78,24 @@ module.exports = {
         try { await run(`ALTER TABLE customers ADD COLUMN discountPercent REAL DEFAULT 0`); } catch(e) {}
         try { await run(`ALTER TABLE sales ADD COLUMN amountPaid REAL DEFAULT 0`); } catch(e) {}
         try { await run(`ALTER TABLE sales ADD COLUMN changeAmount REAL DEFAULT 0`); } catch(e) {}
+        try { await run(`ALTER TABLE items ADD COLUMN description TEXT`); } catch(e) {}
+        try { await run(`ALTER TABLE items ADD COLUMN image TEXT`); } catch(e) {}
+
+        await run(`CREATE TABLE IF NOT EXISTS purchases (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            supplierName TEXT,
+            billNo TEXT,
+            date INTEGER,
+            items TEXT,
+            subtotal REAL,
+            discount REAL,
+            totalAmount REAL,
+            paidAmount REAL,
+            dueAmount REAL,
+            paymentStatus TEXT,
+            note TEXT,
+            createdAt INTEGER
+        )`);
 
         const settings = await get(`SELECT * FROM settings WHERE key = 'shopName'`);
         if (!settings) {
@@ -113,16 +131,16 @@ module.exports = {
         return await all(`SELECT * FROM items ORDER BY name ASC`);
     },
     addItem: async (item) => {
-        const res = await run(`INSERT INTO items (name, category, unit, costPrice, sellPrice, qty, reorderLevel, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-            [item.name, item.category || 'වෙනත්', item.unit || 'pcs', Number(item.costPrice)||0, Number(item.sellPrice)||0, Number(item.qty)||0, Number(item.reorderLevel)||5, Date.now()]);
+        const res = await run(`INSERT INTO items (name, category, unit, costPrice, sellPrice, qty, reorderLevel, description, image, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [item.name, item.category?.trim() || 'වෙනත්', item.unit || 'pcs', Number(item.costPrice)||0, Number(item.sellPrice)||0, Number(item.qty)||0, Number(item.reorderLevel)||5, item.description||'', item.image||'', Date.now()]);
         return await get(`SELECT * FROM items WHERE id = ?`, [res.lastID]);
     },
     updateItem: async (id, patch) => {
         const item = await get(`SELECT * FROM items WHERE id = ?`, [id]);
         if (!item) return null;
         const merged = { ...item, ...patch };
-        await run(`UPDATE items SET name=?, category=?, unit=?, costPrice=?, sellPrice=?, qty=?, reorderLevel=? WHERE id=?`,
-            [merged.name, merged.category, merged.unit, merged.costPrice, merged.sellPrice, merged.qty, merged.reorderLevel, id]);
+        await run(`UPDATE items SET name=?, category=?, unit=?, costPrice=?, sellPrice=?, qty=?, reorderLevel=?, description=?, image=? WHERE id=?`,
+            [merged.name, merged.category?.trim()||'වෙනත්', merged.unit, Number(merged.costPrice)||0, Number(merged.sellPrice)||0, Number(merged.qty)||0, Number(merged.reorderLevel)||5, merged.description||'', merged.image||'', id]);
         return merged;
     },
     deleteItem: async (id) => {
@@ -234,6 +252,120 @@ module.exports = {
         }
 
         await run(`DELETE FROM sales WHERE id = ?`, [id]);
+    },
+
+    getAllPurchases: async () => {
+        const rows = await all(`SELECT * FROM purchases ORDER BY id DESC`);
+        rows.forEach(r => {
+            try { r.items = typeof r.items === 'string' ? JSON.parse(r.items) : (r.items || []); } catch(e) { r.items = []; }
+        });
+        return rows;
+    },
+    addPurchase: async (p) => {
+        const itemsList = Array.isArray(p.items) ? p.items : [];
+        const itemsJson = JSON.stringify(itemsList);
+        const totalAmount = Number(p.totalAmount) || 0;
+        const paidAmount = Number(p.paidAmount) || 0;
+        const dueAmount = Math.max(0, totalAmount - paidAmount);
+        let paymentStatus = 'paid';
+        if (dueAmount >= totalAmount && totalAmount > 0) paymentStatus = 'pending';
+        else if (dueAmount > 0) paymentStatus = 'partial';
+
+        const res = await run(
+            `INSERT INTO purchases (supplierName, billNo, date, items, subtotal, discount, totalAmount, paidAmount, dueAmount, paymentStatus, note, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [
+                p.supplierName?.trim() || 'වෙනත් සැපයුම්කරු',
+                p.billNo?.trim() || '',
+                p.date || Date.now(),
+                itemsJson,
+                Number(p.subtotal) || totalAmount,
+                Number(p.discount) || 0,
+                totalAmount,
+                paidAmount,
+                dueAmount,
+                paymentStatus,
+                p.note?.trim() || '',
+                Date.now()
+            ]
+        );
+
+        if (p.autoUpdateStock && itemsList.length) {
+            for (let item of itemsList) {
+                if (item.itemId) {
+                    const existing = await get(`SELECT qty FROM items WHERE id = ?`, [item.itemId]);
+                    if (existing) {
+                        const addQty = Number(item.qty) || 0;
+                        const costPrice = Number(item.costPrice) || 0;
+                        await run(`UPDATE items SET qty = ?, costPrice = CASE WHEN ? > 0 THEN ? ELSE costPrice END WHERE id = ?`, [existing.qty + addQty, costPrice, costPrice, item.itemId]);
+                    }
+                }
+            }
+        }
+
+        const newPurchase = await get(`SELECT * FROM purchases WHERE id = ?`, [res.lastID]);
+        if (newPurchase) {
+            try { newPurchase.items = JSON.parse(newPurchase.items); } catch(e) { newPurchase.items = []; }
+        }
+        return newPurchase;
+    },
+    updatePurchase: async (id, patch) => {
+        const p = await get(`SELECT * FROM purchases WHERE id = ?`, [id]);
+        if (!p) return null;
+        const merged = { ...p, ...patch };
+        const itemsJson = typeof merged.items === 'string' ? merged.items : JSON.stringify(merged.items || []);
+        const totalAmount = Number(merged.totalAmount) || 0;
+        const paidAmount = Number(merged.paidAmount) || 0;
+        const dueAmount = Math.max(0, totalAmount - paidAmount);
+        let paymentStatus = 'paid';
+        if (dueAmount >= totalAmount && totalAmount > 0) paymentStatus = 'pending';
+        else if (dueAmount > 0) paymentStatus = 'partial';
+
+        await run(
+            `UPDATE purchases SET supplierName=?, billNo=?, date=?, items=?, subtotal=?, discount=?, totalAmount=?, paidAmount=?, dueAmount=?, paymentStatus=?, note=? WHERE id=?`,
+            [
+                merged.supplierName?.trim(),
+                merged.billNo?.trim(),
+                merged.date || Date.now(),
+                itemsJson,
+                merged.subtotal || totalAmount,
+                merged.discount || 0,
+                totalAmount,
+                paidAmount,
+                dueAmount,
+                paymentStatus,
+                merged.note?.trim() || '',
+                id
+            ]
+        );
+        const updated = await get(`SELECT * FROM purchases WHERE id = ?`, [id]);
+        if (updated) {
+            try { updated.items = JSON.parse(updated.items); } catch(e) { updated.items = []; }
+        }
+        return updated;
+    },
+    deletePurchase: async (id) => {
+        await run(`DELETE FROM purchases WHERE id = ?`, [id]);
+    },
+    recordPurchasePayment: async (id, amount) => {
+        const p = await get(`SELECT * FROM purchases WHERE id = ?`, [id]);
+        if (!p) return null;
+        const addAmt = Number(amount) || 0;
+        const newPaid = (Number(p.paidAmount) || 0) + addAmt;
+        const totalAmount = Number(p.totalAmount) || 0;
+        const dueAmount = Math.max(0, totalAmount - newPaid);
+        let paymentStatus = 'paid';
+        if (dueAmount >= totalAmount && totalAmount > 0) paymentStatus = 'pending';
+        else if (dueAmount > 0) paymentStatus = 'partial';
+
+        await run(
+            `UPDATE purchases SET paidAmount=?, dueAmount=?, paymentStatus=? WHERE id=?`,
+            [newPaid, dueAmount, paymentStatus, id]
+        );
+        const updated = await get(`SELECT * FROM purchases WHERE id = ?`, [id]);
+        if (updated) {
+            try { updated.items = JSON.parse(updated.items); } catch(e) { updated.items = []; }
+        }
+        return updated;
     },
 
     exportJSON: async () => {

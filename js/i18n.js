@@ -17,6 +17,7 @@ const i18n = {
     nav_dashboard: "උපකරණ පුවරුව",
     nav_sale: "විකුණුම් / බිල්පත",
     nav_items: "භාණ්ඩ (Items)",
+    nav_purchases: "කඩේට ගත් බිල් (Purchases)",
     nav_stock: "තොග වාර්තාව",
     nav_lowstock: "අඩු තොග",
     nav_customers: "නායට ගනුදෙනුකරුවන්",

@@ -33,12 +33,11 @@
       <button class="nav-btn" data-view="items" data-i18n="nav_items">
         <span class="nav-ico">📦</span> භාණ්ඩ (Items)
       </button>
+      <button class="nav-btn" data-view="purchases" data-i18n="nav_purchases">
+        <span class="nav-ico">🚚</span> කඩේට ගත් බිල් (Purchases)
+      </button>
       <button class="nav-btn" data-view="stock" data-i18n="nav_stock">
         <span class="nav-ico">🗄</span> තොග වාර්තාව
-      </button>
-      <button class="nav-btn" data-view="lowstock" data-i18n="nav_lowstock">
-        <span class="nav-ico">⚠</span> අඩු තොග
-        <span class="badge-count" id="lowStockCount">0</span>
       </button>
       <button class="nav-btn" data-view="customers" data-i18n="nav_customers">
         <span class="nav-ico">👤</span> ගනුදෙනුකරුවන්
@@ -50,24 +49,18 @@
         <span class="nav-ico">⚙</span> සැකසුම් / Backup
       </button>
     </nav>
-
-    <div class="lang-switcher">
-      <button class="lang-btn" data-lang-btn="si" onclick="setLanguage('si')">සිං</button>
-      <button class="lang-btn" data-lang-btn="en" onclick="setLanguage('en')">EN</button>
-    </div>
-
-    <div class="sidebar-foot">
-      <div data-i18n="sidebar_msg1">දත්ත ගබඩා වන්නේ මෙම බ්‍රවුසරයේ පමණි.</div>
-      <div data-i18n="sidebar_msg2">නිතර <b>Backup</b> එකක් ගන්න.</div>
-    </div>
   </aside>
 
   <!-- ===== MAIN ===== -->
   <main class="main">
     <header class="topbar">
       <div class="topbar-title" id="viewTitle">උපකරණ පුවරුව</div>
-      <div class="topbar-right">
+      <div class="topbar-right" style="display:flex; align-items:center; gap:16px;">
         <span id="todayDate"></span>
+        <div class="lang-switcher-top">
+          <button class="top-lang-btn" data-lang-btn="si" onclick="setLanguage('si')">සිං</button>
+          <button class="top-lang-btn" data-lang-btn="en" onclick="setLanguage('en')">EN</button>
+        </div>
       </div>
     </header>
 

@@ -7,21 +7,24 @@ const DB = {
     settings: { shopName: "HardwarePOS" },
     items: [],
     customers: [],
-    sales: []
+    sales: [],
+    purchases: []
   },
 
   async load(){
     try {
-      const [settingsRes, itemsRes, custRes, salesRes] = await Promise.all([
+      const [settingsRes, itemsRes, custRes, salesRes, purchasesRes] = await Promise.all([
         fetch('/api/settings'),
         fetch('/api/items'),
         fetch('/api/customers'),
-        fetch('/api/sales')
+        fetch('/api/sales'),
+        fetch('/api/purchases')
       ]);
       this.data.settings = await settingsRes.json();
       this.data.items = await itemsRes.json();
       this.data.customers = await custRes.json();
       this.data.sales = await salesRes.json();
+      this.data.purchases = await purchasesRes.json();
     } catch(err) {
       console.error("Failed to load data", err);
     }
@@ -153,6 +156,56 @@ const DB = {
   stockValue(){
     return this.data.items.reduce((s,i)=>s + i.qty*i.costPrice, 0);
   },
+
+  /* ---------------- PURCHASES (කඩේට ගත් බිල්පත්) ---------------- */
+  async addPurchase(p){
+    const res = await fetch('/api/purchases', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(p)
+    });
+    const newP = await res.json();
+    this.data.purchases.unshift(newP);
+    if (p.autoUpdateStock) {
+      await this.reload();
+    }
+    return newP;
+  },
+  async updatePurchase(id, patch){
+    const res = await fetch(`/api/purchases/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(patch)
+    });
+    if(res.ok) {
+      const updated = await res.json();
+      const idx = this.data.purchases.findIndex(p => p.id === id);
+      if(idx !== -1) this.data.purchases[idx] = updated;
+      return updated;
+    }
+    return null;
+  },
+  async deletePurchase(id){
+    await fetch(`/api/purchases/${id}`, { method: 'DELETE' });
+    this.data.purchases = this.data.purchases.filter(p => p.id !== id);
+  },
+  async recordPurchasePayment(id, amount){
+    const res = await fetch(`/api/purchases/${id}/payment`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ amount })
+    });
+    if(res.ok) {
+      const updated = await res.json();
+      const idx = this.data.purchases.findIndex(p => p.id === id);
+      if(idx !== -1) this.data.purchases[idx] = updated;
+      return updated;
+    }
+    return null;
+  },
+  allPurchases(){ return this.data.purchases.slice().sort((a,b)=>b.id - a.id); },
+  getPurchase(id){ return this.data.purchases.find(p=>p.id===id); },
+  totalPurchaseDue(){ return this.data.purchases.reduce((s,p)=>s + (p.dueAmount||0), 0); },
 
   /* ---------------- BACKUP & SETTINGS ---------------- */
   async exportJSON(){

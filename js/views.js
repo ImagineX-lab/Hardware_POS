@@ -214,7 +214,14 @@ Views.sale = {
     }
     return items.map(i => `
       <div class="pos-item-card ${i.qty <= 0 ? 'out-of-stock' : ''}" data-grid-item="${i.id}">
-        <div class="item-name">${escapeHTML(i.name)}</div>
+        <div class="pos-item-img">
+          ${i.image
+            ? `<img src="${i.image}" alt="${escapeHTML(i.name)}" style="width:100%; height:100%; object-fit:cover;">`
+            : `<span style="font-size:28px; line-height:1;">📦</span>`
+          }
+        </div>
+        <div class="item-name"><b>${escapeHTML(i.name)}</b></div>
+        <div class="item-desc text-muted">${escapeHTML(i.description||'')}</div>
         <div>
           <div class="item-price">${fmt(i.sellPrice)}</div>
           <div class="item-qty">${i.qty} ${escapeHTML(i.unit)}</div>
@@ -227,13 +234,22 @@ Views.sale = {
     if(!cart.length) return `<div class="empty-state" style="padding:30px 10px"><div class="em-ico">🛒</div><h3>${t('sale_empty_cart')}</h3><div class="small">${t('sale_empty_cart_sub')}</div></div>`;
     return cart.map((l,idx)=>`
       <div class="cart-row">
-        <div>
-          <div class="cart-item-name">${escapeHTML(l.name)}</div>
-          <div class="cart-item-meta">${fmt(l.unitPrice)} / ${escapeHTML(l.unit)} • ${t('word_qty')}: ${l.maxQty}</div>
+        <div class="cart-row-top">
+          <div style="display:flex; align-items:center; gap:8px; flex:1; min-width:0;">
+            <div style="width:32px; height:32px; border-radius:6px; overflow:hidden; background:var(--paper); display:flex; align-items:center; justify-content:center; flex-shrink:0;">
+              ${l.image ? `<img src="${l.image}" style="width:100%; height:100%; object-fit:cover;">` : `<span style="font-size:16px;">📦</span>`}
+            </div>
+            <div class="cart-item-name">${escapeHTML(l.name)}</div>
+          </div>
+          <button class="icon-btn" data-remove-idx="${idx}" title="${t('delete')}" style="font-size:16px; flex-shrink:0;">✕</button>
         </div>
-        <input type="number" min="0.01" step="any" max="${l.maxQty}" value="${l.qty}" data-qty-idx="${idx}" class="input">
-        <div class="num" style="text-align:right; font-weight:700;">${fmt(l.qty*l.unitPrice)}</div>
-        <button class="icon-btn" data-remove-idx="${idx}" title="${t('delete')}">✕</button>
+        <div class="cart-row-bottom">
+          <div class="cart-item-meta">${fmt(l.unitPrice)} / ${escapeHTML(l.unit)} &nbsp;•&nbsp; ${t('word_qty')}: ${l.maxQty}</div>
+          <div style="display:flex; align-items:center; gap:8px;">
+            <input type="number" min="0.01" step="any" max="${l.maxQty}" value="${l.qty}" data-qty-idx="${idx}" class="input">
+            <div class="cart-row-price">${fmt(l.qty*l.unitPrice)}</div>
+          </div>
+        </div>
       </div>
     `).join('');
   },
@@ -332,9 +348,14 @@ Views.sale = {
         }
         suggestBox.innerHTML = `<div class="search-suggest">${matches.map(i=>`
           <div class="suggest-row" data-add-item="${i.id}">
-            <div>
-              <div class="s-name">${escapeHTML(i.name)}</div>
-              <div class="s-meta">${escapeHTML(i.category)} • ${t('word_qty')}: ${i.qty} ${escapeHTML(i.unit)}</div>
+            <div style="display:flex; align-items:center; gap:10px;">
+              <div style="width:36px; height:36px; border-radius:6px; overflow:hidden; background:var(--paper); display:flex; align-items:center; justify-content:center; flex-shrink:0;">
+                ${i.image ? `<img src="${i.image}" style="width:100%; height:100%; object-fit:cover;">` : `<span style="font-size:18px;">📦</span>`}
+              </div>
+              <div>
+                <div class="s-name">${escapeHTML(i.name)}</div>
+                <div class="s-meta">${escapeHTML(i.category)} • ${t('word_qty')}: ${i.qty} ${escapeHTML(i.unit)}</div>
+              </div>
             </div>
             <div style="font-weight:700">${fmt(i.sellPrice)}</div>
           </div>
@@ -588,7 +609,7 @@ Views.sale = {
       if(existing.qty < existing.maxQty){ existing.qty += 1; }
       else { toast(t('sale_exceeds_stock'), 'err'); }
     } else {
-      cart.push({ itemId, name:item.name, unit:item.unit, unitPrice:item.sellPrice, qty:1, maxQty:item.qty });
+      cart.push({ itemId, name:item.name, image:item.image, unit:item.unit, unitPrice:item.sellPrice, qty:1, maxQty:item.qty });
     }
     Views.sale.refreshCart();
   },
@@ -698,7 +719,7 @@ Views.items = {
       <div class="table-wrap">
         <table>
           <thead><tr>
-            <th>${t('items_name')}</th><th>${t('items_category')}</th><th class="num">${t('items_cost_price')}</th><th class="num">${t('items_sell_price')}</th>
+            <th style="width:46px;">Photo</th><th>${t('items_name')}</th><th>${t('items_category')}</th><th class="num">${t('items_cost_price')}</th><th class="num">${t('items_sell_price')}</th>
             <th class="num">${t('word_qty')}</th><th>${t('items_status')}</th><th></th>
           </tr></thead>
           <tbody>
@@ -708,6 +729,11 @@ Views.items = {
                 : `<span class="pill pill-ok">${t('status_ok')}</span>`;
               return `
               <tr>
+                <td>
+                  <div style="width:36px; height:36px; border-radius:6px; overflow:hidden; background:var(--paper); display:flex; align-items:center; justify-content:center; border:1px solid var(--border);">
+                    ${i.image ? `<img src="${i.image}" style="width:100%; height:100%; object-fit:cover;">` : `<span style="font-size:18px;">📦</span>`}
+                  </div>
+                </td>
                 <td><b>${escapeHTML(i.name)}</b></td>
                 <td class="text-muted">${escapeHTML(i.category)}</td>
                 <td class="num">${fmt(i.costPrice)}</td>
@@ -727,11 +753,27 @@ Views.items = {
   },
 
   formHTML(item){
-    const v = item || {name:'',category:'',unit:'pcs',costPrice:'',sellPrice:'',qty:'',reorderLevel:5};
+    const v = item || {name:'',category:'',unit:'pcs',costPrice:'',sellPrice:'',qty:'',reorderLevel:5,image:'',description:''};
     const existingCategories = [...new Set(DB.data.items.map(i => i.category).filter(c => c && c.trim()))].sort();
     const catOptions = existingCategories.map(c => `<div class="combo-opt" data-val="${escapeHTML(c)}">${escapeHTML(c)}</div>`).join('');
     return `
+      <!-- Image Upload -->
+      <div class="field" style="margin-bottom:14px;">
+        <label class="field-label">Item Photo / Item Pinthuraya</label>
+        <div style="display:flex; align-items:center; gap:14px; flex-wrap:wrap;">
+          <div id="imgPreviewWrap" style="width:80px; height:80px; border-radius:10px; overflow:hidden; border:2px dashed var(--border); display:flex; align-items:center; justify-content:center; background:var(--paper); flex-shrink:0;">
+            ${v.image ? `<img id="imgPreview" src="${v.image}" style="width:100%; height:100%; object-fit:cover;">` : `<span id="imgPreview" style="font-size:28px;">📷</span>`}
+          </div>
+          <div style="flex:1; min-width:160px;">
+            <label for="f_image_file" class="btn btn-outline" style="cursor:pointer; display:inline-block; margin-bottom:6px;">📁 Photo Select කරන්න</label>
+            <input type="file" id="f_image_file" accept="image/*" style="display:none;">
+            <input type="hidden" id="f_image" value="${escapeHTML(v.image||'')}"><br>
+            <span class="small text-muted">JPG, PNG, WebP accept කරයි (max 2MB)</span>
+          </div>
+        </div>
+      </div>
       <div class="grid grid-2">
+        <div class="field"><label class="field-label">Description</label><textarea class="input" id="f_desc" placeholder="Enter item description..." style="min-height:50px;">${escapeHTML(v.description||'')}</textarea></div>
         <div class="field"><label class="field-label">${t('items_form_name')}</label><input class="input" id="f_name" value="${escapeHTML(v.name)}" placeholder="${t('items_form_name_ph')}"></div>
         <div class="field">
           <label class="field-label">${t('items_form_cat')}</label>
@@ -768,6 +810,39 @@ Views.items = {
     `;
   },
 
+  bindImageUpload(){
+    const fileInput = document.getElementById('f_image_file');
+    const hiddenInput = document.getElementById('f_image');
+    const previewWrap = document.getElementById('imgPreviewWrap');
+    if (!fileInput || !hiddenInput || !previewWrap) return;
+    fileInput.addEventListener('change', () => {
+      const file = fileInput.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const img = new Image();
+        img.onload = () => {
+          const maxDim = 400;
+          let w = img.width, h = img.height;
+          if (w > maxDim || h > maxDim) {
+            if (w > h) { h = Math.round((h * maxDim) / w); w = maxDim; }
+            else { w = Math.round((w * maxDim) / h); h = maxDim; }
+          }
+          const canvas = document.createElement('canvas');
+          canvas.width = w;
+          canvas.height = h;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, w, h);
+          const resizedBase64 = canvas.toDataURL('image/jpeg', 0.75);
+          hiddenInput.value = resizedBase64;
+          previewWrap.innerHTML = `<img id="imgPreview" src="${resizedBase64}" style="width:100%; height:100%; object-fit:cover;">`;
+        };
+        img.src = e.target.result;
+      };
+      reader.readAsDataURL(file);
+    });
+  },
+
   openAddModal(){
     openModal({
       title:t('items_add_btn'),
@@ -775,22 +850,32 @@ Views.items = {
       footHTML:`<button class="btn btn-outline" data-close>${t('cancel')}</button><button class="btn btn-primary" id="saveItemBtn">${t('confirm')}</button>`,
       onMount:()=>{
         Views.items.bindCategoryCombo();
+        Views.items.bindImageUpload();
         document.getElementById('saveItemBtn').addEventListener('click', async ()=>{
           const name = document.getElementById('f_name').value.trim();
           const sell = document.getElementById('f_sell').value;
           const qty = document.getElementById('f_qty').value;
+          const desc = document.getElementById('f_desc').value.trim();
+          const image = document.getElementById('f_image').value;
+          const category = document.getElementById('f_category').value.trim() || 'වෙනත්';
           if(!name){ toast(t('items_err_name'),'err'); return; }
           if(sell===''){ toast(t('items_err_sell'),'err'); return; }
           if(qty===''){ toast(t('items_err_qty'),'err'); return; }
-          await DB.addItem({
-            name, category:document.getElementById('f_category').value,
-            unit:document.getElementById('f_unit').value,
-            costPrice:document.getElementById('f_cost').value,
-            sellPrice:sell, qty:Number(qty)||0, reorderLevel:document.getElementById('f_reorder').value
-          });
-          closeModal();
-          toast(t('items_added'),'ok');
-          App.render();
+          try {
+            await DB.addItem({
+              name, category,
+              unit:document.getElementById('f_unit').value,
+              costPrice:document.getElementById('f_cost').value,
+              sellPrice:sell, qty:Number(qty)||0, reorderLevel:document.getElementById('f_reorder').value,
+              description: desc, image: image
+            });
+            closeModal();
+            toast(t('items_added'),'ok');
+            App.render();
+          } catch(err) {
+            console.error("Failed to add item:", err);
+            toast("භාණ්ඩය එකතු කිරීමට නොහැකි විය!", "err");
+          }
         });
       }
     });
@@ -805,18 +890,26 @@ Views.items = {
     const allCats = [...new Set(DB.data.items.map(i => i.category).filter(c => c && c.trim()))].sort();
 
     function renderOpts(filter){
-      const q = (filter || '').trim().toLowerCase();
+      const raw = (filter || '').trim();
+      const q = raw.toLowerCase();
       const matched = q ? allCats.filter(c => c.toLowerCase().includes(q)) : allCats;
-      if(!matched.length){
-        drop.innerHTML = '<div class="combo-opt combo-no-match">ගැළපෙන category එකක් නැත</div>';
-      } else {
-        drop.innerHTML = matched.map(c =>
-          `<div class="combo-opt" data-val="${escapeHTML(c)}">${escapeHTML(c)}</div>`
-        ).join('');
-        drop.querySelectorAll('.combo-opt[data-val]').forEach(opt =>{
-          opt.addEventListener('mousedown', e =>{ e.preventDefault(); input.value = opt.dataset.val; closeCombo(); });
-        });
+      
+      let html = matched.map(c =>
+        `<div class="combo-opt" data-val="${escapeHTML(c)}">${escapeHTML(c)}</div>`
+      ).join('');
+
+      if(raw && !allCats.some(c => c.toLowerCase() === q)) {
+        html += `<div class="combo-opt combo-opt-new" data-val="${escapeHTML(raw)}" style="color:var(--orange-dark); font-weight:bold; border-top:1px dashed var(--border);">➕ අලුත් Category ලෙස භාවිත කරන්න: "<b>${escapeHTML(raw)}</b>"</div>`;
       }
+
+      if(!html) {
+        html = '<div class="combo-opt combo-no-match">ලැයිස්තුවේ නැත. අලුත් Category නමක් ටයිප් කරන්න.</div>';
+      }
+
+      drop.innerHTML = html;
+      drop.querySelectorAll('.combo-opt[data-val]').forEach(opt =>{
+        opt.addEventListener('mousedown', e =>{ e.preventDefault(); input.value = opt.dataset.val; closeCombo(); });
+      });
     }
 
     function openCombo(){
@@ -853,20 +946,28 @@ Views.items = {
       footHTML:`<button class="btn btn-outline" data-close>${t('cancel')}</button><button class="btn btn-primary" id="saveItemBtn">${t('update')}</button>`,
       onMount:()=>{
         Views.items.bindCategoryCombo();
+        Views.items.bindImageUpload();
         document.getElementById('saveItemBtn').addEventListener('click', async ()=>{
           const name = document.getElementById('f_name').value.trim();
           if(!name){ toast(t('items_err_name'),'err'); return; }
-          await DB.updateItem(id, {
-            name, category:document.getElementById('f_category').value,
-            unit:document.getElementById('f_unit').value,
-            costPrice:Number(document.getElementById('f_cost').value)||0,
-            sellPrice:Number(document.getElementById('f_sell').value)||0,
-            qty:Number(document.getElementById('f_qty').value)||0,
-            reorderLevel:Number(document.getElementById('f_reorder').value)||0
-          });
-          closeModal();
-          toast(t('items_updated'),'ok');
-          App.render();
+          try {
+            await DB.updateItem(id, {
+              name, category:document.getElementById('f_category').value.trim() || 'වෙනත්',
+              unit:document.getElementById('f_unit').value,
+              costPrice:Number(document.getElementById('f_cost').value)||0,
+              sellPrice:Number(document.getElementById('f_sell').value)||0,
+              description: document.getElementById('f_desc').value.trim(),
+              image: document.getElementById('f_image').value,
+              qty:Number(document.getElementById('f_qty').value)||0,
+              reorderLevel:Number(document.getElementById('f_reorder').value)||0
+            });
+            closeModal();
+            toast(t('items_updated'),'ok');
+            App.render();
+          } catch(err) {
+            console.error("Failed to update item:", err);
+            toast("භාණ්ඩය යාවත්කාලීන කිරීමට නොහැකි විය!", "err");
+          }
         });
       }
     });
@@ -901,93 +1002,186 @@ Views.items = {
   }
 };
 
-/* ================= STOCK ================= */
+/* ================= STOCK REPORT & LOW STOCK ================= */
 Views.stock = {
+  searchQ: '',
+  filterType: 'all', // 'all' | 'low'
+
   render(){
-    const items = DB.allItems();
+    const allItems = DB.allItems();
+    const lowItems = DB.lowStockItems();
     const totalValue = DB.stockValue();
+
     return `
       <div class="section-head">
-        <h2>${t('stock_report')}</h2>
-        <div class="text-muted small">${t('stock_total_val')} <b>${fmt(totalValue)}</b></div>
+        <h2>${t('stock_report')} (${allItems.length})</h2>
+        <div class="flex gap-8">
+          <input class="input" id="stockSearch" placeholder="${t('search_placeholder')}" style="width:220px" value="${escapeHTML(Views.stock.searchQ)}">
+          <select class="input" id="stockFilter" style="width:170px">
+            <option value="all" ${Views.stock.filterType === 'all' ? 'selected' : ''}>📦 සියලුම තොග</option>
+            <option value="low" ${Views.stock.filterType === 'low' ? 'selected' : ''}>⚠ අඩු තොග පමණක් (${lowItems.length})</option>
+          </select>
+        </div>
       </div>
-      ${!items.length ? `<div class="card"><div class="empty-state"><div class="em-ico">🗄</div><h3>${t('items_no_items')}</h3></div></div>` : `
+
+      <div class="grid grid-3 mb-20" style="margin-bottom:16px;">
+        <div class="card stat-card">
+          <div class="stat-label">මුළු භාණ්ඩ ගණන</div>
+          <div class="stat-value">${allItems.length}</div>
+          <div class="stat-sub">සියලු භාණ්ඩ වර්ග</div>
+        </div>
+        <div class="card stat-card accent-danger">
+          <div class="stat-label">අඩු තොග සහිත භාණ්ඩ</div>
+          <div class="stat-value" style="color:${lowItems.length > 0 ? 'var(--danger)' : 'var(--success)'}">${lowItems.length}</div>
+          <div class="stat-sub">Reorder level එකට ළඟින්/පහළින්</div>
+        </div>
+        <div class="card stat-card accent-success">
+          <div class="stat-label">${t('stock_total_val')}</div>
+          <div class="stat-value" style="font-size:22px">${fmt(totalValue)}</div>
+          <div class="stat-sub">ගැනුම් වටිනාකම එකතුව</div>
+        </div>
+      </div>
+
+      ${lowItems.length > 0 ? `
+        <div class="stripe-banner mb-14" style="margin-bottom:16px; display:flex; align-items:center; gap:12px;">
+          <span class="stripe-ico">⚠</span>
+          <div style="flex:1;">
+            <b>භාණ්ඩ ${lowItems.length} ක තොග අවසන් වී හෝ අඩුවෙමින් පවතී!</b>
+            <div class="small" style="font-weight:500;">පහත ලැයිස්තුවේ ඇති "＋ තොග එකතු කරන්න" බටන් එකෙන් තොග නංවාගත හැක.</div>
+          </div>
+          <button class="btn btn-sm btn-outline" id="showOnlyLowBtn" style="white-space:nowrap;">⚠ අඩු තොග බලන්න</button>
+        </div>
+      ` : ``}
+
+      <div id="stockTableWrap">${Views.stock.tableHTML()}</div>
+    `;
+  },
+
+  tableHTML(){
+    let list = DB.allItems();
+    const q = Views.stock.searchQ.toLowerCase();
+    if (q) {
+      list = list.filter(i => (i.name || '').toLowerCase().includes(q) || (i.category || '').toLowerCase().includes(q));
+    }
+
+    if (Views.stock.filterType === 'low') {
+      list = list.filter(i => i.qty <= i.reorderLevel).sort((a,b) => a.qty - b.qty);
+    }
+
+    if(!list.length) {
+      return `<div class="card"><div class="empty-state"><div class="em-ico">🗄</div><h3>${Views.stock.filterType === 'low' ? 'අඩු තොග සහිත භාණ්ඩ නැත' : t('items_no_items')}</h3></div></div>`;
+    }
+
+    return `
       <div class="table-wrap">
         <table>
-          <thead><tr>
-            <th>${t('items_name')}</th><th>${t('items_category')}</th><th class="num">${t('dash_stock')}</th><th>${t('stock_level')}</th><th class="num">${t('stock_value')}</th>
-          </tr></thead>
+          <thead>
+            <tr>
+              <th style="width:46px;">Photo</th>
+              <th>${t('items_name')}</th>
+              <th>${t('items_category')}</th>
+              <th class="num">${t('dash_stock')}</th>
+              <th>${t('stock_level')}</th>
+              <th class="num">${t('dash_reorder')}</th>
+              <th class="num">${t('stock_value')}</th>
+              <th></th>
+            </tr>
+          </thead>
           <tbody>
-            ${items.map(i=>{
-              const ratio = i.reorderLevel>0 ? Math.min(1, i.qty/(i.reorderLevel*3)) : (i.qty>0?1:0);
-              const color = i.qty<=0 ? 'var(--danger)' : i.qty<=i.reorderLevel ? 'var(--yellow)' : 'var(--success)';
+            ${list.map(i => {
+              const isOut = i.qty <= 0;
+              const isLow = i.qty <= i.reorderLevel;
+              const ratio = i.reorderLevel > 0 ? Math.min(1, i.qty / (i.reorderLevel * 3)) : (i.qty > 0 ? 1 : 0);
+              const color = isOut ? 'var(--danger)' : isLow ? 'var(--yellow)' : 'var(--success)';
+
+              const statusTag = isOut 
+                ? `<span class="pill pill-danger" style="margin-left:6px;">${t('status_out')}</span>`
+                : isLow 
+                ? `<span class="pill pill-warn" style="margin-left:6px;">${t('status_low')}</span>` 
+                : ``;
+
               return `
-              <tr>
-                <td><b>${escapeHTML(i.name)}</b></td>
-                <td class="text-muted">${escapeHTML(i.category)}</td>
-                <td class="num">${i.qty} ${escapeHTML(i.unit)}</td>
-                <td style="min-width:120px"><div class="stock-meter"><div style="width:${ratio*100}%; background:${color}"></div></div></td>
-                <td class="num">${fmt(i.qty*i.costPrice)}</td>
-              </tr>`;
+                <tr>
+                  <td>
+                    <div style="width:36px; height:36px; border-radius:6px; overflow:hidden; background:var(--paper); display:flex; align-items:center; justify-content:center; border:1px solid var(--border);">
+                      ${i.image ? `<img src="${i.image}" style="width:100%; height:100%; object-fit:cover;">` : `<span style="font-size:18px;">📦</span>`}
+                    </div>
+                  </td>
+                  <td><b>${escapeHTML(i.name)}</b>${statusTag}</td>
+                  <td class="text-muted">${escapeHTML(i.category)}</td>
+                  <td class="num" style="font-weight:700; color:${color}">${i.qty} ${escapeHTML(i.unit)}</td>
+                  <td style="min-width:110px"><div class="stock-meter"><div style="width:${ratio*100}%; background:${color}"></div></div></td>
+                  <td class="num text-muted">${i.reorderLevel}</td>
+                  <td class="num"><b>${fmt(i.qty * i.costPrice)}</b></td>
+                  <td>
+                    <button class="btn btn-sm ${isLow ? 'btn-primary' : 'btn-outline'}" data-restock="${i.id}">＋ තොග එකතු කරන්න</button>
+                  </td>
+                </tr>
+              `;
             }).join('')}
           </tbody>
         </table>
-      </div>`}
+      </div>
     `;
   },
-  bind(){}
-};
 
-/* ================= LOW STOCK ================= */
-Views.lowstock = {
-  render(){
-    const low = DB.lowStockItems().sort((a,b)=>a.qty-b.qty);
-    return `
-      <div class="section-head"><h2>${t('ls_title')}</h2></div>
-      ${low.length ? `
-      <div class="stripe-banner mt-8" style="margin-bottom:16px;">
-        <span class="stripe-ico">⚠</span>
-        <div><b>${low.length} ${t('ls_banner')}</b></div>
-      </div>
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th>${t('items_name')}</th><th>${t('items_category')}</th><th class="num">${t('ls_current')}</th><th class="num">${t('dash_reorder')}</th><th></th></tr></thead>
-          <tbody>
-            ${low.map(i=>`
-              <tr>
-                <td><b>${escapeHTML(i.name)}</b></td>
-                <td class="text-muted">${escapeHTML(i.category)}</td>
-                <td class="num">${i.qty===0 ? `<span class="pill pill-danger">${t('status_out')}</span>` : `<span style="color:var(--danger); font-weight:700">${i.qty} ${escapeHTML(i.unit)}</span>`}</td>
-                <td class="num text-muted">${i.reorderLevel}</td>
-                <td><button class="btn btn-sm btn-primary" data-restock="${i.id}">${t('ls_add_btn')}</button></td>
-              </tr>
-            `).join('')}
-          </tbody>
-        </table>
-      </div>
-      ` : `<div class="card"><div class="empty-state"><div class="em-ico">✅</div><h3>${t('ls_all_normal')}</h3><div class="small">${t('ls_no_low')}</div></div></div>`}
-    `;
-  },
   bind(){
-    document.querySelectorAll('[data-restock]').forEach(b=>{
-      b.addEventListener('click', ()=>{
+    const search = document.getElementById('stockSearch');
+    if (search) {
+      search.addEventListener('input', () => {
+        Views.stock.searchQ = search.value;
+        document.getElementById('stockTableWrap').innerHTML = Views.stock.tableHTML();
+        Views.stock.bindRowActions();
+      });
+    }
+
+    const filter = document.getElementById('stockFilter');
+    if (filter) {
+      filter.addEventListener('change', (e) => {
+        Views.stock.filterType = e.target.value;
+        document.getElementById('stockTableWrap').innerHTML = Views.stock.tableHTML();
+        Views.stock.bindRowActions();
+      });
+    }
+
+    document.getElementById('showOnlyLowBtn')?.addEventListener('click', () => {
+      Views.stock.filterType = 'low';
+      const filterSel = document.getElementById('stockFilter');
+      if (filterSel) filterSel.value = 'low';
+      document.getElementById('stockTableWrap').innerHTML = Views.stock.tableHTML();
+      Views.stock.bindRowActions();
+    });
+
+    Views.stock.bindRowActions();
+  },
+
+  bindRowActions(){
+    document.querySelectorAll('[data-restock]').forEach(b => {
+      b.addEventListener('click', () => {
         const id = Number(b.dataset.restock);
         const item = DB.getItem(id);
+        if (!item) return;
+
         openModal({
-          title:`"${escapeHTML(item.name)}" ${t('ls_add_stock_title')}`,
-          bodyHTML:`
+          title: `"${escapeHTML(item.name)}" ${t('ls_add_stock_title')}`,
+          bodyHTML: `
             <div class="field"><label class="field-label">${t('ls_current')}</label><input class="input" value="${item.qty} ${escapeHTML(item.unit)}" disabled></div>
-            <div class="field"><label class="field-label">${t('ls_add_qty')}</label><input class="input" id="restockQty" type="number" min="0.01" step="any" value="10"></div>
+            <div class="field"><label class="field-label">එකතු කරන ප්‍රමාණය (Qty to Add)</label><input class="input" id="restockQty" type="number" min="0.01" step="any" value="10"></div>
           `,
-          footHTML:`<button class="btn btn-outline" data-close>${t('cancel')}</button><button class="btn btn-primary" id="restockSaveBtn">${t('ls_add_btn')}</button>`,
-          onMount:()=>{
-            document.getElementById('restockSaveBtn').addEventListener('click', async ()=>{
-              const add = Number(document.getElementById('restockQty').value)||0;
-              if(add<=0){ toast(t('ls_err_qty'),'err'); return; }
-              await DB.updateItem(id, {qty:item.qty+add});
-              closeModal();
-              toast(t('ls_updated'),'ok');
-              App.render();
+          footHTML: `<button class="btn btn-outline" data-close>${t('cancel')}</button><button class="btn btn-primary" id="restockSaveBtn">${t('ls_add_btn')}</button>`,
+          onMount: () => {
+            document.getElementById('restockSaveBtn').addEventListener('click', async () => {
+              const add = Number(document.getElementById('restockQty').value) || 0;
+              if (add <= 0) { toast(t('ls_err_qty'), 'err'); return; }
+              try {
+                await DB.updateItem(id, { qty: item.qty + add });
+                closeModal();
+                toast(t('ls_updated'), 'ok');
+                App.render();
+              } catch(err) {
+                console.error("Failed to update stock:", err);
+                toast('තොගය යාවත්කාලීන කිරීමට නොහැකි විය!', 'err');
+              }
             });
           }
         });
@@ -1371,5 +1565,473 @@ Views.settings = {
     });
     document.getElementById('langSiBtn').addEventListener('click', ()=>setLanguage('si'));
     document.getElementById('langEnBtn').addEventListener('click', ()=>setLanguage('en'));
+  }
+};
+
+/* ================= PURCHASES (කඩේට ගත් බිල්පත්) ================= */
+Views.purchases = {
+  searchQ: '',
+  filterStatus: 'all', // 'all' | 'due' | 'paid'
+
+  render(){
+    const purchases = DB.allPurchases();
+    const totalAmount = purchases.reduce((s, p) => s + (p.totalAmount || 0), 0);
+    const totalDue = purchases.reduce((s, p) => s + (p.dueAmount || 0), 0);
+    const dueCount = purchases.filter(p => (p.dueAmount || 0) > 0).length;
+
+    return `
+      <div class="section-head">
+        <h2>කඩේට ගත් බිල්පත් කළමනාකරණය (${purchases.length})</h2>
+        <div class="flex gap-8">
+          <input class="input" id="purchasesSearch" placeholder="🔍 සැපයුම්කරු / බිල් No..." style="width:220px" value="${escapeHTML(Views.purchases.searchQ)}">
+          <select class="input" id="purchasesStatusFilter" style="width:150px">
+            <option value="all" ${Views.purchases.filterStatus === 'all' ? 'selected' : ''}>සියලු බිල්පත්</option>
+            <option value="due" ${Views.purchases.filterStatus === 'due' ? 'selected' : ''}>ගෙවීමට ඇති බිල්</option>
+            <option value="paid" ${Views.purchases.filterStatus === 'paid' ? 'selected' : ''}>සම්පූර්ණ ගෙවූ බිල්</option>
+          </select>
+          <button class="btn btn-primary" id="addPurchaseBtn">＋ අලුත් බිලක් එක් කරන්න</button>
+        </div>
+      </div>
+
+      <div class="grid grid-3 mb-20" style="margin-bottom:16px;">
+        <div class="card stat-card">
+          <div class="stat-label">මුළු ගත් බිල්පත් ගණන</div>
+          <div class="stat-value">${purchases.length}</div>
+          <div class="stat-sub">සැපයුම්කරුවන්ගේ බිල්පත්</div>
+        </div>
+        <div class="card stat-card accent-success">
+          <div class="stat-label">මුළු ගත් බිල්පත් වටිනාකම</div>
+          <div class="stat-value" style="font-size:22px">${fmt(totalAmount)}</div>
+          <div class="stat-sub">සියලු බිල්පත් මුදල</div>
+        </div>
+        <div class="card stat-card accent-orange">
+          <div class="stat-label">සැපයුම්කරුවන්ට ගෙවීමට ඇති හිඟ මුදල</div>
+          <div class="stat-value" style="font-size:22px; color:var(--danger);">${fmt(totalDue)}</div>
+          <div class="stat-sub">${dueCount} ක් ගෙවීමට ඇත</div>
+        </div>
+      </div>
+
+      <div id="purchasesTableWrap">${Views.purchases.tableHTML()}</div>
+    `;
+  },
+
+  tableHTML(){
+    let list = DB.allPurchases();
+    const q = Views.purchases.searchQ.toLowerCase();
+    if(q) {
+      list = list.filter(p => 
+        (p.supplierName || '').toLowerCase().includes(q) ||
+        (p.billNo || '').toLowerCase().includes(q) ||
+        (p.note || '').toLowerCase().includes(q)
+      );
+    }
+    if (Views.purchases.filterStatus === 'due') {
+      list = list.filter(p => (p.dueAmount || 0) > 0);
+    } else if (Views.purchases.filterStatus === 'paid') {
+      list = list.filter(p => (p.dueAmount || 0) <= 0);
+    }
+
+    if(!list.length) return `<div class="card"><div class="empty-state"><div class="em-ico">🚚</div><h3>කඩේට ගත් බිල්පත් නැත</h3><div class="small">"+ අලුත් බිලක් එක් කරන්න" ක්ලික් කරන්න</div></div></div>`;
+
+    return `
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th># / දිනය</th>
+              <th>සැපයුම්කරු (Supplier)</th>
+              <th>බිල් No</th>
+              <th>භාණ්ඩ විස්තරය</th>
+              <th class="num">මුළු මුදල</th>
+              <th class="num">ගෙවූ මුදල</th>
+              <th class="num">හිඟ මුදල</th>
+              <th>තත්ත්වය</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            ${list.map(p => {
+              const statusBadge = (p.dueAmount || 0) <= 0 
+                ? `<span class="pill pill-ok">සම්පූර්ණ ගෙවා ඇත</span>`
+                : (p.paidAmount || 0) > 0
+                ? `<span class="pill pill-warn">කොටසක් ගෙවා ඇත</span>`
+                : `<span class="pill pill-danger">හිඟ ඇත</span>`;
+              
+              const itemsText = Array.isArray(p.items) && p.items.length 
+                ? p.items.map(i => `${escapeHTML(i.name)} (${i.qty} ${escapeHTML(i.unit || '')})`).join(', ')
+                : '-';
+
+              return `
+                <tr>
+                  <td><b>#${p.id}</b><br><span class="small text-muted">${fmtDate(p.date)}</span></td>
+                  <td><b>${escapeHTML(p.supplierName || 'වෙනත්')}</b></td>
+                  <td>${escapeHTML(p.billNo || '-')}</td>
+                  <td class="small" style="max-width:200px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${escapeHTML(itemsText)}">${itemsText}</td>
+                  <td class="num"><b>${fmt(p.totalAmount)}</b></td>
+                  <td class="num text-muted">${fmt(p.paidAmount)}</td>
+                  <td class="num">${p.dueAmount > 0 ? `<span style="color:var(--danger); font-weight:700;">${fmt(p.dueAmount)}</span>` : `<span class="pill pill-ok">රු. 0.00</span>`}</td>
+                  <td>${statusBadge}</td>
+                  <td>
+                    <button class="btn btn-sm btn-outline" data-view-purchase="${p.id}">👁 විස්තර / ගෙවීම්</button>
+                    <button class="icon-btn" data-del-purchase="${p.id}" title="මකන්න">🗑</button>
+                  </td>
+                </tr>
+              `;
+            }).join('')}
+          </tbody>
+        </table>
+      </div>
+    `;
+  },
+
+  openAddPurchaseModal(){
+    let purchaseItems = [];
+    const existingItems = DB.allItems();
+
+    function renderModalItemsHTML(){
+      if (!purchaseItems.length) {
+        return `<div class="text-muted small" style="padding:10px 0; text-align:center;">භාණ්ඩ එකතු කර නැත. පහතින් එකතු කරන්න.</div>`;
+      }
+      return `
+        <table class="table" style="font-size:12px; margin-bottom:8px; width:100%;">
+          <thead>
+            <tr>
+              <th>භාණ්ඩය</th>
+              <th style="width:70px;">ප්‍රමාණය</th>
+              <th style="width:90px;">ඒකක මිල</th>
+              <th class="num" style="width:90px;">එකතුව</th>
+              <th style="width:30px;"></th>
+            </tr>
+          </thead>
+          <tbody>
+            ${purchaseItems.map((item, idx) => `
+              <tr>
+                <td><b>${escapeHTML(item.name)}</b></td>
+                <td>${item.qty} ${escapeHTML(item.unit || '')}</td>
+                <td>${fmt(item.costPrice)}</td>
+                <td class="num"><b>${fmt(item.qty * item.costPrice)}</b></td>
+                <td><button type="button" class="icon-btn" data-remove-pitem="${idx}">&times;</button></td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      `;
+    }
+
+    function calcModalTotal(){
+      return purchaseItems.reduce((s, i) => s + (i.qty * i.costPrice), 0);
+    }
+
+    openModal({
+      title: "＋ කඩේට ගත් අලුත් බිලක් එකතු කරන්න",
+      wide: true,
+      bodyHTML: `
+        <div class="grid grid-3">
+          <div class="field">
+            <label class="field-label">සැපයුම්කරු / සමාගමේ නම (Supplier)</label>
+            <input class="input" id="pb_supplier" placeholder="උදා: DSI, Tokyo Cement, S-Lon">
+          </div>
+          <div class="field">
+            <label class="field-label">බිල් අංකය (Invoice / Bill No)</label>
+            <input class="input" id="pb_billNo" placeholder="උදා: INV-1042">
+          </div>
+          <div class="field">
+            <label class="field-label">දිනය</label>
+            <input class="input" id="pb_date" type="date" value="${new Date().toISOString().slice(0,10)}">
+          </div>
+        </div>
+
+        <div class="card" style="background:var(--paper); padding:12px; margin-bottom:14px; box-shadow:none;">
+          <div class="card-title" style="font-size:13px; margin-bottom:8px;">📦 ගත් භාණ්ඩ ලැයිස්තුව</div>
+          <div id="modalItemsTableWrap">${renderModalItemsHTML()}</div>
+
+          <div style="background:#fff; border:1px solid var(--border); border-radius:8px; padding:8px; margin-top:8px;">
+            <div class="grid grid-4" style="gap:8px; align-items:flex-end;">
+              <div class="field" style="margin:0; grid-column:span 2;">
+                <label class="field-label" style="font-size:11px;">භාණ්ඩය තෝරන්න හෝ නම ටයිප් කරන්න</label>
+                <input class="input" id="pi_name" placeholder="භාණ්ඩයේ නම..." list="existingItemsList">
+                <datalist id="existingItemsList">
+                  ${existingItems.map(i => `<option value="${escapeHTML(i.name)}">${escapeHTML(i.category || '')}</option>`).join('')}
+                </datalist>
+              </div>
+              <div class="field" style="margin:0;">
+                <label class="field-label" style="font-size:11px;">ප්‍රමාණය (Qty)</label>
+                <input class="input" id="pi_qty" type="number" step="any" min="0.01" value="1">
+              </div>
+              <div class="field" style="margin:0;">
+                <label class="field-label" style="font-size:11px;">ගැනුම් මිල (Unit Cost)</label>
+                <input class="input" id="pi_cost" type="number" step="any" min="0" placeholder="0.00">
+              </div>
+            </div>
+            <button type="button" class="btn btn-sm btn-outline mt-8" id="addPItemBtn" style="width:100%;">＋ භාණ්ඩය ලැයිස්තුවට එකතු කරන්න</button>
+          </div>
+        </div>
+
+        <div class="grid grid-2">
+          <div class="field">
+            <label class="field-label">මුළු බිල්පත් වටිනාකම (රු.)</label>
+            <input class="input" id="pb_total" type="number" step="any" min="0" placeholder="0.00" style="font-weight:700; font-size:16px;">
+          </div>
+          <div class="field">
+            <label class="field-label">අද ගෙවූ මුදල (Amount Paid, රු.)</label>
+            <input class="input" id="pb_paid" type="number" step="any" min="0" placeholder="0.00" style="font-weight:700; font-size:16px;">
+          </div>
+        </div>
+
+        <div class="field">
+          <label style="display:flex; align-items:center; gap:8px; cursor:pointer; font-weight:600;">
+            <input type="checkbox" id="pb_autoStock" checked>
+            <span>☑ මෙම භාණ්ඩ කඩේ තොගයට (Stock Qty) ස්වයංක්‍රීයව එකතු කරන්න</span>
+          </label>
+        </div>
+
+        <div class="field">
+          <label class="field-label">විස්තර / සටහන් (Notes)</label>
+          <textarea class="input" id="pb_note" placeholder="අමතර විස්තර..." style="min-height:45px;"></textarea>
+        </div>
+      `,
+      footHTML: `<button class="btn btn-outline" data-close>${t('cancel')}</button><button class="btn btn-primary" id="savePurchaseBtn">✔ බිල සුරකින්න</button>`,
+      onMount: (wrap) => {
+        const totalInp = wrap.querySelector('#pb_total');
+        const paidInp = wrap.querySelector('#pb_paid');
+        const nameInp = wrap.querySelector('#pi_name');
+        const qtyInp = wrap.querySelector('#pi_qty');
+        const costInp = wrap.querySelector('#pi_cost');
+
+        nameInp.addEventListener('change', () => {
+          const val = nameInp.value.trim();
+          const match = existingItems.find(i => i.name.toLowerCase() === val.toLowerCase());
+          if (match && match.costPrice) {
+            costInp.value = match.costPrice;
+          }
+        });
+
+        function updateModalItemsList(){
+          wrap.querySelector('#modalItemsTableWrap').innerHTML = renderModalItemsHTML();
+          const calculatedTotal = calcModalTotal();
+          if (calculatedTotal > 0) {
+            totalInp.value = calculatedTotal;
+            paidInp.value = calculatedTotal;
+          }
+          wrap.querySelectorAll('[data-remove-pitem]').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+              const idx = Number(e.currentTarget.dataset.removePitem);
+              purchaseItems.splice(idx, 1);
+              updateModalItemsList();
+            });
+          });
+        }
+
+        wrap.querySelector('#addPItemBtn').addEventListener('click', () => {
+          const name = nameInp.value.trim();
+          const qty = Number(qtyInp.value) || 0;
+          const cost = Number(costInp.value) || 0;
+          if (!name) { toast('කරුණාකර භාණ්ඩයේ නම ඇතුළත් කරන්න', 'err'); return; }
+          if (qty <= 0) { toast('ප්‍රමාණය 0 ට වැඩි විය යුතුය', 'err'); return; }
+
+          const matchedItem = existingItems.find(i => i.name.toLowerCase() === name.toLowerCase());
+
+          purchaseItems.push({
+            itemId: matchedItem ? matchedItem.id : null,
+            name,
+            qty,
+            unit: matchedItem ? matchedItem.unit : 'pcs',
+            costPrice: cost
+          });
+
+          nameInp.value = '';
+          qtyInp.value = '1';
+          costInp.value = '';
+          updateModalItemsList();
+        });
+
+        wrap.querySelector('#savePurchaseBtn').addEventListener('click', async () => {
+          const supplierName = wrap.querySelector('#pb_supplier').value.trim();
+          const billNo = wrap.querySelector('#pb_billNo').value.trim();
+          const dateStr = wrap.querySelector('#pb_date').value;
+          const totalAmount = Number(totalInp.value) || calcModalTotal() || 0;
+          const paidAmount = Number(paidInp.value) || 0;
+          const autoUpdateStock = wrap.querySelector('#pb_autoStock').checked;
+          const note = wrap.querySelector('#pb_note').value.trim();
+
+          if (!supplierName && !billNo && !purchaseItems.length) {
+            toast('කරුණාකර සැපයුම්කරුගේ නම හෝ බිල් අංකය ඇතුළත් කරන්න', 'err');
+            return;
+          }
+
+          try {
+            await DB.addPurchase({
+              supplierName: supplierName || 'වෙනත් සැපයුම්කරු',
+              billNo,
+              date: dateStr ? new Date(dateStr).getTime() : Date.now(),
+              items: purchaseItems,
+              totalAmount,
+              paidAmount,
+              autoUpdateStock,
+              note
+            });
+            closeModal();
+            toast('කඩේට ගත් බිල සාර්ථකව සුරකින ලදී!', 'ok');
+            App.render();
+          } catch(err) {
+            console.error("Failed to add purchase:", err);
+            toast('බිල සුරැකීමට නොහැකි විය!', 'err');
+          }
+        });
+      }
+    });
+  },
+
+  openDetailModal(id){
+    const p = DB.getPurchase(id);
+    if (!p) return;
+    const due = p.dueAmount || 0;
+
+    openModal({
+      title: `ගත් බිල #${p.id} — ${escapeHTML(p.supplierName)}`,
+      wide: true,
+      bodyHTML: `
+        <div class="grid grid-3 mb-14">
+          <div>
+            <div class="small text-muted">සැපයුම්කරු (Supplier)</div>
+            <div style="font-weight:700; font-size:16px;">${escapeHTML(p.supplierName)}</div>
+          </div>
+          <div>
+            <div class="small text-muted">බිල් අංකය (Invoice No)</div>
+            <div style="font-weight:600;">${escapeHTML(p.billNo || '-')}</div>
+          </div>
+          <div>
+            <div class="small text-muted">දිනය</div>
+            <div style="font-weight:600;">${fmtDate(p.date)}</div>
+          </div>
+        </div>
+
+        <div class="grid grid-3 mb-14" style="background:var(--paper); padding:10px; border-radius:8px;">
+          <div>
+            <div class="small text-muted">මුළු බිල්පත් වටිනාකම</div>
+            <div style="font-weight:700; font-size:16px;">${fmt(p.totalAmount)}</div>
+          </div>
+          <div>
+            <div class="small text-muted">ගෙවූ මුදල</div>
+            <div style="font-weight:700; font-size:16px; color:var(--success);">${fmt(p.paidAmount)}</div>
+          </div>
+          <div>
+            <div class="small text-muted">හිඟ මුදල (Due Amount)</div>
+            <div style="font-weight:700; font-size:16px; color:${due > 0 ? 'var(--danger)' : 'var(--success)'}">${fmt(due)}</div>
+          </div>
+        </div>
+
+        ${Array.isArray(p.items) && p.items.length ? `
+          <div class="card-title mt-14" style="font-size:13px;">📦 ගත් භාණ්ඩ විස්තරය</div>
+          <div class="table-wrap mb-14" style="margin-top:6px;">
+            <table>
+              <thead>
+                <tr>
+                  <th>භාණ්ඩය</th>
+                  <th class="num">ප්‍රමාණය</th>
+                  <th class="num">ඒකක ගැනුම් මිල</th>
+                  <th class="num">එකතුව</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${p.items.map(i => `
+                  <tr>
+                    <td><b>${escapeHTML(i.name)}</b></td>
+                    <td class="num">${i.qty} ${escapeHTML(i.unit || '')}</td>
+                    <td class="num">${fmt(i.costPrice)}</td>
+                    <td class="num"><b>${fmt(i.qty * i.costPrice)}</b></td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+          </div>
+        ` : ``}
+
+        ${p.note ? `
+          <div class="mb-14">
+            <div class="small text-muted">සටහන්:</div>
+            <div style="font-style:italic;">${escapeHTML(p.note)}</div>
+          </div>
+        ` : ``}
+
+        ${due > 0 ? `
+          <div class="card" style="background:var(--paper); box-shadow:none; border:1px solid var(--orange);">
+            <div class="card-title" style="color:var(--orange-dark);">💰 සැපයුම්කරුට මුදල් ගෙවීම සටහන් කරන්න</div>
+            <div class="flex gap-8 mt-8" style="align-items:flex-end;">
+              <div class="field" style="flex:1; margin-bottom:0;">
+                <label class="field-label">ගෙවන මුදල (රු.)</label>
+                <input class="input" id="pPayAmt" type="number" step="any" min="1" max="${due}" value="${due}">
+              </div>
+              <button class="btn btn-success" id="recordPPayBtn">✔ ගෙවීම සටහන් කරන්න</button>
+            </div>
+          </div>
+        ` : `<div class="pill pill-ok" style="display:inline-block; margin-top:8px;">✅ මෙම බිල සඳහා සම්පූර්ණයෙන්ම ගෙවා ඇත.</div>`}
+      `,
+      footHTML: `<button class="btn btn-outline" data-close>${t('close')}</button>`,
+      onMount: (wrap) => {
+        const payBtn = wrap.querySelector('#recordPPayBtn');
+        if (payBtn) {
+          payBtn.addEventListener('click', async () => {
+            const amt = Number(wrap.querySelector('#pPayAmt').value) || 0;
+            if (amt <= 0) { toast('කරුණාකර නිවැරදි මුදලක් ඇතුළත් කරන්න', 'err'); return; }
+            try {
+              await DB.recordPurchasePayment(id, amt);
+              toast('ගෙවීම සාර්ථකව සටහන් විය!', 'ok');
+              closeModal();
+              App.render();
+            } catch(err) {
+              console.error("Failed to record payment:", err);
+              toast('ගෙවීම සටහන් කිරීමට නොහැකි විය!', 'err');
+            }
+          });
+        }
+      }
+    });
+  },
+
+  bind(){
+    document.getElementById('addPurchaseBtn')?.addEventListener('click', Views.purchases.openAddPurchaseModal);
+
+    const search = document.getElementById('purchasesSearch');
+    if (search) {
+      search.addEventListener('input', () => {
+        Views.purchases.searchQ = search.value;
+        document.getElementById('purchasesTableWrap').innerHTML = Views.purchases.tableHTML();
+        Views.purchases.bindRowActions();
+      });
+    }
+
+    const statusFilter = document.getElementById('purchasesStatusFilter');
+    if (statusFilter) {
+      statusFilter.addEventListener('change', (e) => {
+        Views.purchases.filterStatus = e.target.value;
+        document.getElementById('purchasesTableWrap').innerHTML = Views.purchases.tableHTML();
+        Views.purchases.bindRowActions();
+      });
+    }
+
+    Views.purchases.bindRowActions();
+  },
+
+  bindRowActions(){
+    document.querySelectorAll('[data-view-purchase]').forEach(b => {
+      b.addEventListener('click', () => Views.purchases.openDetailModal(Number(b.dataset.viewPurchase)));
+    });
+
+    document.querySelectorAll('[data-del-purchase]').forEach(b => {
+      b.addEventListener('click', () => {
+        const id = Number(b.dataset.delPurchase);
+        confirmAction('මෙම ගත් බිල පද්ධතියෙන් ඉවත් කිරීමට තහවුරු කරන්නද?', async () => {
+          try {
+            await DB.deletePurchase(id);
+            toast('ගත් බිල ඉවත් කරන ලදී', 'ok');
+            App.render();
+          } catch(err) {
+            console.error("Failed to delete purchase:", err);
+            toast('ඉවත් කිරීමට නොහැකි විය', 'err');
+          }
+        });
+      });
+    });
   }
 };
