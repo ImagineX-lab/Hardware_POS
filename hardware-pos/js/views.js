@@ -728,10 +728,25 @@ Views.items = {
 
   formHTML(item){
     const v = item || {name:'',category:'',unit:'pcs',costPrice:'',sellPrice:'',qty:'',reorderLevel:5};
+    const existingCategories = [...new Set(DB.data.items.map(i => i.category).filter(c => c && c.trim()))].sort();
+    const catOptions = existingCategories.map(c => `<div class="combo-opt" data-val="${escapeHTML(c)}">${escapeHTML(c)}</div>`).join('');
     return `
       <div class="grid grid-2">
         <div class="field"><label class="field-label">${t('items_form_name')}</label><input class="input" id="f_name" value="${escapeHTML(v.name)}" placeholder="${t('items_form_name_ph')}"></div>
-        <div class="field"><label class="field-label">${t('items_form_cat')}</label><input class="input" id="f_category" value="${escapeHTML(v.category)}" placeholder="${t('items_form_cat_ph')}"></div>
+        <div class="field">
+          <label class="field-label">${t('items_form_cat')}</label>
+          <div class="combo-wrap" id="comboCatWrap">
+            <input class="combo-input" id="f_category" value="${escapeHTML(v.category)}" placeholder="${t('items_form_cat_ph')}" autocomplete="off">
+            <button type="button" class="combo-arrow" id="comboCatArrow" tabindex="-1">
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M2 4L6 8L10 4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </button>
+            <div class="combo-dropdown" id="comboCatDrop">
+              ${catOptions || '<div class="combo-opt combo-no-match">කිසිදු category එකක් නැත</div>'}
+            </div>
+          </div>
+        </div>
       </div>
       <div class="grid grid-2">
         <div class="field"><label class="field-label">${t('items_form_unit')}</label>
@@ -759,6 +774,7 @@ Views.items = {
       bodyHTML: Views.items.formHTML(null),
       footHTML:`<button class="btn btn-outline" data-close>${t('cancel')}</button><button class="btn btn-primary" id="saveItemBtn">${t('confirm')}</button>`,
       onMount:()=>{
+        Views.items.bindCategoryCombo();
         document.getElementById('saveItemBtn').addEventListener('click', async ()=>{
           const name = document.getElementById('f_name').value.trim();
           const sell = document.getElementById('f_sell').value;
@@ -780,6 +796,54 @@ Views.items = {
     });
   },
 
+  bindCategoryCombo(){
+    const input = document.getElementById('f_category');
+    const arrow = document.getElementById('comboCatArrow');
+    const drop  = document.getElementById('comboCatDrop');
+    if(!input || !arrow || !drop) return;
+
+    const allCats = [...new Set(DB.data.items.map(i => i.category).filter(c => c && c.trim()))].sort();
+
+    function renderOpts(filter){
+      const q = (filter || '').trim().toLowerCase();
+      const matched = q ? allCats.filter(c => c.toLowerCase().includes(q)) : allCats;
+      if(!matched.length){
+        drop.innerHTML = '<div class="combo-opt combo-no-match">ගැළපෙන category එකක් නැත</div>';
+      } else {
+        drop.innerHTML = matched.map(c =>
+          `<div class="combo-opt" data-val="${escapeHTML(c)}">${escapeHTML(c)}</div>`
+        ).join('');
+        drop.querySelectorAll('.combo-opt[data-val]').forEach(opt =>{
+          opt.addEventListener('mousedown', e =>{ e.preventDefault(); input.value = opt.dataset.val; closeCombo(); });
+        });
+      }
+    }
+
+    function openCombo(){
+      renderOpts(input.value);
+      drop.classList.add('open');
+      arrow.classList.add('open');
+    }
+    function closeCombo(){
+      drop.classList.remove('open');
+      arrow.classList.remove('open');
+    }
+    function toggleCombo(){
+      drop.classList.contains('open') ? closeCombo() : openCombo();
+    }
+
+    arrow.addEventListener('click', e =>{ e.stopPropagation(); toggleCombo(); input.focus(); });
+    input.addEventListener('focus', ()=> openCombo());
+    input.addEventListener('input', ()=> renderOpts(input.value));
+    document.addEventListener('click', function handler(e){
+      if(!document.getElementById('comboCatWrap')){ document.removeEventListener('click', handler); return; }
+      if(!document.getElementById('comboCatWrap').contains(e.target)) closeCombo();
+    });
+    input.addEventListener('keydown', e=>{ if(e.key==='Escape'||e.key==='Tab') closeCombo(); });
+
+    renderOpts('');
+  },
+
   openEditModal(id){
     const item = DB.getItem(id);
     if(!item) return;
@@ -788,6 +852,7 @@ Views.items = {
       bodyHTML: Views.items.formHTML(item),
       footHTML:`<button class="btn btn-outline" data-close>${t('cancel')}</button><button class="btn btn-primary" id="saveItemBtn">${t('update')}</button>`,
       onMount:()=>{
+        Views.items.bindCategoryCombo();
         document.getElementById('saveItemBtn').addEventListener('click', async ()=>{
           const name = document.getElementById('f_name').value.trim();
           if(!name){ toast(t('items_err_name'),'err'); return; }
