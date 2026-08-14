@@ -12,7 +12,7 @@ const i18n = {
     yes: "ඔව්",
     no: "නැත",
     all: "සියල්ල",
-    
+
     // Sidebar
     nav_dashboard: "උපකරණ පුවරුව",
     nav_sale: "විකුණුම් / බිල්පත",
@@ -26,7 +26,7 @@ const i18n = {
     sidebar_msg1: "දත්ත ගබඩා වන්නේ මෙම බ්‍රවුසරයේ පමණි.",
     sidebar_msg2: "නිතර <b>Backup</b> එකක් ගන්න.",
     brand_sub: "කඩේ කළමනාකරණය",
-    
+
     // Dashboard
     dash_total_items: "මුළු භාණ්ඩ ගණන",
     dash_item_types: "Item Types",
@@ -50,7 +50,7 @@ const i18n = {
     dash_type: "වර්ගය",
     dash_amount: "මුදල",
     dash_no_sales: "තවම විකුණුම් නැත",
-    
+
     // Sale
     sale_add_items: "භාණ්ඩ එකතු කරන්න",
     sale_search_placeholder: "🔍 භාණ්ඩයක් සොයන්න... (උදා: සිමෙන්ති, ඇණ, පයිප්ප)",
@@ -71,13 +71,13 @@ const i18n = {
     sale_exceeds_stock: "තිබෙන තොගයට වඩා තෝරා ඇත",
     sale_select_credit_customer: "නායට විකිණීමට ගනුදෙනුකරුවෙක් තෝරන්න",
     sale_success: "බිල්පත සාර්ථකයි! #",
-    
+
     sale_subtotal: "උප එකතුව",
     sale_total: "එකතුව",
     sale_payment: "ගෙවීම",
     sale_amount_paid: "ගෙවූ මුදල (රු.)",
     sale_change_due: "ඉතිරි මුදල (රු.)",
-    
+
     app_title: "HardwarePOS — කඩේ පරිගණක ක්‍රමය",
     receipt_title: "Hardware Store POS",
     receipt_amount: "මුදල",
@@ -85,7 +85,7 @@ const i18n = {
     receipt_thanks: "ස්තුතියි! නැවත එන්න.",
     receipt_print: "🖨 මුද්‍රණය කරන්න",
     receipt_completed: "බිල්පත සම්පූර්ණයි",
-    
+
     // Items
     items_list: "භාණ්ඩ ලැයිස්තුව",
     items_add_btn: "+ භාණ්ඩයක් එකතු කරන්න",
@@ -97,11 +97,11 @@ const i18n = {
     items_sell_price: "විකුණුම් මිල",
     items_status: "තත්ත්වය",
     items_edit: "සංස්කරණය",
-    
+
     status_out: "ඉවරයි",
     status_low: "අඩුයි",
     status_ok: "හොඳයි",
-    
+
     items_form_name: "භාණ්ඩයේ නම *",
     items_form_name_ph: "උදා: සිමෙන්ති, 6mm ඇණ",
     items_form_cat: "වර්ගය (Category)",
@@ -111,7 +111,7 @@ const i18n = {
     items_form_cost: "මිල ගැනීම (Cost Price)",
     items_form_sell: "විකුණුම් මිල (Sell Price) *",
     items_form_qty: "වර්තමාන තොගය (Quantity) *",
-    
+
     items_err_name: "භාණ්ඩයේ නම අවශ්‍යයි",
     items_err_sell: "විකුණුම් මිල අවශ්‍යයි",
     items_err_qty: "තොග ප්‍රමාණය අවශ්‍යයි",
@@ -119,13 +119,13 @@ const i18n = {
     items_updated: "භාණ්ඩය යාවත්කාලීන කරන ලදී",
     items_deleted: "ඉවත් කරන ලදී",
     items_del_confirm: "ඉවත් කරන්නද?",
-    
+
     // Stock
     stock_report: "තොග වාර්තාව",
     stock_total_val: "මුළු තොග වටිනාකම (cost මිලට):",
     stock_level: "මට්ටම",
     stock_value: "තොග වටිනාකම",
-    
+
     // Low Stock
     ls_title: "අඩු තොග ඇති භාණ්ඩ",
     ls_banner: "භාණ්ඩයක් නැවත ගෙන්වා ගැනීමට කාලයයි.",
@@ -137,7 +137,7 @@ const i18n = {
     ls_add_qty: "එකතු කරන ප්‍රමාණය *",
     ls_err_qty: "නිවැරදි ප්‍රමාණයක් ඇතුළත් කරන්න",
     ls_updated: "තොගය යාවත්කාලීන කරන ලදී",
-    
+
     // Customers
     cust_title: "ගනුදෙනුකරුවන්",
     cust_tab_hardwares: "හාර්ඩ්වෙයාර්ස් (Hardwares)",
@@ -151,7 +151,7 @@ const i18n = {
     cust_due: "හිඟ මුදල",
     cust_zero: "ශුන්‍ය",
     cust_details: "විස්තර",
-    
+
     cust_form_name: "නම *",
     cust_form_name_ph: "සම්පූර්ණ නම",
     cust_form_phone: "දුරකථන අංකය",
@@ -176,7 +176,7 @@ const i18n = {
     cust_payment_amount: "මුදල (රු.)",
     cust_err_name: "නම අවශ්‍යයි",
     cust_added: "ගනුදෙනුකරු එකතු කරන ලදී",
-    
+
     cust_curr_due: "වත්මන් හිඟ මුදල",
     cust_record_payment_title: "ගෙවීමක් වාර්තා කරන්න",
     cust_record_payment_btn: "ගෙවීම වාර්තා කරන්න",
@@ -187,7 +187,7 @@ const i18n = {
     cust_err_amt: "නිවැරදි මුදලක් ඇතුළත් කරන්න",
     cust_pay_recorded: "ගෙවීම වාර්තා කරන ලදී",
     cust_err_del_due: "හිඟ මුදලක් ඇති ගනුදෙනුකරුවෙකු ඉවත් කළ නොහැක",
-    
+
     // History
     hist_title: "විකුණුම් ඉතිහාසය",
     hist_filter_all: "සියල්ල",
@@ -198,7 +198,7 @@ const i18n = {
     hist_del_title: "අවලංගු කරන්න",
     hist_del_confirm: "මෙම බිල්පත අවලංගු කරන්නද? තොගය සහ නායට ශේෂය නැවත සකසනු ලැබේ.",
     hist_deleted: "බිල්පත අවලංගු කරන ලදී",
-    
+
     // Settings
     settings_title: "සැකසුම්",
     settings_shop_details: "කඩේ විස්තර",
@@ -215,7 +215,7 @@ const i18n = {
     settings_restore_err: "වැරදි backup file එකක්",
     settings_wipe_confirm: "සියලුම භාණ්ඩ, ගනුදෙනුකරුවන් සහ විකුණුම් ස්ථිරවම මකා දමන්නද? මෙය අහවලකළ නොහැක!",
     settings_wiped: "සියලුම දත්ත මකා දමන ලදී",
-    
+
     // Other short words
     word_credit: "නායට",
     word_cash: "කැෂ්",
@@ -223,7 +223,7 @@ const i18n = {
     word_qty: "තොගය",
     word_type: "වර්ගය"
   },
-  
+
   en: {
     // General
     currency_symbol: "Rs.",
@@ -237,7 +237,7 @@ const i18n = {
     yes: "Yes",
     no: "No",
     all: "All",
-    
+
     // Sidebar
     nav_dashboard: "Dashboard",
     nav_sale: "Sales / Billing",
@@ -250,7 +250,7 @@ const i18n = {
     sidebar_msg1: "Data is stored locally in this browser.",
     sidebar_msg2: "Take a <b>Backup</b> frequently.",
     brand_sub: "Store Management",
-    
+
     // Dashboard
     dash_total_items: "Total Items",
     dash_item_types: "Item Types",
@@ -274,7 +274,7 @@ const i18n = {
     dash_type: "Type",
     dash_amount: "Amount",
     dash_no_sales: "No sales yet",
-    
+
     // Sale
     sale_add_items: "Add Items",
     sale_search_placeholder: "🔍 Search an item... (e.g., Cement, Nails, Pipes)",
@@ -295,13 +295,13 @@ const i18n = {
     sale_exceeds_stock: "Selected quantity exceeds available stock",
     sale_select_credit_customer: "Select a customer for credit sales",
     sale_success: "Sale completed! #",
-    
+
     sale_subtotal: "Subtotal",
     sale_total: "Total",
     sale_payment: "Payment",
     sale_amount_paid: "Amount Paid (Rs.)",
     sale_change_due: "Change Due (Rs.)",
-    
+
     app_title: "HardwarePOS — Store POS",
     receipt_title: "Hardware Store POS",
     receipt_amount: "Amount",
@@ -309,7 +309,7 @@ const i18n = {
     receipt_thanks: "Thank you! Come again.",
     receipt_print: "🖨 Print Receipt",
     receipt_completed: "Transaction Completed",
-    
+
     // Items
     items_list: "Item List",
     items_add_btn: "+ Add an Item",
@@ -321,11 +321,11 @@ const i18n = {
     items_sell_price: "Selling Price",
     items_status: "Status",
     items_edit: "Edit",
-    
+
     status_out: "Out",
     status_low: "Low",
     status_ok: "OK",
-    
+
     items_form_name: "Item Name *",
     items_form_name_ph: "e.g., Cement, 6mm Nails",
     items_form_cat: "Category",
@@ -335,7 +335,7 @@ const i18n = {
     items_form_cost: "Cost Price",
     items_form_sell: "Selling Price *",
     items_form_qty: "Current Quantity *",
-    
+
     items_err_name: "Item name is required",
     items_err_sell: "Selling price is required",
     items_err_qty: "Quantity is required",
@@ -343,13 +343,13 @@ const i18n = {
     items_updated: "Item updated successfully",
     items_deleted: "Item deleted",
     items_del_confirm: "delete this item?",
-    
+
     // Stock
     stock_report: "Stock Report",
     stock_total_val: "Total Stock Value (at cost):",
     stock_level: "Level",
     stock_value: "Stock Value",
-    
+
     // Low Stock
     ls_title: "Low Stock Items",
     ls_banner: "items need to be restocked.",
@@ -361,7 +361,7 @@ const i18n = {
     ls_add_qty: "Quantity to add *",
     ls_err_qty: "Enter a valid quantity",
     ls_updated: "Stock updated successfully",
-    
+
     // Customers
     cust_title: "Customers",
     cust_tab_hardwares: "Hardwares",
@@ -375,7 +375,7 @@ const i18n = {
     cust_due: "Due Amount",
     cust_zero: "Zero",
     cust_details: "Details",
-    
+
     cust_form_name: "Name *",
     cust_form_name_ph: "Full Name",
     cust_form_phone: "Phone Number",
@@ -394,7 +394,7 @@ const i18n = {
     cust_payment_amount: "Amount (Rs.)",
     cust_err_name: "Name is required",
     cust_added: "Customer added successfully",
-    
+
     cust_curr_due: "Current Due",
     cust_record_payment_title: "Record a Payment",
     cust_record_payment_btn: "Record Payment",
@@ -405,7 +405,7 @@ const i18n = {
     cust_err_amt: "Enter a valid amount",
     cust_pay_recorded: "Payment recorded successfully",
     cust_err_del_due: "Cannot delete a customer with pending dues",
-    
+
     // History
     hist_title: "Sales History",
     hist_filter_all: "All",
@@ -416,7 +416,7 @@ const i18n = {
     hist_del_title: "Cancel Sale",
     hist_del_confirm: "Cancel this sale? Stock and credit balances will be restored.",
     hist_deleted: "Sale cancelled successfully",
-    
+
     // Settings
     settings_title: "Settings",
     settings_shop_details: "Shop Details",
@@ -433,7 +433,7 @@ const i18n = {
     settings_restore_err: "Invalid backup file",
     settings_wipe_confirm: "Permanently delete all items, customers, and sales? This cannot be undone!",
     settings_wiped: "All data wiped successfully",
-    
+
     // Other short words
     word_credit: "Credit",
     word_cash: "Cash",

@@ -1337,15 +1337,143 @@ th.num {
   font-weight: 600;
 }
 
-.combo-opt.combo-no-match {
-  color: var(--steel);
-  font-style: italic;
-  padding: 12px 13px;
-  cursor: default;
-}
-
 .combo-opt.combo-no-match:hover {
   background: #fff;
   color: var(--steel);
   font-weight: 400;
+}
+
+/* ===== RESPONSIVE MEDIA QUERIES ===== */
+
+/* Tablets & Small Laptops (max-width: 1024px) */
+@media (max-width: 1024px) {
+  .app {
+    flex-direction: column;
+  }
+
+  .sidebar {
+    width: 100%;
+    height: auto;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+
+  .brand {
+    padding: 10px 14px;
+  }
+
+  .nav {
+    flex-direction: row;
+    overflow-x: auto;
+    white-space: nowrap;
+    padding: 6px 10px 10px;
+    gap: 6px;
+    -webkit-overflow-scrolling: touch;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+  }
+
+  .nav-btn {
+    padding: 8px 12px;
+    font-size: 13px;
+    flex-shrink: 0;
+  }
+
+  .topbar {
+    padding: 8px 16px;
+    height: auto;
+    min-height: 52px;
+    flex-wrap: wrap;
+    gap: 8px;
+    position: relative;
+  }
+
+  .topbar-right {
+    flex-wrap: wrap;
+  }
+
+  .view-wrap {
+    padding: 16px 14px 40px;
+  }
+
+  .grid-3 {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .sale-layout {
+    grid-template-columns: 1fr;
+    height: auto;
+  }
+
+  .pos-item-grid {
+    grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)) !important;
+  }
+}
+
+/* Mobile Devices (max-width: 640px) */
+@media (max-width: 640px) {
+  .grid-4, .grid-3, .grid-2 {
+    grid-template-columns: 1fr;
+  }
+
+  .section-head {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .section-head > div {
+    flex-wrap: wrap;
+    width: 100%;
+  }
+
+  .section-head input, 
+  .section-head select, 
+  .section-head button {
+    width: 100% !important;
+  }
+
+  .topbar {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+    padding: 10px 14px;
+  }
+
+  .topbar-title {
+    font-size: 17px;
+  }
+
+  .topbar-right {
+    width: 100%;
+    justify-content: space-between;
+    font-size: 12px;
+  }
+
+  .stat-card {
+    padding: 14px;
+  }
+
+  .stat-value {
+    font-size: 22px;
+  }
+
+  .modal-dialog {
+    max-width: 96vw;
+    margin: 8px;
+    padding: 14px;
+  }
+
+  .pos-item-grid {
+    grid-template-columns: repeat(auto-fill, minmax(105px, 1fr)) !important;
+    gap: 8px !important;
+  }
+
+  .pos-item-card {
+    padding: 8px;
+    min-height: 120px;
+  }
+
+  .pos-item-img {
+    height: 55px;
+  }
 }
