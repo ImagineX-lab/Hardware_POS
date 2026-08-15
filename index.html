@@ -58,6 +58,22 @@
       <div class="topbar-title" id="viewTitle">උපකරණ පුවරුව</div>
       <div class="topbar-right" style="display:flex; align-items:center; gap:16px;">
         <span id="todayDate"></span>
+        
+        <!-- Notification Bell -->
+        <div class="notif-bell-wrap" id="notifBellWrap">
+          <button class="topbar-bell-btn" id="bellBtn" title="Notifications">
+            <i class="ph ph-bell"></i>
+            <span class="bell-badge" id="bellBadge"></span>
+          </button>
+          <div class="notif-dropdown" id="notifDropdown">
+            <div class="notif-header">
+              <span data-i18n="notif_title">නිවේදන</span>
+              <span id="notifCount" class="notif-count-badge">0</span>
+            </div>
+            <div class="notif-list" id="notifList"></div>
+          </div>
+        </div>
+
         <div class="lang-switcher-top">
           <button class="top-lang-btn" data-lang-btn="si" onclick="setLanguage('si')">සිං</button>
           <button class="top-lang-btn" data-lang-btn="en" onclick="setLanguage('en')">EN</button>

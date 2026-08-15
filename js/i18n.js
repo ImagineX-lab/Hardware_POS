@@ -78,6 +78,12 @@ const i18n = {
     sale_amount_paid: "ගෙව්ව මුදල (රු.)",
     sale_change_due: "ඉතිරි (රු.)",
 
+    cart_unit_price: "මිල",
+    cart_cost_price: "ගත්ත මිල (Cost)",
+    cart_stock: "තොගය",
+    cart_qty_label: "ප්‍රමාණය (Qty)",
+    cart_discount_label: "වට්ටම (Disc)",
+
     app_title: "HardwarePOS — කඩේ සිස්ටම්",
     receipt_title: "Hardware Store POS",
     receipt_amount: "මුදල",
@@ -215,7 +221,12 @@ const i18n = {
     word_cash: "Cash",
     word_due: "හිඟ",
     word_qty: "Stock",
-    word_type: "Type"
+    word_type: "Type",
+    notif_title: "නිවේදන",
+    notif_empty: "සියලුම තොග සීමාවන් යහපත් මට්ටමේ පවතී!",
+    notif_low_stock: "Stock අඩුයි!",
+    notif_current: "දැන් තියෙන්නේ",
+    notif_reorder: "Reorder සීමාව"
   },
 
   en: {
@@ -295,6 +306,12 @@ const i18n = {
     sale_payment: "Payment",
     sale_amount_paid: "Amount Paid (Rs.)",
     sale_change_due: "Change Due (Rs.)",
+
+    cart_unit_price: "Price",
+    cart_cost_price: "Cost",
+    cart_stock: "Stock",
+    cart_qty_label: "Qty",
+    cart_discount_label: "Disc",
 
     app_title: "HardwarePOS — Store POS",
     receipt_title: "Hardware Store POS",
@@ -433,7 +450,12 @@ const i18n = {
     word_cash: "Cash",
     word_due: "Due",
     word_qty: "Qty",
-    word_type: "Type"
+    word_type: "Type",
+    notif_title: "Notifications",
+    notif_empty: "All stock levels are normal!",
+    notif_low_stock: "Low stock alert!",
+    notif_current: "Current stock",
+    notif_reorder: "Reorder limit"
   }
 };
 

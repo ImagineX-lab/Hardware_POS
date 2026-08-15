@@ -74,15 +74,6 @@ Views.dashboard = {
         </div>
       </div>
 
-      ${low.length ? `
-      <div class="stripe-banner mt-20">
-        <span class="stripe-ico">⚠</span>
-        <div>
-          <b>${low.length} ${t('dash_low_stock_banner')}</b>
-          <div class="small" style="font-weight:500">${t('dash_low_stock_banner_sub')}</div>
-        </div>
-      </div>` : ``}
-
       <div class="grid grid-2 mt-20">
         <div class="card">
           <div class="card-title">${t('dash_low_stock_items')}</div>
@@ -165,18 +156,20 @@ Views.sale = {
 
           <div class="totals-box" id="totalsBox" style="margin-top:auto; padding-top:10px; border-top:none;">${Views.sale.totalsHTML()}</div>
 
+          <!-- Payment Method Selector -->
+          <div class="field mt-8" style="margin-bottom:6px;">
+            <label class="field-label" style="margin-bottom:4px;">${t('sale_pay_method')}</label>
+            <div class="pay-toggle" style="margin:0;">
+              <button type="button" id="payCashBtn" class="${Views.sale.payType === 'cash' ? 'active' : ''}">${t('sale_cash')}</button>
+              <button type="button" id="payCreditBtn" class="credit ${Views.sale.payType === 'credit' ? 'active' : ''}">${t('sale_credit')}</button>
+            </div>
+          </div>
+
           <!-- Customer Selection Box (For Cash or Credit) -->
           <div class="field mt-8" style="margin-bottom:6px;">
             <label class="field-label" style="margin-bottom:4px;">${t('sale_customer')} <small class="text-muted">(${Views.sale.payType === 'credit' ? 'අවශ්‍යයි' : 'විකල්පයි'})</small></label>
             <div id="customerSelectionWrap">
               ${Views.sale.customerWidgetHTML()}
-            </div>
-          </div>
-          
-          <div class="field mt-8" style="margin-bottom:6px;">
-            <div class="pay-toggle" style="margin:0;">
-              <button type="button" id="payCashBtn" class="${Views.sale.payType === 'cash' ? 'active' : ''}">${t('sale_cash')}</button>
-              <button type="button" id="payCreditBtn" class="credit ${Views.sale.payType === 'credit' ? 'active' : ''}">${t('sale_credit')}</button>
             </div>
           </div>
 
@@ -190,9 +183,10 @@ Views.sale = {
             </div>
           </div>
 
-          <div class="field" style="margin-bottom:12px; display:flex; align-items:center; gap:10px; margin-top:4px;">
-            <label class="field-label" style="margin:0;">${t('sale_discount')}</label>
-            <input class="input" id="saleDiscount" type="number" min="0" step="any" value="0" style="flex:1;">
+          <!-- Overall Discount Field -->
+          <div class="field mt-8" style="margin-bottom:12px;">
+            <label class="field-label" style="margin-bottom:4px;">${t('sale_discount')}</label>
+            <input class="input" id="saleDiscount" type="number" min="0" step="any" value="0">
           </div>
 
           <button class="btn btn-primary btn-block" id="completeSaleBtn" style="padding:13px; font-size:15px;">${t('sale_complete_btn')}</button>
@@ -277,16 +271,28 @@ Views.sale = {
           </div>
           <button class="icon-btn" data-remove-idx="${idx}" title="${t('delete')}" style="font-size:16px; flex-shrink:0;">✕</button>
         </div>
-        <div class="cart-row-bottom">
-          <div class="cart-item-meta">
-            ${fmt(l.unitPrice)} / ${escapeHTML(l.unit)} &nbsp;•&nbsp; 
-            Cost: ${fmt(l.costPrice)} &nbsp;•&nbsp; 
-            ${t('word_qty')}: ${l.maxQty}
+        <div class="cart-row-bottom" style="display:flex; flex-direction:column; gap:8px; align-items:stretch; width:100%;">
+          <div class="cart-item-meta" style="display:flex; flex-wrap:wrap; gap:6px 8px; font-size:11.5px; color:var(--steel);">
+            <span>${t('cart_unit_price')}: <b>${fmt(l.unitPrice)} / ${escapeHTML(l.unit)}</b></span>
+            <span>•</span>
+            <span>${t('cart_cost_price')}: <b>${fmt(l.costPrice)}</b></span>
+            <span>•</span>
+            <span>${t('cart_stock')}: <b>${l.maxQty}</b></span>
           </div>
-          <div style="display:flex; align-items:center; gap:8px;">
-            <input type="number" min="0.01" step="any" max="${l.maxQty}" value="${l.qty}" data-qty-idx="${idx}" class="input" style="width:75px;" title="Quantity">
-            <input type="number" min="0" step="any" placeholder="Disc" value="${l.discount || ''}" data-discount-idx="${idx}" class="input" style="width:75px;" title="Discount">
-            <div class="cart-row-price">${fmt(Math.max(0, l.qty * l.unitPrice - (l.discount || 0)))}</div>
+          <div style="display:flex; align-items:flex-end; justify-content:space-between; gap:10px; width:100%;">
+            <div style="display:flex; gap:8px;">
+              <div style="display:flex; flex-direction:column; gap:2px;">
+                <label style="font-size:10px; font-weight:600; color:var(--steel); text-transform:uppercase;">${t('cart_qty_label')}</label>
+                <input type="number" min="0.01" step="any" max="${l.maxQty}" value="${l.qty}" data-qty-idx="${idx}" class="input" style="width:70px; height:32px; padding:4px 6px;" title="Quantity">
+              </div>
+              <div style="display:flex; flex-direction:column; gap:2px;">
+                <label style="font-size:10px; font-weight:600; color:var(--steel); text-transform:uppercase;">${t('cart_discount_label')}</label>
+                <input type="number" min="0" step="any" placeholder="0" value="${l.discount || ''}" data-discount-idx="${idx}" class="input" style="width:70px; height:32px; padding:4px 6px;" title="Discount">
+              </div>
+            </div>
+            <div class="cart-row-price" style="font-size:16px; font-weight:700; color:var(--primary-dark); margin-bottom:2px;">
+              ${fmt(Math.max(0, l.qty * l.unitPrice - (l.discount || 0)))}
+            </div>
           </div>
         </div>
       </div>
@@ -294,24 +300,31 @@ Views.sale = {
   },
 
   calcSubtotal() {
-    return cart.reduce((s, l) => s + Math.max(0, l.qty * l.unitPrice - (l.discount || 0)), 0);
+    return cart.reduce((s, l) => s + l.qty * l.unitPrice, 0);
+  },
+
+  calcItemDiscounts() {
+    return cart.reduce((s, l) => s + (Number(l.discount) || 0), 0);
   },
 
   calcTotal() {
     const subtotal = Views.sale.calcSubtotal();
+    const itemDiscounts = Views.sale.calcItemDiscounts();
     const discountEl = document.getElementById('saleDiscount');
-    const discount = discountEl ? Number(discountEl.value) || 0 : 0;
-    return Math.max(0, subtotal - discount);
+    const overallDiscount = discountEl ? Number(discountEl.value) || 0 : 0;
+    return Math.max(0, subtotal - (itemDiscounts + overallDiscount));
   },
 
   totalsHTML() {
     const subtotal = Views.sale.calcSubtotal();
+    const itemDiscounts = Views.sale.calcItemDiscounts();
     const discountEl = document.getElementById('saleDiscount');
-    const discount = discountEl ? Number(discountEl.value) || 0 : 0;
-    const total = Math.max(0, subtotal - discount);
+    const overallDiscount = discountEl ? Number(discountEl.value) || 0 : 0;
+    const totalDiscount = itemDiscounts + overallDiscount;
+    const total = Math.max(0, subtotal - totalDiscount);
     return `
       <div class="totals-line"><span>${t('sale_subtotal')}</span><span>${fmt(subtotal)}</span></div>
-      <div class="totals-line"><span>${t('sale_discount')}</span><span>- ${fmt(discount)}</span></div>
+      <div class="totals-line"><span>${t('sale_discount')}</span><span>- ${fmt(totalDiscount)}</span></div>
       <div class="totals-line grand"><span>${t('sale_total')}</span><span>${fmt(total)}</span></div>
     `;
   },
@@ -687,12 +700,14 @@ Views.sale = {
       if (!customerId) { toast(t('sale_select_credit_customer'), 'err'); return; }
     }
 
-    const discount = Number(document.getElementById('saleDiscount').value) || 0;
+    const itemDiscounts = Views.sale.calcItemDiscounts();
+    const overallDiscount = Number(document.getElementById('saleDiscount').value) || 0;
+    const discount = overallDiscount + itemDiscounts;
     const amountPaid = Number(document.getElementById('saleAmountPaid')?.value) || Number(Views.sale.amountPaid) || 0;
     const total = Views.sale.calcTotal();
     const changeAmount = Math.max(0, amountPaid - total);
 
-    const lines = cart.map(l => ({ itemId: l.itemId, name: l.name, unit: l.unit, qty: l.qty, unitPrice: l.unitPrice }));
+    const lines = cart.map(l => ({ itemId: l.itemId, name: l.name, unit: l.unit, qty: l.qty, unitPrice: l.unitPrice, discount: l.discount || 0 }));
 
     const sale = await DB.createSale({ lines, paymentType: payType, customerId, customerName, discount, amountPaid, changeAmount });
     toast(`${t('sale_success')}#${sale.id}`, 'ok');
@@ -1103,17 +1118,6 @@ Views.stock = {
         </div>
       </div>
 
-      ${lowItems.length > 0 ? `
-        <div class="stripe-banner mb-14" style="margin-bottom:16px; display:flex; align-items:center; gap:12px;">
-          <span class="stripe-ico">⚠</span>
-          <div style="flex:1;">
-            <b>භාණ්ඩ ${lowItems.length} ක තොග අවසන් වී හෝ අඩුවෙමින් පවතී!</b>
-            <div class="small" style="font-weight:500;">පහත ලැයිස්තුවේ ඇති "＋ තොග එකතු කරන්න" බටන් එකෙන් තොග නංවාගත හැක.</div>
-          </div>
-          <button class="btn btn-sm btn-outline" id="showOnlyLowBtn" style="white-space:nowrap;">⚠ අඩු තොග බලන්න</button>
-        </div>
-      ` : ``}
-
       <div id="stockTableWrap">${Views.stock.tableHTML()}</div>
     `;
   },
@@ -1162,7 +1166,7 @@ Views.stock = {
           : ``;
 
       return `
-                <tr>
+                <tr style="${isOut ? 'background:rgba(239,68,68,0.07); border-left:3px solid var(--danger);' : isLow ? 'background:rgba(245,158,11,0.07); border-left:3px solid var(--yellow);' : ''}">
                   <td>
                     <div style="width:36px; height:36px; border-radius:6px; overflow:hidden; background:var(--paper); display:flex; align-items:center; justify-content:center; border:1px solid var(--border);">
                       ${i.image ? `<img src="${i.image}" style="width:100%; height:100%; object-fit:cover;">` : `<i class="ph ph-package" style="font-size:18px;"></i>`}

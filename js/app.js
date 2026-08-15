@@ -34,6 +34,26 @@ const App = {
         this.render();
       });
     });
+
+    // Bell dropdown toggle
+    document.getElementById('bellBtn')?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const dropdown = document.getElementById('notifDropdown');
+      if (dropdown) {
+        const isVisible = dropdown.style.display === 'block';
+        dropdown.style.display = isVisible ? 'none' : 'block';
+      }
+    });
+
+    // Close dropdown on click outside
+    document.addEventListener('click', (e) => {
+      const dropdown = document.getElementById('notifDropdown');
+      const bellBtn = document.getElementById('bellBtn');
+      if (dropdown && bellBtn && !dropdown.contains(e.target) && !bellBtn.contains(e.target)) {
+        dropdown.style.display = 'none';
+      }
+    });
+
     this.bindGlobalShortcuts();
     this.render();
   },
@@ -120,6 +140,7 @@ const App = {
     if (typeof updateStaticTranslations === 'function') {
       updateStaticTranslations();
     }
+    this.updateNotifications();
   },
 
   updateSidebarCounts(){
@@ -128,6 +149,63 @@ const App = {
     const n = DB.lowStockItems().length;
     el.textContent = n;
     el.style.display = n>0 ? 'flex' : 'none';
+  },
+
+  updateNotifications() {
+    const bellBadge = document.getElementById('bellBadge');
+    const notifCount = document.getElementById('notifCount');
+    const notifList = document.getElementById('notifList');
+    if (!bellBadge || !notifCount || !notifList) return;
+
+    const lowItems = DB.lowStockItems() || [];
+    const count = lowItems.length;
+
+    notifCount.textContent = count;
+    if (count > 0) {
+      bellBadge.style.display = 'block';
+      notifCount.style.display = 'inline-block';
+      notifList.innerHTML = lowItems.map(item => `
+        <div class="notif-item" data-notif-item-id="${item.id}">
+          <span class="notif-item-icon"><i class="ph ph-warning-octagon"></i></span>
+          <div style="flex:1;">
+            <div class="notif-item-title">${escapeHTML(item.name)} ${t('notif_low_stock')}</div>
+            <div class="notif-item-desc">${t('notif_current')}: <b>${item.qty} ${escapeHTML(item.unit)}</b> &nbsp;•&nbsp; ${t('notif_reorder')}: <b>${item.reorderLevel}</b></div>
+          </div>
+        </div>
+      `).join('');
+
+      // Bind click handlers to notification items
+      notifList.querySelectorAll('.notif-item').forEach(el => {
+        el.addEventListener('click', () => {
+          const itemId = Number(el.dataset.notifItemId);
+          const item = DB.allItems().find(i => i.id === itemId);
+          if (item) {
+            Views.items.searchQ = item.name;
+            App.currentView = 'items';
+            App.render();
+            // Focus and select the search input
+            setTimeout(() => {
+              const inp = document.getElementById('itemsSearch');
+              if (inp) {
+                inp.value = item.name;
+                inp.focus();
+                inp.select();
+              }
+            }, 100);
+          }
+          document.getElementById('notifDropdown').style.display = 'none';
+        });
+      });
+    } else {
+      bellBadge.style.display = 'none';
+      notifCount.style.display = 'none';
+      notifList.innerHTML = `
+        <div class="notif-empty">
+          <div class="notif-empty-icon"><i class="ph ph-check-circle"></i></div>
+          <div class="notif-empty-text">${t('notif_empty')}</div>
+        </div>
+      `;
+    }
   }
 };
 
