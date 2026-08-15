@@ -135,7 +135,7 @@ Views.sale = {
     if (!Views.sale.payType) Views.sale.payType = 'cash';
     return `
       <div class="sale-layout">
-        <div class="card" style="display:flex; flex-direction:column; overflow:hidden;">
+      <div class="card">
           <div style="position:relative;">
             <input class="input" id="saleSearch" placeholder="${t('sale_search_placeholder')}" autocomplete="off">
             <div id="saleSuggest" style="position:absolute; z-index:10; width:100%; top:100%;"></div>
@@ -150,7 +150,7 @@ Views.sale = {
           </div>
         </div>
 
-        <div class="card" style="display:flex; flex-direction:column; overflow:hidden;">
+        <div class="card">
           <div class="card-title" style="margin-bottom:10px">${t('sale_cart')}</div>
           <div class="cart-list-wrap" id="cartBox">${Views.sale.cartHTML()}</div>
 
