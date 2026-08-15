@@ -1,25 +1,28 @@
 @import url('./fonts.css');
 
 :root {
-  --charcoal: #20242A;
-  --charcoal-2: #2B3038;
-  --charcoal-3: #363C46;
+  --charcoal: #111827;
+  --charcoal-2: #1F2937;
+  --charcoal-3: #374151;
   --steel: #6B7280;
-  --steel-light: #9AA1AC;
-  --paper: #F5F3EC;
+  --steel-light: #9CA3AF;
+  --paper: #F3F4F6;
   --card: #FFFFFF;
-  --orange: #E8590C;
-  --orange-dark: #C94A05;
-  --orange-light: #FCE7D9;
-  --yellow: #F4B400;
-  --success: #2F9E5B;
-  --success-light: #E4F5EB;
-  --danger: #D9432E;
-  --danger-light: #FBE6E3;
-  --border: #E6E2D8;
-  --border-dark: #3E4550;
-  --radius: 10px;
-  --shadow: 0 1px 2px rgba(20, 20, 20, .04), 0 6px 20px rgba(20, 20, 20, .06);
+  --primary: #10B981;
+  --primary-dark: #059669;
+  --primary-light: #D1FAE5;
+  --orange: #10B981;
+  --orange-dark: #059669;
+  --orange-light: #D1FAE5;
+  --yellow: #F59E0B;
+  --success: #10B981;
+  --success-light: #D1FAE5;
+  --danger: #EF4444;
+  --danger-light: #FEE2E2;
+  --border: #E5E7EB;
+  --border-dark: #374151;
+  --radius: 12px;
+  --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
 }
 
 * {
@@ -29,7 +32,7 @@
 }
 
 body {
-  font-family: 'Abhaya Libre', 'Noto Sans Sinhala', 'Inter', -apple-system, 'Segoe UI', 'Nirmala UI', sans-serif;
+  font-family: 'Inter', 'Noto Sans Sinhala', 'Abhaya Libre', -apple-system, 'Segoe UI', 'Nirmala UI', sans-serif;
   background: var(--paper);
   color: var(--charcoal);
   font-size: 15px;
@@ -63,8 +66,8 @@ textarea {
 
 /* ===== SIDEBAR ===== */
 .sidebar {
-  width: 250px;
-  flex: 0 0 250px;
+  width: 70px;
+  flex: 0 0 70px;
   background: linear-gradient(180deg, var(--charcoal), var(--charcoal-2));
   color: #EDEEF0;
   display: flex;
@@ -72,6 +75,32 @@ textarea {
   position: sticky;
   top: 0;
   height: 100vh;
+  transition: width 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  overflow: hidden;
+  z-index: 100;
+}
+
+.sidebar:hover {
+  width: 250px;
+  flex: 0 0 250px;
+}
+
+.brand-text,
+.nav-text,
+.sidebar-foot,
+.sidebar .badge-count {
+  opacity: 0;
+  white-space: nowrap;
+  transition: opacity 0.2s ease, visibility 0.2s ease;
+  visibility: hidden;
+}
+
+.sidebar:hover .brand-text,
+.sidebar:hover .nav-text,
+.sidebar:hover .sidebar-foot,
+.sidebar:hover .badge-count {
+  opacity: 1;
+  visibility: visible;
 }
 
 .brand {
@@ -86,7 +115,7 @@ textarea {
   width: 38px;
   height: 38px;
   border-radius: 8px;
-  background: var(--orange);
+  background: var(--primary);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -156,7 +185,7 @@ textarea {
 }
 
 .nav-btn.active {
-  background: var(--orange);
+  background: var(--primary);
   color: #fff;
 }
 
@@ -272,11 +301,12 @@ textarea {
   align-items: center;
   justify-content: space-between;
   padding: 0 26px;
-  background: var(--card);
-  border-bottom: 1px solid var(--border);
+  background: var(--charcoal);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
   position: sticky;
   top: 0;
   z-index: 5;
+  color: #EDEEF0;
 }
 
 .topbar-title {
@@ -284,16 +314,60 @@ textarea {
   font-size: 19px;
   font-weight: 600;
   letter-spacing: .3px;
+  color: #fff;
 }
 
 .topbar-right {
-  color: var(--steel);
+  color: var(--steel-light);
   font-size: 13px;
+}
+
+.topbar .lang-switcher-top {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+.topbar .top-lang-btn {
+  color: var(--steel-light);
+}
+
+.topbar .top-lang-btn:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.topbar .top-lang-btn.lang-active {
+  background: var(--primary);
+  color: #fff;
+  box-shadow: 0 1px 4px rgba(16, 185, 129, 0.3);
 }
 
 .view-wrap {
   padding: 22px 26px 60px;
   flex: 1;
+  animation: fadeIn 0.4s ease-out;
+}
+
+/* ===== ANIMATIONS ===== */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes scaleUp {
+  from { opacity: 0; transform: scale(0.95); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+@keyframes bounceIn {
+  0% { transform: scale(0.9); opacity: 0; }
+  60% { transform: scale(1.05); opacity: 1; }
+  100% { transform: scale(1); }
 }
 
 /* ===== GENERIC UI ===== */
@@ -304,6 +378,10 @@ textarea {
 
 .grid-4 {
   grid-template-columns: repeat(4, 1fr);
+}
+
+.grid-3 {
+  grid-template-columns: repeat(3, 1fr);
 }
 
 .grid-2 {
@@ -323,9 +401,15 @@ textarea {
 .card {
   background: var(--card);
   border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 18px;
+  border-radius: 16px;
+  padding: 22px;
   box-shadow: var(--shadow);
+  animation: slideUp 0.4s ease-out backwards;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.card:hover {
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
 }
 
 .card-title {
@@ -361,7 +445,9 @@ textarea {
 .stat-value {
   font-family: 'Oswald', sans-serif;
   font-size: 30px;
-  font-weight: 600;
+  font-weight: 700;
+  line-height: 1.1;
+  color: var(--charcoal);
 }
 
 .stat-sub {
@@ -381,17 +467,47 @@ textarea {
   color: var(--success);
 }
 
-.section-head {
+.section-head, .page-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 14px;
+  margin-bottom: 16px;
   gap: 12px;
   flex-wrap: wrap;
 }
 
-.section-head h2 {
-  font-size: 17px;
+.section-head h2, .page-header-title {
+  font-size: 18px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+}
+
+.page-header-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.page-header-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.page-header-icon {
+  font-size: 22px;
+  color: var(--primary);
+}
+
+.page-header-count {
+  background: var(--charcoal-2);
+  color: #fff;
+  font-size: 12px;
+  padding: 2px 8px;
+  border-radius: 12px;
   font-weight: 600;
 }
 
@@ -419,11 +535,11 @@ textarea {
 }
 
 .btn-primary {
-  background: var(--orange);
+  background: var(--primary);
 }
 
 .btn-primary:hover {
-  background: var(--orange-dark);
+  background: var(--primary-dark);
   opacity: 1;
 }
 
@@ -1352,11 +1468,19 @@ th.num {
   }
 
   .sidebar {
-    width: 100%;
+    width: 100% !important;
+    flex: 0 0 auto;
     height: auto;
     position: sticky;
     top: 0;
     z-index: 100;
+  }
+
+  .brand-text,
+  .nav-text,
+  .sidebar .badge-count {
+    opacity: 1 !important;
+    visibility: visible !important;
   }
 
   .brand {

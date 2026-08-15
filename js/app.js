@@ -99,7 +99,7 @@ const App = {
       const d = new Date();
       const dateStr = d.toLocaleDateString('en-GB', { weekday:'long', year:'numeric', month:'long', day:'numeric' });
       const timeStr = d.toLocaleTimeString('en-US', { hour:'2-digit', minute:'2-digit', second:'2-digit', hour12:true });
-      el.innerHTML = `<span style="font-weight:500;">${dateStr}</span> <span style="margin:0 6px; color:var(--border);">|</span> <b style="color:var(--orange-dark); font-weight:700; font-family:monospace; font-size:14px;">⏰ ${timeStr}</b>`;
+      el.innerHTML = `<span style="font-weight:500;">${dateStr}</span> <span style="margin:0 6px; color:var(--border);">|</span> <b style="color:var(--primary); font-weight:700; font-family:monospace; font-size:14px;">${timeStr}</b>`;
     };
     update();
     setInterval(update, 1000);

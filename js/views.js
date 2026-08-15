@@ -6,15 +6,49 @@
 const Views = {};
 let cart = []; // { itemId, name, unit, unitPrice, qty, maxQty }
 
+/* ================= GLOBAL PAGE HEADER TEMPLATE =================
+   Usage: Views.renderPageHeader({ icon, title, count, search, actions })
+   - icon    : Phosphor icon class name (e.g. 'ph-package')
+   - title   : Page title string
+   - count   : (optional) number shown as a badge beside the title
+   - search  : (optional) { id, placeholder, value }
+   - actions : (optional) [{ id, label, cls }]  cls defaults to 'btn-primary'
+   ================================================================ */
+Views.renderPageHeader = function ({ icon = '', title = '', count = null, search = null, actions = [] } = {}) {
+  const countBadge = (count !== null && count !== undefined)
+    ? `<span class="page-header-count">${count}</span>`
+    : '';
+  const iconHTML = icon ? `<i class="ph ${icon} page-header-icon"></i>` : '';
+  const searchHTML = search
+    ? `<input class="input" id="${search.id}" placeholder="${search.placeholder || ''}" style="width:220px" value="${search.value || ''}">`
+    : '';
+  const actionsHTML = actions.map(a =>
+    `<button class="btn ${a.cls || 'btn-primary'}" id="${a.id}">${a.label}</button>`
+  ).join('');
+
+  return `
+    <div class="page-header">
+      <div class="page-header-left">
+        ${iconHTML}
+        <h2 class="page-header-title">${title}${countBadge}</h2>
+      </div>
+      <div class="page-header-right">
+        ${searchHTML}
+        ${actionsHTML}
+      </div>
+    </div>`;
+};
+
+
 /* ================= DASHBOARD ================= */
 Views.dashboard = {
-  render(){
+  render() {
     const items = DB.allItems();
     const low = DB.lowStockItems();
     const today = DB.todaySales();
-    const todayTotal = today.reduce((s,x)=>s+x.total,0);
+    const todayTotal = today.reduce((s, x) => s + x.total, 0);
     const credit = DB.totalCreditOutstanding();
-    const recent = DB.allSales().slice(0,6);
+    const recent = DB.allSales().slice(0, 6);
 
     return `
       <div class="grid grid-4">
@@ -58,7 +92,7 @@ Views.dashboard = {
               <table>
                 <thead><tr><th>${t('dash_item')}</th><th class="num">${t('dash_stock')}</th><th class="num">${t('dash_reorder')}</th></tr></thead>
                 <tbody>
-                  ${low.slice(0,6).map(i=>`
+                  ${low.slice(0, 6).map(i => `
                     <tr>
                       <td>${escapeHTML(i.name)}</td>
                       <td class="num">${i.qty} ${escapeHTML(i.unit)}</td>
@@ -79,23 +113,23 @@ Views.dashboard = {
               <table>
                 <thead><tr><th>#</th><th>${t('dash_date')}</th><th>${t('dash_type')}</th><th class="num">${t('dash_amount')}</th></tr></thead>
                 <tbody>
-                  ${recent.map(s=>`
+                  ${recent.map(s => `
                     <tr>
                       <td>${s.id}</td>
                       <td>${fmtDate(s.date)}</td>
-                      <td>${s.paymentType==='credit' ? `<span class="pill pill-warn">${t('word_credit')}</span>` : `<span class="pill pill-ok">${t('word_cash')}</span>`}</td>
+                      <td>${s.paymentType === 'credit' ? `<span class="pill pill-warn">${t('word_credit')}</span>` : `<span class="pill pill-ok">${t('word_cash')}</span>`}</td>
                       <td class="num">${fmt(s.total)}</td>
                     </tr>
                   `).join('')}
                 </tbody>
               </table>
             </div>
-          ` : `<div class="empty-state"><div class="em-ico">🧾</div><h3>${t('dash_no_sales')}</h3></div>`}
+          ` : `<div class="empty-state"><div class="em-ico"><i class="ph ph-receipt"></i></div><h3>${t('dash_no_sales')}</h3></div>`}
         </div>
       </div>
     `;
   },
-  bind(){}
+  bind() { }
 };
 
 /* ================= SALE / BILLING ================= */
@@ -105,9 +139,9 @@ Views.sale = {
   selectedCustomer: null,
   amountPaid: '',
 
-  render(){
+  render() {
     cart = cart || [];
-    if(!Views.sale.payType) Views.sale.payType = 'cash';
+    if (!Views.sale.payType) Views.sale.payType = 'cash';
     return `
       <div class="sale-layout">
         <div class="card" style="display:flex; flex-direction:column; overflow:hidden;">
@@ -133,7 +167,7 @@ Views.sale = {
 
           <!-- Customer Selection Box (For Cash or Credit) -->
           <div class="field mt-8" style="margin-bottom:6px;">
-            <label class="field-label" style="margin-bottom:4px;">${t('sale_customer')} <small class="text-muted">(${Views.sale.payType==='credit'?'අවශ්‍යයි':'විකල්පයි'})</small></label>
+            <label class="field-label" style="margin-bottom:4px;">${t('sale_customer')} <small class="text-muted">(${Views.sale.payType === 'credit' ? 'අවශ්‍යයි' : 'විකල්පයි'})</small></label>
             <div id="customerSelectionWrap">
               ${Views.sale.customerWidgetHTML()}
             </div>
@@ -141,16 +175,16 @@ Views.sale = {
           
           <div class="field mt-8" style="margin-bottom:6px;">
             <div class="pay-toggle" style="margin:0;">
-              <button type="button" id="payCashBtn" class="${Views.sale.payType==='cash'?'active':''}">${t('sale_cash')}</button>
-              <button type="button" id="payCreditBtn" class="credit ${Views.sale.payType==='credit'?'active':''}">${t('sale_credit')}</button>
+              <button type="button" id="payCashBtn" class="${Views.sale.payType === 'cash' ? 'active' : ''}">${t('sale_cash')}</button>
+              <button type="button" id="payCreditBtn" class="credit ${Views.sale.payType === 'credit' ? 'active' : ''}">${t('sale_credit')}</button>
             </div>
           </div>
 
           <!-- Amount Paid & Change Due for Cash -->
-          <div class="field mt-8" id="amountPaidWrap" style="display:${Views.sale.payType==='cash'?'block':'none'}; margin-bottom:6px;">
+          <div class="field mt-8" id="amountPaidWrap" style="display:${Views.sale.payType === 'cash' ? 'block' : 'none'}; margin-bottom:6px;">
             <label class="field-label" style="margin-bottom:4px;">${t('sale_amount_paid')}</label>
             <input class="input" id="saleAmountPaid" type="number" min="0" step="any" placeholder="0.00" value="${Views.sale.amountPaid || ''}">
-            <div id="changeDueWrap" class="change-due-box" style="display:${(Number(Views.sale.amountPaid) > 0)?'flex':'none'};">
+            <div id="changeDueWrap" class="change-due-box" style="display:${(Number(Views.sale.amountPaid) > 0) ? 'flex' : 'none'};">
               <span>${t('sale_change_due')}</span>
               <span id="changeDueAmount" style="font-size:16px;">${fmt(Math.max(0, (Number(Views.sale.amountPaid) || 0) - Views.sale.calcTotal()))}</span>
             </div>
@@ -168,14 +202,14 @@ Views.sale = {
     `;
   },
 
-  customerWidgetHTML(){
+  customerWidgetHTML() {
     if (Views.sale.selectedCustomer) {
       const c = Views.sale.selectedCustomer;
       const isHardware = c.customerType === 'hardware';
       return `
         <div class="selected-cust-card">
           <div>
-            <div class="cust-name-title">👤 ${escapeHTML(c.name)} ${isHardware ? `<span class="pill pill-ok" style="font-size:10px; margin-left:4px;">${t('cust_tab_hardwares')}</span>` : ''}</div>
+            <div class="cust-name-title"><i class="ph ph-user"></i> ${escapeHTML(c.name)} ${isHardware ? `<span class="pill pill-ok" style="font-size:10px; margin-left:4px;">${t('cust_tab_hardwares')}</span>` : ''}</div>
             <div class="cust-meta">
               ${c.phone ? `📞 ${escapeHTML(c.phone)}` : ''} 
               ${c.balance > 0 ? ` • <span style="color:var(--danger); font-weight:700;">${t('word_due')}: ${fmt(c.balance)}</span>` : ''}
@@ -194,7 +228,7 @@ Views.sale = {
     `;
   },
 
-  categoriesHTML(){
+  categoriesHTML() {
     const items = DB.allItems();
     const cats = ['All', ...new Set(items.map(i => i.category || 'Uncategorized'))].filter(Boolean);
     return `
@@ -204,24 +238,24 @@ Views.sale = {
     `;
   },
 
-  posGridHTML(){
+  posGridHTML() {
     let items = DB.allItems();
     if (Views.sale.currentCategory !== 'All') {
       items = items.filter(i => (i.category || 'Uncategorized') === Views.sale.currentCategory);
     }
     if (!items.length) {
-      return `<div class="empty-state" style="grid-column:1/-1; padding:40px 20px;"><div class="em-ico">📦</div><h3>${t('sale_no_matches')||'No items'}</h3></div>`;
+      return `<div class="empty-state" style="grid-column:1/-1; padding:40px 20px;"><div class="em-ico"><i class="ph ph-package"></i></div><h3>${t('sale_no_matches') || 'No items'}</h3></div>`;
     }
     return items.map(i => `
       <div class="pos-item-card ${i.qty <= 0 ? 'out-of-stock' : ''}" data-grid-item="${i.id}">
         <div class="pos-item-img">
           ${i.image
-            ? `<img src="${i.image}" alt="${escapeHTML(i.name)}" style="width:100%; height:100%; object-fit:cover;">`
-            : `<span style="font-size:28px; line-height:1;">📦</span>`
-          }
+        ? `<img src="${i.image}" alt="${escapeHTML(i.name)}" style="width:100%; height:100%; object-fit:cover;">`
+        : `<i class="ph ph-package" style="font-size:28px; line-height:1; color:var(--text-muted);"></i>`
+      }
         </div>
         <div class="item-name"><b>${escapeHTML(i.name)}</b></div>
-        <div class="item-desc text-muted">${escapeHTML(i.description||'')}</div>
+        <div class="item-desc text-muted">${escapeHTML(i.description || '')}</div>
         <div>
           <div class="item-price">${fmt(i.sellPrice)}</div>
           <div class="item-qty">${i.qty} ${escapeHTML(i.unit)}</div>
@@ -230,45 +264,50 @@ Views.sale = {
     `).join('');
   },
 
-  cartHTML(){
-    if(!cart.length) return `<div class="empty-state" style="padding:30px 10px"><div class="em-ico">🛒</div><h3>${t('sale_empty_cart')}</h3><div class="small">${t('sale_empty_cart_sub')}</div></div>`;
-    return cart.map((l,idx)=>`
+  cartHTML() {
+    if (!cart.length) return `<div class="empty-state" style="padding:30px 10px"><div class="em-ico"><i class="ph ph-shopping-cart"></i></div><h3>${t('sale_empty_cart')}</h3><div class="small">${t('sale_empty_cart_sub')}</div></div>`;
+    return cart.map((l, idx) => `
       <div class="cart-row">
         <div class="cart-row-top">
           <div style="display:flex; align-items:center; gap:8px; flex:1; min-width:0;">
             <div style="width:32px; height:32px; border-radius:6px; overflow:hidden; background:var(--paper); display:flex; align-items:center; justify-content:center; flex-shrink:0;">
-              ${l.image ? `<img src="${l.image}" style="width:100%; height:100%; object-fit:cover;">` : `<span style="font-size:16px;">📦</span>`}
+              ${l.image ? `<img src="${l.image}" style="width:100%; height:100%; object-fit:cover;">` : `<i class="ph ph-package" style="font-size:16px;"></i>`}
             </div>
             <div class="cart-item-name">${escapeHTML(l.name)}</div>
           </div>
           <button class="icon-btn" data-remove-idx="${idx}" title="${t('delete')}" style="font-size:16px; flex-shrink:0;">✕</button>
         </div>
         <div class="cart-row-bottom">
-          <div class="cart-item-meta">${fmt(l.unitPrice)} / ${escapeHTML(l.unit)} &nbsp;•&nbsp; ${t('word_qty')}: ${l.maxQty}</div>
+          <div class="cart-item-meta">
+            ${fmt(l.unitPrice)} / ${escapeHTML(l.unit)} &nbsp;•&nbsp; 
+            Cost: ${fmt(l.costPrice)} &nbsp;•&nbsp; 
+            ${t('word_qty')}: ${l.maxQty}
+          </div>
           <div style="display:flex; align-items:center; gap:8px;">
-            <input type="number" min="0.01" step="any" max="${l.maxQty}" value="${l.qty}" data-qty-idx="${idx}" class="input">
-            <div class="cart-row-price">${fmt(l.qty*l.unitPrice)}</div>
+            <input type="number" min="0.01" step="any" max="${l.maxQty}" value="${l.qty}" data-qty-idx="${idx}" class="input" style="width:75px;" title="Quantity">
+            <input type="number" min="0" step="any" placeholder="Disc" value="${l.discount || ''}" data-discount-idx="${idx}" class="input" style="width:75px;" title="Discount">
+            <div class="cart-row-price">${fmt(Math.max(0, l.qty * l.unitPrice - (l.discount || 0)))}</div>
           </div>
         </div>
       </div>
     `).join('');
   },
 
-  calcSubtotal(){
-    return cart.reduce((s,l)=>s+l.qty*l.unitPrice,0);
+  calcSubtotal() {
+    return cart.reduce((s, l) => s + Math.max(0, l.qty * l.unitPrice - (l.discount || 0)), 0);
   },
 
-  calcTotal(){
+  calcTotal() {
     const subtotal = Views.sale.calcSubtotal();
     const discountEl = document.getElementById('saleDiscount');
-    const discount = discountEl ? Number(discountEl.value)||0 : 0;
+    const discount = discountEl ? Number(discountEl.value) || 0 : 0;
     return Math.max(0, subtotal - discount);
   },
 
-  totalsHTML(){
+  totalsHTML() {
     const subtotal = Views.sale.calcSubtotal();
     const discountEl = document.getElementById('saleDiscount');
-    const discount = discountEl ? Number(discountEl.value)||0 : 0;
+    const discount = discountEl ? Number(discountEl.value) || 0 : 0;
     const total = Math.max(0, subtotal - discount);
     return `
       <div class="totals-line"><span>${t('sale_subtotal')}</span><span>${fmt(subtotal)}</span></div>
@@ -277,14 +316,14 @@ Views.sale = {
     `;
   },
 
-  refreshCart(){
+  refreshCart() {
     document.getElementById('cartBox').innerHTML = Views.sale.cartHTML();
     document.getElementById('totalsBox').innerHTML = Views.sale.totalsHTML();
     Views.sale.updateChangeDue();
     Views.sale.bindCartRows();
   },
 
-  updateChangeDue(){
+  updateChangeDue() {
     const paid = Number(document.getElementById('saleAmountPaid')?.value) || Number(Views.sale.amountPaid) || 0;
     Views.sale.amountPaid = paid > 0 ? paid : '';
     const total = Views.sale.calcTotal();
@@ -297,7 +336,7 @@ Views.sale = {
     }
   },
 
-  applyCustomerHardwareDiscount(){
+  applyCustomerHardwareDiscount() {
     if (Views.sale.selectedCustomer && Views.sale.selectedCustomer.customerType === 'hardware' && Views.sale.selectedCustomer.discountPercent > 0) {
       const subtotal = Views.sale.calcSubtotal();
       const disc = Math.round((subtotal * (Views.sale.selectedCustomer.discountPercent / 100)) * 100) / 100;
@@ -309,9 +348,9 @@ Views.sale = {
     }
   },
 
-  bindCartRows(){
-    document.querySelectorAll('[data-qty-idx]').forEach(inp=>{
-      inp.addEventListener('change', (e)=>{
+  bindCartRows() {
+    document.querySelectorAll('[data-qty-idx]').forEach(inp => {
+      inp.addEventListener('change', (e) => {
         const idx = Number(e.target.dataset.qtyIdx);
         let v = Number(e.target.value) || 0.01;
         v = Math.max(0.01, Math.min(v, cart[idx].maxQty));
@@ -321,36 +360,45 @@ Views.sale = {
         Views.sale.applyCustomerHardwareDiscount();
       });
     });
-    document.querySelectorAll('[data-remove-idx]').forEach(btn=>{
-      btn.addEventListener('click', (e)=>{
+    document.querySelectorAll('[data-discount-idx]').forEach(inp => {
+      inp.addEventListener('change', (e) => {
+        const idx = Number(e.target.dataset.discountIdx);
+        let v = Number(e.target.value) || 0;
+        v = Math.max(0, v);
+        cart[idx].discount = v;
+        Views.sale.refreshCart();
+      });
+    });
+    document.querySelectorAll('[data-remove-idx]').forEach(btn => {
+      btn.addEventListener('click', (e) => {
         const idx = Number(e.target.dataset.removeIdx);
-        cart.splice(idx,1);
+        cart.splice(idx, 1);
         Views.sale.refreshCart();
         Views.sale.applyCustomerHardwareDiscount();
       });
     });
   },
 
-  bind(){
+  bind() {
     const searchInp = document.getElementById('saleSearch');
     const suggestBox = document.getElementById('saleSuggest');
     let selectedIndex = -1;
 
     if (searchInp) {
-      searchInp.addEventListener('input', ()=>{
+      searchInp.addEventListener('input', () => {
         selectedIndex = -1;
         const q = searchInp.value.trim().toLowerCase();
-        if(!q){ suggestBox.innerHTML=''; return; }
-        const matches = DB.allItems().filter(i=>i.name.toLowerCase().includes(q) || (i.category||'').toLowerCase().includes(q)).slice(0,8);
-        if(!matches.length){
+        if (!q) { suggestBox.innerHTML = ''; return; }
+        const matches = DB.allItems().filter(i => i.name.toLowerCase().includes(q) || (i.category || '').toLowerCase().includes(q)).slice(0, 8);
+        if (!matches.length) {
           suggestBox.innerHTML = `<div class="search-suggest"><div class="suggest-row text-muted">${t('sale_no_matches')}</div></div>`;
           return;
         }
-        suggestBox.innerHTML = `<div class="search-suggest">${matches.map(i=>`
+        suggestBox.innerHTML = `<div class="search-suggest">${matches.map(i => `
           <div class="suggest-row" data-add-item="${i.id}">
             <div style="display:flex; align-items:center; gap:10px;">
               <div style="width:36px; height:36px; border-radius:6px; overflow:hidden; background:var(--paper); display:flex; align-items:center; justify-content:center; flex-shrink:0;">
-                ${i.image ? `<img src="${i.image}" style="width:100%; height:100%; object-fit:cover;">` : `<span style="font-size:18px;">📦</span>`}
+                ${i.image ? `<img src="${i.image}" style="width:100%; height:100%; object-fit:cover;">` : `<i class="ph ph-package" style="font-size:18px;"></i>`}
               </div>
               <div>
                 <div class="s-name">${escapeHTML(i.name)}</div>
@@ -360,11 +408,11 @@ Views.sale = {
             <div style="font-weight:700">${fmt(i.sellPrice)}</div>
           </div>
         `).join('')}</div>`;
-        suggestBox.querySelectorAll('[data-add-item]').forEach(row=>{
-          row.addEventListener('click', ()=>{
+        suggestBox.querySelectorAll('[data-add-item]').forEach(row => {
+          row.addEventListener('click', () => {
             const id = Number(row.dataset.addItem);
             Views.sale.addToCart(id);
-            searchInp.value=''; suggestBox.innerHTML=''; searchInp.focus();
+            searchInp.value = ''; suggestBox.innerHTML = ''; searchInp.focus();
           });
         });
       });
@@ -372,7 +420,7 @@ Views.sale = {
       searchInp.addEventListener('keydown', (e) => {
         const rows = suggestBox.querySelectorAll('[data-add-item]');
         if (!rows.length) return;
-        
+
         if (e.key === 'ArrowDown') {
           e.preventDefault();
           selectedIndex = (selectedIndex + 1) % rows.length;
@@ -409,12 +457,12 @@ Views.sale = {
 
     Views.sale.bindCustomerSearch();
 
-    document.getElementById('payCashBtn').addEventListener('click', ()=>Views.sale.setPayType('cash'));
-    document.getElementById('payCreditBtn').addEventListener('click', ()=>Views.sale.setPayType('credit'));
-    
+    document.getElementById('payCashBtn').addEventListener('click', () => Views.sale.setPayType('cash'));
+    document.getElementById('payCreditBtn').addEventListener('click', () => Views.sale.setPayType('credit'));
+
     const discEl = document.getElementById('saleDiscount');
     if (discEl) {
-      discEl.addEventListener('input', ()=>{
+      discEl.addEventListener('input', () => {
         document.getElementById('totalsBox').innerHTML = Views.sale.totalsHTML();
         Views.sale.updateChangeDue();
       });
@@ -422,13 +470,13 @@ Views.sale = {
 
     const paidEl = document.getElementById('saleAmountPaid');
     if (paidEl) {
-      paidEl.addEventListener('input', (e)=>{
+      paidEl.addEventListener('input', (e) => {
         Views.sale.amountPaid = e.target.value;
         Views.sale.updateChangeDue();
       });
     }
 
-    document.getElementById('clearCartBtn').addEventListener('click', ()=>{
+    document.getElementById('clearCartBtn').addEventListener('click', () => {
       cart = [];
       Views.sale.refreshCart();
     });
@@ -436,16 +484,16 @@ Views.sale = {
 
     Views.sale.bindCartRows();
     Views.sale.bindGrid();
-    if(searchInp) setTimeout(() => searchInp.focus(), 100);
+    if (searchInp) setTimeout(() => searchInp.focus(), 100);
   },
 
-  bindCustomerSearch(){
+  bindCustomerSearch() {
     const custWrap = document.getElementById('customerSelectionWrap');
-    if(!custWrap) return;
+    if (!custWrap) return;
 
     const unselectBtn = document.getElementById('unselectCustBtn');
     if (unselectBtn) {
-      unselectBtn.addEventListener('click', ()=>{
+      unselectBtn.addEventListener('click', () => {
         Views.sale.selectedCustomer = null;
         custWrap.innerHTML = Views.sale.customerWidgetHTML();
         Views.sale.bindCustomerSearch();
@@ -457,7 +505,7 @@ Views.sale = {
     const suggestBox = document.getElementById('custSuggestBox');
     if (!searchInp || !suggestBox) return;
 
-    searchInp.addEventListener('input', ()=>{
+    searchInp.addEventListener('input', () => {
       const q = searchInp.value.trim();
       if (!q) {
         suggestBox.style.display = 'none';
@@ -489,7 +537,7 @@ Views.sale = {
       suggestBox.style.display = 'block';
 
       suggestBox.querySelectorAll('[data-select-cust]').forEach(row => {
-        row.addEventListener('click', ()=>{
+        row.addEventListener('click', () => {
           const id = Number(row.dataset.selectCust);
           const c = DB.getCustomer(id);
           if (c) {
@@ -503,7 +551,7 @@ Views.sale = {
 
       const quickBtn = document.getElementById('quickAddCustRow');
       if (quickBtn) {
-        quickBtn.addEventListener('click', ()=>{
+        quickBtn.addEventListener('click', () => {
           suggestBox.style.display = 'none';
           Views.sale.openQuickAddModal(q);
         });
@@ -511,14 +559,14 @@ Views.sale = {
     });
   },
 
-  openQuickAddModal(initialText){
+  openQuickAddModal(initialText) {
     const isPhone = /^[0-9+\s-]{4,}$/.test(initialText);
     const initialName = isPhone ? '' : initialText;
     const initialPhone = isPhone ? initialText : '';
 
     openModal({
       title: t('cust_quick_add_title'),
-      bodyHTML:`
+      bodyHTML: `
         <div class="field"><label class="field-label">${t('cust_form_name')}</label><input class="input" id="qc_name" value="${escapeHTML(initialName)}" placeholder="${t('cust_form_name_ph')}"></div>
         <div class="grid grid-2">
           <div class="field"><label class="field-label">${t('cust_form_phone')}</label><input class="input" id="qc_phone" value="${escapeHTML(initialPhone)}" placeholder="${t('cust_form_phone_ph')}"></div>
@@ -532,17 +580,17 @@ Views.sale = {
         <div class="field" id="qc_discount_wrap" style="display:none;"><label class="field-label">${t('cust_form_discount')}</label><input class="input" id="qc_discount" type="number" min="0" max="100" value="0"></div>
         <div class="field"><label class="field-label">${t('cust_form_address')}</label><input class="input" id="qc_address"></div>
       `,
-      footHTML:`<button class="btn btn-outline" data-close>${t('cancel')}</button><button class="btn btn-primary" id="saveQCustBtn">${t('confirm')}</button>`,
-      onMount:(wrap)=>{
+      footHTML: `<button class="btn btn-outline" data-close>${t('cancel')}</button><button class="btn btn-primary" id="saveQCustBtn">${t('confirm')}</button>`,
+      onMount: (wrap) => {
         const typeSelect = wrap.querySelector('#qc_type');
         const discWrap = wrap.querySelector('#qc_discount_wrap');
-        typeSelect.addEventListener('change', ()=>{
+        typeSelect.addEventListener('change', () => {
           discWrap.style.display = typeSelect.value === 'hardware' ? 'block' : 'none';
         });
 
-        wrap.querySelector('#saveQCustBtn').addEventListener('click', async ()=>{
+        wrap.querySelector('#saveQCustBtn').addEventListener('click', async () => {
           const name = wrap.querySelector('#qc_name').value.trim();
-          if(!name){ toast(t('cust_err_name'),'err'); return; }
+          if (!name) { toast(t('cust_err_name'), 'err'); return; }
           const newC = await DB.addCustomer({
             name,
             phone: wrap.querySelector('#qc_phone').value,
@@ -551,7 +599,7 @@ Views.sale = {
             discountPercent: Number(wrap.querySelector('#qc_discount')?.value) || 0
           });
           closeModal();
-          toast(t('cust_added'),'ok');
+          toast(t('cust_added'), 'ok');
           Views.sale.selectedCustomer = newC;
           const custWrap = document.getElementById('customerSelectionWrap');
           if (custWrap) {
@@ -592,30 +640,40 @@ Views.sale = {
     });
   },
 
-  setPayType(type){
+  setPayType(type) {
     Views.sale.payType = type;
-    document.getElementById('payCashBtn').classList.toggle('active', type==='cash');
-    document.getElementById('payCreditBtn').classList.toggle('active', type==='credit');
+    document.getElementById('payCashBtn').classList.toggle('active', type === 'cash');
+    document.getElementById('payCreditBtn').classList.toggle('active', type === 'credit');
     const paidWrap = document.getElementById('amountPaidWrap');
     if (paidWrap) paidWrap.style.display = type === 'cash' ? 'block' : 'none';
   },
 
-  addToCart(itemId){
+  addToCart(itemId) {
     const item = DB.getItem(itemId);
-    if(!item) return;
-    if(item.qty <= 0){ toast(t('sale_out_of_stock'), 'err'); return; }
-    const existing = cart.find(l=>l.itemId===itemId);
-    if(existing){
-      if(existing.qty < existing.maxQty){ existing.qty += 1; }
+    if (!item) return;
+    if (item.qty <= 0) { toast(t('sale_out_of_stock'), 'err'); return; }
+    const existing = cart.find(l => l.itemId === itemId);
+    if (existing) {
+      if (existing.qty < existing.maxQty) { existing.qty += 1; }
       else { toast(t('sale_exceeds_stock'), 'err'); }
     } else {
-      cart.push({ itemId, name:item.name, image:item.image, unit:item.unit, unitPrice:item.sellPrice, qty:1, maxQty:item.qty });
+      cart.push({
+        itemId,
+        name: item.name,
+        image: item.image,
+        unit: item.unit,
+        unitPrice: item.sellPrice,
+        costPrice: item.costPrice || 0,
+        qty: 1,
+        maxQty: item.qty,
+        discount: 0
+      });
     }
     Views.sale.refreshCart();
   },
 
-  async completeSale(){
-    if(!cart.length){ toast(t('sale_empty_cart'), 'err'); return; }
+  async completeSale() {
+    if (!cart.length) { toast(t('sale_empty_cart'), 'err'); return; }
     const payType = Views.sale.payType;
     let customerId = null;
     let customerName = '';
@@ -625,18 +683,18 @@ Views.sale = {
       customerName = Views.sale.selectedCustomer.name;
     }
 
-    if(payType==='credit'){
-      if(!customerId){ toast(t('sale_select_credit_customer'), 'err'); return; }
+    if (payType === 'credit') {
+      if (!customerId) { toast(t('sale_select_credit_customer'), 'err'); return; }
     }
 
-    const discount = Number(document.getElementById('saleDiscount').value)||0;
+    const discount = Number(document.getElementById('saleDiscount').value) || 0;
     const amountPaid = Number(document.getElementById('saleAmountPaid')?.value) || Number(Views.sale.amountPaid) || 0;
     const total = Views.sale.calcTotal();
     const changeAmount = Math.max(0, amountPaid - total);
 
-    const lines = cart.map(l=>({ itemId:l.itemId, name:l.name, unit:l.unit, qty:l.qty, unitPrice:l.unitPrice }));
+    const lines = cart.map(l => ({ itemId: l.itemId, name: l.name, unit: l.unit, qty: l.qty, unitPrice: l.unitPrice }));
 
-    const sale = await DB.createSale({ lines, paymentType:payType, customerId, customerName, discount, amountPaid, changeAmount });
+    const sale = await DB.createSale({ lines, paymentType: payType, customerId, customerName, discount, amountPaid, changeAmount });
     toast(`${t('sale_success')}#${sale.id}`, 'ok');
     cart = [];
     document.getElementById('saleDiscount').value = 0;
@@ -648,7 +706,7 @@ Views.sale = {
     App.updateSidebarCounts();
   },
 
-  showReceipt(sale){
+  showReceipt(sale) {
     const html = `
       <div class="receipt" id="printArea">
         <h2>${escapeHTML(DB.data.settings.shopName || 'HardwarePOS')}</h2>
@@ -657,11 +715,11 @@ Views.sale = {
         <table>
           <thead><tr><th style="text-align:left">${t('receipt_qty')}</th><th class="num">${t('word_qty')}</th><th class="num">${t('receipt_amount') || t('sale_total')}</th></tr></thead>
           <tbody>
-            ${sale.lines.map(l=>`
+            ${sale.lines.map(l => `
               <tr>
                 <td>${escapeHTML(l.name)}</td>
-                <td class="num">${l.qty} ${escapeHTML(l.unit||'')}</td>
-                <td class="num">${fmt(l.qty*l.unitPrice)}</td>
+                <td class="num">${l.qty} ${escapeHTML(l.unit || '')}</td>
+                <td class="num">${fmt(l.qty * l.unitPrice)}</td>
               </tr>
             `).join('')}
           </tbody>
@@ -670,8 +728,8 @@ Views.sale = {
         <div style="display:flex; justify-content:space-between;"><span>${t('sale_subtotal')}</span><span>${fmt(sale.subtotal)}</span></div>
         <div style="display:flex; justify-content:space-between;"><span>${t('sale_discount')}</span><span>${fmt(sale.discount)}</span></div>
         <div style="display:flex; justify-content:space-between; font-weight:700; font-size:14px;"><span>${t('sale_total')}</span><span>${fmt(sale.total)}</span></div>
-        <div style="display:flex; justify-content:space-between; margin-top:4px;"><span>${t('sale_payment')}</span><span>${sale.paymentType==='credit' ? `${t('word_credit')} - ${escapeHTML(sale.customerName)}` : t('word_cash')}</span></div>
-        ${sale.paymentType==='cash' && sale.amountPaid > 0 ? `
+        <div style="display:flex; justify-content:space-between; margin-top:4px;"><span>${t('sale_payment')}</span><span>${sale.paymentType === 'credit' ? `${t('word_credit')} - ${escapeHTML(sale.customerName)}` : t('word_cash')}</span></div>
+        ${sale.paymentType === 'cash' && sale.amountPaid > 0 ? `
           <div style="display:flex; justify-content:space-between; margin-top:4px;"><span>${t('sale_amount_paid')}</span><span>${fmt(sale.amountPaid)}</span></div>
           <div style="display:flex; justify-content:space-between; font-weight:700;"><span>${t('sale_change_due')}</span><span>${fmt(sale.changeAmount)}</span></div>
         ` : ''}
@@ -680,15 +738,15 @@ Views.sale = {
       </div>
     `;
     openModal({
-      title:t('receipt_completed'),
+      title: t('receipt_completed'),
       bodyHTML: html,
-      footHTML:`
+      footHTML: `
         <button class="btn btn-outline" data-close>${t('close')}</button>
         <button class="btn btn-primary" id="printReceiptBtn">${t('receipt_print')}</button>
       `,
-      wide:false,
-      onMount:(wrap)=>{
-        wrap.querySelector('#printReceiptBtn').addEventListener('click', ()=>window.print());
+      wide: false,
+      onMount: (wrap) => {
+        wrap.querySelector('#printReceiptBtn').addEventListener('click', () => window.print());
       }
     });
   }
@@ -696,25 +754,25 @@ Views.sale = {
 
 /* ================= ITEMS ================= */
 Views.items = {
-  searchQ:'',
-  render(){
+  searchQ: '',
+  render() {
     return `
-      <div class="section-head">
-        <h2>${t('items_list')} (${DB.allItems().length})</h2>
-        <div class="flex gap-8">
-          <input class="input" id="itemsSearch" placeholder="${t('search_placeholder')}" style="width:220px" value="${escapeHTML(Views.items.searchQ)}">
-          <button class="btn btn-primary" id="addItemBtn">${t('items_add_btn')}</button>
-        </div>
-      </div>
+      ${Views.renderPageHeader({
+      icon: 'ph-package',
+      title: t('items_list'),
+      count: DB.allItems().length,
+      search: { id: 'itemsSearch', placeholder: t('search_placeholder'), value: Views.items.searchQ },
+      actions: [{ id: 'addItemBtn', label: t('items_add_btn'), cls: 'btn-primary' }]
+    })}
       <div id="itemsTableWrap">${Views.items.tableHTML()}</div>
     `;
   },
 
-  tableHTML(){
+  tableHTML() {
     let list = DB.allItems();
     const q = Views.items.searchQ.toLowerCase();
-    if(q) list = list.filter(i=>i.name.toLowerCase().includes(q) || (i.category||'').toLowerCase().includes(q));
-    if(!list.length) return `<div class="card"><div class="empty-state"><div class="em-ico">📦</div><h3>${t('items_no_items')}</h3><div class="small">${t('items_no_items_sub')}</div></div></div>`;
+    if (q) list = list.filter(i => i.name.toLowerCase().includes(q) || (i.category || '').toLowerCase().includes(q));
+    if (!list.length) return `<div class="card"><div class="empty-state"><div class="em-ico"><i class="ph ph-package"></i></div><h3>${t('items_no_items')}</h3><div class="small">${t('items_no_items_sub')}</div></div></div>`;
     return `
       <div class="table-wrap">
         <table>
@@ -723,15 +781,15 @@ Views.items = {
             <th class="num">${t('word_qty')}</th><th>${t('items_status')}</th><th></th>
           </tr></thead>
           <tbody>
-            ${list.map(i=>{
-              const status = i.qty<=0 ? `<span class="pill pill-danger">${t('status_out')}</span>`
-                : i.qty<=i.reorderLevel ? `<span class="pill pill-warn">${t('status_low')}</span>`
-                : `<span class="pill pill-ok">${t('status_ok')}</span>`;
-              return `
+            ${list.map(i => {
+      const status = i.qty <= 0 ? `<span class="pill pill-danger">${t('status_out')}</span>`
+        : i.qty <= i.reorderLevel ? `<span class="pill pill-warn">${t('status_low')}</span>`
+          : `<span class="pill pill-ok">${t('status_ok')}</span>`;
+      return `
               <tr>
                 <td>
                   <div style="width:36px; height:36px; border-radius:6px; overflow:hidden; background:var(--paper); display:flex; align-items:center; justify-content:center; border:1px solid var(--border);">
-                    ${i.image ? `<img src="${i.image}" style="width:100%; height:100%; object-fit:cover;">` : `<span style="font-size:18px;">📦</span>`}
+                    ${i.image ? `<img src="${i.image}" style="width:100%; height:100%; object-fit:cover;">` : `<i class="ph ph-package" style="font-size:18px;"></i>`}
                   </div>
                 </td>
                 <td><b>${escapeHTML(i.name)}</b></td>
@@ -742,18 +800,18 @@ Views.items = {
                 <td>${status}</td>
                 <td>
                   <button class="icon-btn" data-edit-item="${i.id}" title="${t('items_edit')}">✎</button>
-                  <button class="icon-btn" data-del-item="${i.id}" title="${t('delete')}">🗑</button>
+                  <button class="icon-btn" data-del-item="${i.id}" title="${t('delete')}"><i class="ph ph-trash"></i></button>
                 </td>
               </tr>`;
-            }).join('')}
+    }).join('')}
           </tbody>
         </table>
       </div>
     `;
   },
 
-  formHTML(item){
-    const v = item || {name:'',category:'',unit:'pcs',costPrice:'',sellPrice:'',qty:'',reorderLevel:5,image:'',description:''};
+  formHTML(item) {
+    const v = item || { name: '', category: '', unit: 'pcs', costPrice: '', sellPrice: '', qty: '', reorderLevel: 5, image: '', description: '' };
     const existingCategories = [...new Set(DB.data.items.map(i => i.category).filter(c => c && c.trim()))].sort();
     const catOptions = existingCategories.map(c => `<div class="combo-opt" data-val="${escapeHTML(c)}">${escapeHTML(c)}</div>`).join('');
     return `
@@ -767,13 +825,13 @@ Views.items = {
           <div style="flex:1; min-width:160px;">
             <label for="f_image_file" class="btn btn-outline" style="cursor:pointer; display:inline-block; margin-bottom:6px;">📁 Photo Select කරන්න</label>
             <input type="file" id="f_image_file" accept="image/*" style="display:none;">
-            <input type="hidden" id="f_image" value="${escapeHTML(v.image||'')}"><br>
+            <input type="hidden" id="f_image" value="${escapeHTML(v.image || '')}"><br>
             <span class="small text-muted">JPG, PNG, WebP accept කරයි (max 2MB)</span>
           </div>
         </div>
       </div>
       <div class="grid grid-2">
-        <div class="field"><label class="field-label">Description</label><textarea class="input" id="f_desc" placeholder="Enter item description..." style="min-height:50px;">${escapeHTML(v.description||'')}</textarea></div>
+        <div class="field"><label class="field-label">Description</label><textarea class="input" id="f_desc" placeholder="Enter item description..." style="min-height:50px;">${escapeHTML(v.description || '')}</textarea></div>
         <div class="field"><label class="field-label">${t('items_form_name')}</label><input class="input" id="f_name" value="${escapeHTML(v.name)}" placeholder="${t('items_form_name_ph')}"></div>
         <div class="field">
           <label class="field-label">${t('items_form_cat')}</label>
@@ -793,7 +851,7 @@ Views.items = {
       <div class="grid grid-2">
         <div class="field"><label class="field-label">${t('items_form_unit')}</label>
           <select class="input" id="f_unit">
-            ${['pcs','kg','g','L','ml','bag','box','m','ft','set','roll','sheet','bundle'].map(u=>`<option value="${u}" ${v.unit===u?'selected':''}>${u}</option>`).join('')}
+            ${['pcs', 'kg', 'g', 'L', 'ml', 'bag', 'box', 'm', 'ft', 'set', 'roll', 'sheet', 'bundle'].map(u => `<option value="${u}" ${v.unit === u ? 'selected' : ''}>${u}</option>`).join('')}
           </select>
         </div>
         <div class="field"><label class="field-label">${t('items_form_reorder')}</label><input class="input" id="f_reorder" type="number" min="0" step="any" value="${v.reorderLevel}"></div>
@@ -810,7 +868,7 @@ Views.items = {
     `;
   },
 
-  bindImageUpload(){
+  bindImageUpload() {
     const fileInput = document.getElementById('f_image_file');
     const hiddenInput = document.getElementById('f_image');
     const previewWrap = document.getElementById('imgPreviewWrap');
@@ -843,36 +901,36 @@ Views.items = {
     });
   },
 
-  openAddModal(){
+  openAddModal() {
     openModal({
-      title:t('items_add_btn'),
+      title: t('items_add_btn'),
       bodyHTML: Views.items.formHTML(null),
-      footHTML:`<button class="btn btn-outline" data-close>${t('cancel')}</button><button class="btn btn-primary" id="saveItemBtn">${t('confirm')}</button>`,
-      onMount:()=>{
+      footHTML: `<button class="btn btn-outline" data-close>${t('cancel')}</button><button class="btn btn-primary" id="saveItemBtn">${t('confirm')}</button>`,
+      onMount: () => {
         Views.items.bindCategoryCombo();
         Views.items.bindImageUpload();
-        document.getElementById('saveItemBtn').addEventListener('click', async ()=>{
+        document.getElementById('saveItemBtn').addEventListener('click', async () => {
           const name = document.getElementById('f_name').value.trim();
           const sell = document.getElementById('f_sell').value;
           const qty = document.getElementById('f_qty').value;
           const desc = document.getElementById('f_desc').value.trim();
           const image = document.getElementById('f_image').value;
           const category = document.getElementById('f_category').value.trim() || 'වෙනත්';
-          if(!name){ toast(t('items_err_name'),'err'); return; }
-          if(sell===''){ toast(t('items_err_sell'),'err'); return; }
-          if(qty===''){ toast(t('items_err_qty'),'err'); return; }
+          if (!name) { toast(t('items_err_name'), 'err'); return; }
+          if (sell === '') { toast(t('items_err_sell'), 'err'); return; }
+          if (qty === '') { toast(t('items_err_qty'), 'err'); return; }
           try {
             await DB.addItem({
               name, category,
-              unit:document.getElementById('f_unit').value,
-              costPrice:document.getElementById('f_cost').value,
-              sellPrice:sell, qty:Number(qty)||0, reorderLevel:document.getElementById('f_reorder').value,
+              unit: document.getElementById('f_unit').value,
+              costPrice: document.getElementById('f_cost').value,
+              sellPrice: sell, qty: Number(qty) || 0, reorderLevel: document.getElementById('f_reorder').value,
               description: desc, image: image
             });
             closeModal();
-            toast(t('items_added'),'ok');
+            toast(t('items_added'), 'ok');
             App.render();
-          } catch(err) {
+          } catch (err) {
             console.error("Failed to add item:", err);
             toast("භාණ්ඩය එකතු කිරීමට නොහැකි විය!", "err");
           }
@@ -881,90 +939,90 @@ Views.items = {
     });
   },
 
-  bindCategoryCombo(){
+  bindCategoryCombo() {
     const input = document.getElementById('f_category');
     const arrow = document.getElementById('comboCatArrow');
-    const drop  = document.getElementById('comboCatDrop');
-    if(!input || !arrow || !drop) return;
+    const drop = document.getElementById('comboCatDrop');
+    if (!input || !arrow || !drop) return;
 
     const allCats = [...new Set(DB.data.items.map(i => i.category).filter(c => c && c.trim()))].sort();
 
-    function renderOpts(filter){
+    function renderOpts(filter) {
       const raw = (filter || '').trim();
       const q = raw.toLowerCase();
       const matched = q ? allCats.filter(c => c.toLowerCase().includes(q)) : allCats;
-      
+
       let html = matched.map(c =>
         `<div class="combo-opt" data-val="${escapeHTML(c)}">${escapeHTML(c)}</div>`
       ).join('');
 
-      if(raw && !allCats.some(c => c.toLowerCase() === q)) {
-        html += `<div class="combo-opt combo-opt-new" data-val="${escapeHTML(raw)}" style="color:var(--orange-dark); font-weight:bold; border-top:1px dashed var(--border);">➕ අලුත් Category ලෙස භාවිත කරන්න: "<b>${escapeHTML(raw)}</b>"</div>`;
+      if (raw && !allCats.some(c => c.toLowerCase() === q)) {
+        html += `<div class="combo-opt combo-opt-new" data-val="${escapeHTML(raw)}" style="color:var(--orange-dark); font-weight:bold; border-top:1px dashed var(--border);"><i class="ph ph-plus"></i> අලුත් Category ලෙස භාවිත කරන්න: "<b>${escapeHTML(raw)}</b>"</div>`;
       }
 
-      if(!html) {
+      if (!html) {
         html = '<div class="combo-opt combo-no-match">ලැයිස්තුවේ නැත. අලුත් Category නමක් ටයිප් කරන්න.</div>';
       }
 
       drop.innerHTML = html;
-      drop.querySelectorAll('.combo-opt[data-val]').forEach(opt =>{
-        opt.addEventListener('mousedown', e =>{ e.preventDefault(); input.value = opt.dataset.val; closeCombo(); });
+      drop.querySelectorAll('.combo-opt[data-val]').forEach(opt => {
+        opt.addEventListener('mousedown', e => { e.preventDefault(); input.value = opt.dataset.val; closeCombo(); });
       });
     }
 
-    function openCombo(){
+    function openCombo() {
       renderOpts(input.value);
       drop.classList.add('open');
       arrow.classList.add('open');
     }
-    function closeCombo(){
+    function closeCombo() {
       drop.classList.remove('open');
       arrow.classList.remove('open');
     }
-    function toggleCombo(){
+    function toggleCombo() {
       drop.classList.contains('open') ? closeCombo() : openCombo();
     }
 
-    arrow.addEventListener('click', e =>{ e.stopPropagation(); toggleCombo(); input.focus(); });
-    input.addEventListener('focus', ()=> openCombo());
-    input.addEventListener('input', ()=> renderOpts(input.value));
-    document.addEventListener('click', function handler(e){
-      if(!document.getElementById('comboCatWrap')){ document.removeEventListener('click', handler); return; }
-      if(!document.getElementById('comboCatWrap').contains(e.target)) closeCombo();
+    arrow.addEventListener('click', e => { e.stopPropagation(); toggleCombo(); input.focus(); });
+    input.addEventListener('focus', () => openCombo());
+    input.addEventListener('input', () => renderOpts(input.value));
+    document.addEventListener('click', function handler(e) {
+      if (!document.getElementById('comboCatWrap')) { document.removeEventListener('click', handler); return; }
+      if (!document.getElementById('comboCatWrap').contains(e.target)) closeCombo();
     });
-    input.addEventListener('keydown', e=>{ if(e.key==='Escape'||e.key==='Tab') closeCombo(); });
+    input.addEventListener('keydown', e => { if (e.key === 'Escape' || e.key === 'Tab') closeCombo(); });
 
     renderOpts('');
   },
 
-  openEditModal(id){
+  openEditModal(id) {
     const item = DB.getItem(id);
-    if(!item) return;
+    if (!item) return;
     openModal({
-      title:t('items_edit'),
+      title: t('items_edit'),
       bodyHTML: Views.items.formHTML(item),
-      footHTML:`<button class="btn btn-outline" data-close>${t('cancel')}</button><button class="btn btn-primary" id="saveItemBtn">${t('update')}</button>`,
-      onMount:()=>{
+      footHTML: `<button class="btn btn-outline" data-close>${t('cancel')}</button><button class="btn btn-primary" id="saveItemBtn">${t('update')}</button>`,
+      onMount: () => {
         Views.items.bindCategoryCombo();
         Views.items.bindImageUpload();
-        document.getElementById('saveItemBtn').addEventListener('click', async ()=>{
+        document.getElementById('saveItemBtn').addEventListener('click', async () => {
           const name = document.getElementById('f_name').value.trim();
-          if(!name){ toast(t('items_err_name'),'err'); return; }
+          if (!name) { toast(t('items_err_name'), 'err'); return; }
           try {
             await DB.updateItem(id, {
-              name, category:document.getElementById('f_category').value.trim() || 'වෙනත්',
-              unit:document.getElementById('f_unit').value,
-              costPrice:Number(document.getElementById('f_cost').value)||0,
-              sellPrice:Number(document.getElementById('f_sell').value)||0,
+              name, category: document.getElementById('f_category').value.trim() || 'වෙනත්',
+              unit: document.getElementById('f_unit').value,
+              costPrice: Number(document.getElementById('f_cost').value) || 0,
+              sellPrice: Number(document.getElementById('f_sell').value) || 0,
               description: document.getElementById('f_desc').value.trim(),
               image: document.getElementById('f_image').value,
-              qty:Number(document.getElementById('f_qty').value)||0,
-              reorderLevel:Number(document.getElementById('f_reorder').value)||0
+              qty: Number(document.getElementById('f_qty').value) || 0,
+              reorderLevel: Number(document.getElementById('f_reorder').value) || 0
             });
             closeModal();
-            toast(t('items_updated'),'ok');
+            toast(t('items_updated'), 'ok');
             App.render();
-          } catch(err) {
+          } catch (err) {
             console.error("Failed to update item:", err);
             toast("භාණ්ඩය යාවත්කාලීන කිරීමට නොහැකි විය!", "err");
           }
@@ -973,10 +1031,10 @@ Views.items = {
     });
   },
 
-  bind(){
+  bind() {
     document.getElementById('addItemBtn').addEventListener('click', Views.items.openAddModal);
     const search = document.getElementById('itemsSearch');
-    search.addEventListener('input', ()=>{
+    search.addEventListener('input', () => {
       Views.items.searchQ = search.value;
       document.getElementById('itemsTableWrap').innerHTML = Views.items.tableHTML();
       Views.items.bindRowActions();
@@ -984,17 +1042,17 @@ Views.items = {
     Views.items.bindRowActions();
     setTimeout(() => search.focus(), 100);
   },
-  bindRowActions(){
-    document.querySelectorAll('[data-edit-item]').forEach(b=>{
-      b.addEventListener('click', ()=>Views.items.openEditModal(Number(b.dataset.editItem)));
+  bindRowActions() {
+    document.querySelectorAll('[data-edit-item]').forEach(b => {
+      b.addEventListener('click', () => Views.items.openEditModal(Number(b.dataset.editItem)));
     });
-    document.querySelectorAll('[data-del-item]').forEach(b=>{
-      b.addEventListener('click', ()=>{
+    document.querySelectorAll('[data-del-item]').forEach(b => {
+      b.addEventListener('click', () => {
         const id = Number(b.dataset.delItem);
         const item = DB.getItem(id);
-        confirmAction(`"${escapeHTML(item.name)}" ${t('items_del_confirm')}`, async ()=>{
+        confirmAction(`"${escapeHTML(item.name)}" ${t('items_del_confirm')}`, async () => {
           await DB.deleteItem(id);
-          toast(t('items_deleted'),'ok');
+          toast(t('items_deleted'), 'ok');
           App.render();
         });
       });
@@ -1007,18 +1065,21 @@ Views.stock = {
   searchQ: '',
   filterType: 'all', // 'all' | 'low'
 
-  render(){
+  render() {
     const allItems = DB.allItems();
     const lowItems = DB.lowStockItems();
     const totalValue = DB.stockValue();
 
     return `
-      <div class="section-head">
-        <h2>${t('stock_report')} (${allItems.length})</h2>
-        <div class="flex gap-8">
+      <div class="page-header">
+        <div class="page-header-left">
+          <i class="ph ph-chart-bar page-header-icon"></i>
+          <h2 class="page-header-title">${t('stock_report')} <span class="page-header-count">${allItems.length}</span></h2>
+        </div>
+        <div class="page-header-right">
           <input class="input" id="stockSearch" placeholder="${t('search_placeholder')}" style="width:220px" value="${escapeHTML(Views.stock.searchQ)}">
           <select class="input" id="stockFilter" style="width:170px">
-            <option value="all" ${Views.stock.filterType === 'all' ? 'selected' : ''}>📦 සියලුම තොග</option>
+            <option value="all" ${Views.stock.filterType === 'all' ? 'selected' : ''}>සියලුම තොග</option>
             <option value="low" ${Views.stock.filterType === 'low' ? 'selected' : ''}>⚠ අඩු තොග පමණක් (${lowItems.length})</option>
           </select>
         </div>
@@ -1057,7 +1118,7 @@ Views.stock = {
     `;
   },
 
-  tableHTML(){
+  tableHTML() {
     let list = DB.allItems();
     const q = Views.stock.searchQ.toLowerCase();
     if (q) {
@@ -1065,11 +1126,11 @@ Views.stock = {
     }
 
     if (Views.stock.filterType === 'low') {
-      list = list.filter(i => i.qty <= i.reorderLevel).sort((a,b) => a.qty - b.qty);
+      list = list.filter(i => i.qty <= i.reorderLevel).sort((a, b) => a.qty - b.qty);
     }
 
-    if(!list.length) {
-      return `<div class="card"><div class="empty-state"><div class="em-ico">🗄</div><h3>${Views.stock.filterType === 'low' ? 'අඩු තොග සහිත භාණ්ඩ නැත' : t('items_no_items')}</h3></div></div>`;
+    if (!list.length) {
+      return `<div class="card"><div class="empty-state"><div class="em-ico"><i class="ph ph-archive-box"></i></div><h3>${Views.stock.filterType === 'low' ? 'අඩු තොග සහිත භාණ්ඩ නැත' : t('items_no_items')}</h3></div></div>`;
     }
 
     return `
@@ -1089,28 +1150,28 @@ Views.stock = {
           </thead>
           <tbody>
             ${list.map(i => {
-              const isOut = i.qty <= 0;
-              const isLow = i.qty <= i.reorderLevel;
-              const ratio = i.reorderLevel > 0 ? Math.min(1, i.qty / (i.reorderLevel * 3)) : (i.qty > 0 ? 1 : 0);
-              const color = isOut ? 'var(--danger)' : isLow ? 'var(--yellow)' : 'var(--success)';
+      const isOut = i.qty <= 0;
+      const isLow = i.qty <= i.reorderLevel;
+      const ratio = i.reorderLevel > 0 ? Math.min(1, i.qty / (i.reorderLevel * 3)) : (i.qty > 0 ? 1 : 0);
+      const color = isOut ? 'var(--danger)' : isLow ? 'var(--yellow)' : 'var(--success)';
 
-              const statusTag = isOut 
-                ? `<span class="pill pill-danger" style="margin-left:6px;">${t('status_out')}</span>`
-                : isLow 
-                ? `<span class="pill pill-warn" style="margin-left:6px;">${t('status_low')}</span>` 
-                : ``;
+      const statusTag = isOut
+        ? `<span class="pill pill-danger" style="margin-left:6px;">${t('status_out')}</span>`
+        : isLow
+          ? `<span class="pill pill-warn" style="margin-left:6px;">${t('status_low')}</span>`
+          : ``;
 
-              return `
+      return `
                 <tr>
                   <td>
                     <div style="width:36px; height:36px; border-radius:6px; overflow:hidden; background:var(--paper); display:flex; align-items:center; justify-content:center; border:1px solid var(--border);">
-                      ${i.image ? `<img src="${i.image}" style="width:100%; height:100%; object-fit:cover;">` : `<span style="font-size:18px;">📦</span>`}
+                      ${i.image ? `<img src="${i.image}" style="width:100%; height:100%; object-fit:cover;">` : `<i class="ph ph-package" style="font-size:18px;"></i>`}
                     </div>
                   </td>
                   <td><b>${escapeHTML(i.name)}</b>${statusTag}</td>
                   <td class="text-muted">${escapeHTML(i.category)}</td>
                   <td class="num" style="font-weight:700; color:${color}">${i.qty} ${escapeHTML(i.unit)}</td>
-                  <td style="min-width:110px"><div class="stock-meter"><div style="width:${ratio*100}%; background:${color}"></div></div></td>
+                  <td style="min-width:110px"><div class="stock-meter"><div style="width:${ratio * 100}%; background:${color}"></div></div></td>
                   <td class="num text-muted">${i.reorderLevel}</td>
                   <td class="num"><b>${fmt(i.qty * i.costPrice)}</b></td>
                   <td>
@@ -1118,14 +1179,14 @@ Views.stock = {
                   </td>
                 </tr>
               `;
-            }).join('')}
+    }).join('')}
           </tbody>
         </table>
       </div>
     `;
   },
 
-  bind(){
+  bind() {
     const search = document.getElementById('stockSearch');
     if (search) {
       search.addEventListener('input', () => {
@@ -1155,7 +1216,7 @@ Views.stock = {
     Views.stock.bindRowActions();
   },
 
-  bindRowActions(){
+  bindRowActions() {
     document.querySelectorAll('[data-restock]').forEach(b => {
       b.addEventListener('click', () => {
         const id = Number(b.dataset.restock);
@@ -1178,7 +1239,7 @@ Views.stock = {
                 closeModal();
                 toast(t('ls_updated'), 'ok');
                 App.render();
-              } catch(err) {
+              } catch (err) {
                 console.error("Failed to update stock:", err);
                 toast('තොගය යාවත්කාලීන කිරීමට නොහැකි විය!', 'err');
               }
@@ -1192,28 +1253,28 @@ Views.stock = {
 
 /* ================= CUSTOMERS (CREDIT / NAYATA) ================= */
 Views.customers = {
-  searchQ:'',
+  searchQ: '',
   activeTab: 'hardwares', // 'hardwares' | 'retail'
 
-  render(){
+  render() {
     const hardwaresCount = DB.getHardwareCustomers().length;
     const retailCount = DB.getRetailCustomers().length;
 
     return `
-      <div class="section-head">
-        <h2>${t('cust_title')} (${DB.allCustomers().length})</h2>
-        <div class="flex gap-8">
-          <input class="input" id="custSearch" placeholder="${t('search_placeholder')}" style="width:220px" value="${escapeHTML(Views.customers.searchQ)}">
-          <button class="btn btn-primary" id="addCustBtn">${t('cust_add_btn')}</button>
-        </div>
-      </div>
+      ${Views.renderPageHeader({
+      icon: 'ph-users',
+      title: t('cust_title'),
+      count: DB.allCustomers().length,
+      search: { id: 'custSearch', placeholder: t('search_placeholder'), value: Views.customers.searchQ },
+      actions: [{ id: 'addCustBtn', label: t('cust_add_btn'), cls: 'btn-primary' }]
+    })}
 
       <div class="cust-subtabs">
-        <button class="cust-tab-btn ${Views.customers.activeTab==='hardwares'?'active':''}" data-cust-tab="hardwares">
-          🏢 ${t('cust_tab_hardwares')} (${hardwaresCount})
+        <button class="cust-tab-btn ${Views.customers.activeTab === 'hardwares' ? 'active' : ''}" data-cust-tab="hardwares">
+          <i class="ph ph-buildings"></i> ${t('cust_tab_hardwares')} (${hardwaresCount})
         </button>
-        <button class="cust-tab-btn ${Views.customers.activeTab==='retail'?'active':''}" data-cust-tab="retail">
-          👤 ${t('cust_tab_customers')} (${retailCount})
+        <button class="cust-tab-btn ${Views.customers.activeTab === 'retail' ? 'active' : ''}" data-cust-tab="retail">
+          <i class="ph ph-user"></i> ${t('cust_tab_customers')} (${retailCount})
         </button>
       </div>
 
@@ -1221,11 +1282,11 @@ Views.customers = {
     `;
   },
 
-  tableHTML(){
+  tableHTML() {
     let list = Views.customers.activeTab === 'hardwares' ? DB.getHardwareCustomers() : DB.getRetailCustomers();
     const q = Views.customers.searchQ.toLowerCase();
-    if(q) list = list.filter(c=>c.name.toLowerCase().includes(q) || (c.phone||'').includes(q));
-    if(!list.length) return `<div class="card"><div class="empty-state"><div class="em-ico">👤</div><h3>${t('cust_no_cust')}</h3><div class="small">${t('cust_no_cust_sub')}</div></div></div>`;
+    if (q) list = list.filter(c => c.name.toLowerCase().includes(q) || (c.phone || '').includes(q));
+    if (!list.length) return `<div class="card"><div class="empty-state"><div class="em-ico"><i class="ph ph-user"></i></div><h3>${t('cust_no_cust')}</h3><div class="small">${t('cust_no_cust_sub')}</div></div></div>`;
     return `
       <div class="table-wrap">
         <table>
@@ -1234,22 +1295,23 @@ Views.customers = {
               <th>${t('cust_name')}</th>
               <th>${t('cust_phone')}</th>
               <th>${t('cust_address')}</th>
-              ${Views.customers.activeTab==='hardwares' ? `<th>${t('cust_hardware_discount_badge')}</th>` : ''}
+              ${Views.customers.activeTab === 'hardwares' ? `<th>${t('cust_hardware_discount_badge')}</th>` : ''}
               <th class="num">${t('cust_due')}</th>
               <th></th>
             </tr>
           </thead>
           <tbody>
-            ${list.map(c=>`
+            ${list.map(c => `
               <tr>
                 <td><b>${escapeHTML(c.name)}</b></td>
-                <td>${escapeHTML(c.phone)||'-'}</td>
-                <td class="text-muted">${escapeHTML(c.address)||'-'}</td>
-                ${Views.customers.activeTab==='hardwares' ? `<td><span class="pill pill-ok">${c.discountPercent||0}% Discount</span></td>` : ''}
-                <td class="num">${c.balance>0 ? `<span style="color:var(--danger); font-weight:700">${fmt(c.balance)}</span>` : `<span class="pill pill-ok">${t('cust_zero')}</span>`}</td>
+                <td>${escapeHTML(c.phone) || '-'}</td>
+                <td class="text-muted">${escapeHTML(c.address) || '-'}</td>
+                ${Views.customers.activeTab === 'hardwares' ? `<td><span class="pill pill-ok">${c.discountPercent || 0}% Discount</span></td>` : ''}
+                <td class="num">${c.balance > 0 ? `<span style="color:var(--danger); font-weight:700">${fmt(c.balance)}</span>` : `<span class="pill pill-ok">${t('cust_zero')}</span>`}</td>
                 <td>
                   <button class="btn btn-sm btn-outline" data-view-cust="${c.id}">${t('cust_details')}</button>
-                  <button class="icon-btn" data-del-cust="${c.id}" title="${t('delete')}">🗑</button>
+                  <button class="icon-btn" data-edit-cust="${c.id}" title="${t('items_edit')}"><i class="ph ph-pencil-simple"></i></button>
+                  <button class="icon-btn" data-del-cust="${c.id}" title="${t('delete')}"><i class="ph ph-trash"></i></button>
                 </td>
               </tr>
             `).join('')}
@@ -1259,17 +1321,17 @@ Views.customers = {
     `;
   },
 
-  openAddModal(){
+  openAddModal() {
     openModal({
-      title:t('cust_add_btn'),
-      bodyHTML:`
+      title: t('cust_add_btn'),
+      bodyHTML: `
         <div class="field"><label class="field-label">${t('cust_form_name')}</label><input class="input" id="c_name" placeholder="${t('cust_form_name_ph')}"></div>
         <div class="grid grid-2">
           <div class="field"><label class="field-label">${t('cust_form_phone')}</label><input class="input" id="c_phone" placeholder="${t('cust_form_phone_ph')}"></div>
           <div class="field"><label class="field-label">${t('cust_form_type')}</label>
             <select class="input" id="c_type">
-              <option value="hardware" ${Views.customers.activeTab==='hardwares'?'selected':''}>${t('cust_type_hardware')}</option>
-              <option value="customer" ${Views.customers.activeTab==='retail'?'selected':''}>${t('cust_type_retail')}</option>
+              <option value="hardware" ${Views.customers.activeTab === 'hardwares' ? 'selected' : ''}>${t('cust_type_hardware')}</option>
+              <option value="customer" ${Views.customers.activeTab === 'retail' ? 'selected' : ''}>${t('cust_type_retail')}</option>
             </select>
           </div>
         </div>
@@ -1280,17 +1342,17 @@ Views.customers = {
         <div class="field"><label class="field-label">${t('cust_form_address')}</label><input class="input" id="c_address"></div>
         <div class="field"><label class="field-label">${t('cust_form_nic')}</label><input class="input" id="c_nic"></div>
       `,
-      footHTML:`<button class="btn btn-outline" data-close>${t('cancel')}</button><button class="btn btn-primary" id="saveCustBtn">${t('confirm')}</button>`,
-      onMount:(wrap)=>{
+      footHTML: `<button class="btn btn-outline" data-close>${t('cancel')}</button><button class="btn btn-primary" id="saveCustBtn">${t('confirm')}</button>`,
+      onMount: (wrap) => {
         const typeSelect = wrap.querySelector('#c_type');
         const discWrap = wrap.querySelector('#c_discount_wrap');
         const toggleDisc = () => { discWrap.style.display = typeSelect.value === 'hardware' ? 'block' : 'none'; };
         toggleDisc();
         typeSelect.addEventListener('change', toggleDisc);
 
-        wrap.querySelector('#saveCustBtn').addEventListener('click', async ()=>{
+        wrap.querySelector('#saveCustBtn').addEventListener('click', async () => {
           const name = wrap.querySelector('#c_name').value.trim();
-          if(!name){ toast(t('cust_err_name'),'err'); return; }
+          if (!name) { toast(t('cust_err_name'), 'err'); return; }
           await DB.addCustomer({
             name,
             phone: wrap.querySelector('#c_phone').value,
@@ -1298,35 +1360,86 @@ Views.customers = {
             address: wrap.querySelector('#c_address').value,
             creditLimit: wrap.querySelector('#c_limit').value,
             customerType: typeSelect.value,
-            discountPercent: Number(wrap.querySelector('#c_discount').value)||0
+            discountPercent: Number(wrap.querySelector('#c_discount').value) || 0
           });
           closeModal();
-          toast(t('cust_added'),'ok');
+          toast(t('cust_added'), 'ok');
           App.render();
         });
       }
     });
   },
 
-  openDetailModal(id){
+  openEditModal(id) {
     const c = DB.getCustomer(id);
-    if(!c) return;
+    if (!c) return;
+    openModal({
+      title: t('items_edit') + ' - ' + escapeHTML(c.name),
+      bodyHTML: `
+        <div class="field"><label class="field-label">${t('cust_form_name')}</label><input class="input" id="ce_name" value="${escapeHTML(c.name)}" placeholder="${t('cust_form_name_ph')}"></div>
+        <div class="grid grid-2">
+          <div class="field"><label class="field-label">${t('cust_form_phone')}</label><input class="input" id="ce_phone" value="${escapeHTML(c.phone || '')}" placeholder="${t('cust_form_phone_ph')}"></div>
+          <div class="field"><label class="field-label">${t('cust_form_type')}</label>
+            <select class="input" id="ce_type">
+              <option value="hardware" ${c.customerType === 'hardware' ? 'selected' : ''}>${t('cust_type_hardware')}</option>
+              <option value="customer" ${c.customerType === 'customer' ? 'selected' : ''}>${t('cust_type_retail')}</option>
+            </select>
+          </div>
+        </div>
+        <div class="grid grid-2">
+          <div class="field" id="ce_discount_wrap"><label class="field-label">${t('cust_form_discount')}</label><input class="input" id="ce_discount" type="number" min="0" max="100" value="${c.discountPercent || 0}"></div>
+          <div class="field"><label class="field-label">${t('cust_form_limit')}</label><input class="input" id="ce_limit" type="number" min="0" value="${c.creditLimit || 0}"></div>
+        </div>
+        <div class="field"><label class="field-label">${t('cust_form_address')}</label><input class="input" id="ce_address" value="${escapeHTML(c.address || '')}"></div>
+        <div class="field"><label class="field-label">${t('cust_form_nic')}</label><input class="input" id="ce_nic" value="${escapeHTML(c.nic || '')}"></div>
+      `,
+      footHTML: `<button class="btn btn-outline" data-close>${t('cancel')}</button><button class="btn btn-primary" id="updateCustBtn">${t('confirm')}</button>`,
+      onMount: (wrap) => {
+        const typeSelect = wrap.querySelector('#ce_type');
+        const discWrap = wrap.querySelector('#ce_discount_wrap');
+        const toggleDisc = () => { discWrap.style.display = typeSelect.value === 'hardware' ? 'block' : 'none'; };
+        toggleDisc();
+        typeSelect.addEventListener('change', toggleDisc);
+
+        wrap.querySelector('#updateCustBtn').addEventListener('click', async () => {
+          const name = wrap.querySelector('#ce_name').value.trim();
+          if (!name) { toast(t('cust_err_name'), 'err'); return; }
+          await DB.updateCustomer(id, {
+            name,
+            phone: wrap.querySelector('#ce_phone').value,
+            nic: wrap.querySelector('#ce_nic').value,
+            address: wrap.querySelector('#ce_address').value,
+            creditLimit: wrap.querySelector('#ce_limit').value,
+            customerType: typeSelect.value,
+            discountPercent: Number(wrap.querySelector('#ce_discount').value) || 0
+          });
+          closeModal();
+          App.render();
+        });
+      }
+    });
+  },
+
+
+  openDetailModal(id) {
+    const c = DB.getCustomer(id);
+    if (!c) return;
     openModal({
       title: c.name,
-      wide:true,
-      bodyHTML:`
+      wide: true,
+      bodyHTML: `
         <div class="grid grid-2">
           <div>
             <div class="small text-muted">${t('cust_phone')}</div>
-            <div style="font-weight:600; margin-bottom:8px;">${escapeHTML(c.phone)||'-'}</div>
+            <div style="font-weight:600; margin-bottom:8px;">${escapeHTML(c.phone) || '-'}</div>
             <div class="small text-muted">${t('cust_address')}</div>
-            <div style="font-weight:600; margin-bottom:8px;">${escapeHTML(c.address)||'-'}</div>
+            <div style="font-weight:600; margin-bottom:8px;">${escapeHTML(c.address) || '-'}</div>
             <div class="small text-muted">${t('cust_form_type')}</div>
-            <div style="font-weight:600;">${c.customerType==='hardware'? `${t('cust_type_hardware')} (${c.discountPercent||0}% discount)` : t('cust_type_retail')}</div>
+            <div style="font-weight:600;">${c.customerType === 'hardware' ? `${t('cust_type_hardware')} (${c.discountPercent || 0}% discount)` : t('cust_type_retail')}</div>
           </div>
           <div>
             <div class="small text-muted">${t('cust_curr_due')}</div>
-            <div style="font-size:22px; font-weight:700; color:${c.balance>0?'var(--danger)':'var(--success)'}">${fmt(c.balance)}</div>
+            <div style="font-size:22px; font-weight:700; color:${c.balance > 0 ? 'var(--danger)' : 'var(--success)'}">${fmt(c.balance)}</div>
           </div>
         </div>
 
@@ -1345,26 +1458,41 @@ Views.customers = {
               <table>
                 <thead><tr><th>${t('dash_date')}</th><th>${t('word_type')}</th><th class="num">${t('sale_payment')}</th></tr></thead>
                 <tbody>
-                  ${c.ledger.map(l=>`
+                  ${c.ledger.map(l => {
+        let itemsHtml = '';
+        if (l.type === 'sale' && l.saleId) {
+          const sale = DB.allSales().find(s => s.id === l.saleId);
+          if (sale && sale.lines && sale.lines.length) {
+            itemsHtml = `<div style="margin-top:4px; font-size:12px; color:var(--text-color); opacity:0.8; line-height:1.4;">` +
+              sale.lines.map(line => `• ${escapeHTML(line.name)} (x${line.qty})`).join('<br>') +
+              `</div>`;
+          }
+        }
+        return `
                     <tr>
-                      <td>${fmtDate(l.date)}</td>
-                      <td>${l.type==='sale' ? `<span class="pill pill-warn">${t('cust_type_sale')}</span>` : `<span class="pill pill-ok">${t('cust_type_pay')}</span>`} <span class="small text-muted">${escapeHTML(l.note||'')}</span></td>
-                      <td class="num">${l.type==='sale'?'+':'-'} ${fmt(l.amount)}</td>
+                      <td style="vertical-align:top; padding-top:12px;">${fmtDate(l.date)}</td>
+                      <td style="vertical-align:top; padding-top:12px;">
+                        ${l.type === 'sale' ? `<span class="pill pill-warn">${t('cust_type_sale')}</span>` : `<span class="pill pill-ok">${t('cust_type_pay')}</span>`} 
+                        <span class="small text-muted" style="display:inline-block; margin-left:6px;">${escapeHTML(l.note || '')}</span>
+                        ${itemsHtml}
+                      </td>
+                      <td class="num" style="vertical-align:top; padding-top:12px;">${l.type === 'sale' ? '+' : '-'} ${fmt(l.amount)}</td>
                     </tr>
-                  `).join('')}
+                    `;
+      }).join('')}
                 </tbody>
               </table>
             </div>
           ` : `<div class="text-muted small">${t('cust_history_empty')}</div>`}
         </div>
       `,
-      footHTML:`<button class="btn btn-outline" data-close>${t('close')}</button>`,
-      onMount:()=>{
-        document.getElementById('recordPaymentBtn').addEventListener('click', async ()=>{
-          const amt = Number(document.getElementById('paymentAmt').value)||0;
-          if(amt<=0){ toast(t('cust_err_amt'),'err'); return; }
+      footHTML: `<button class="btn btn-outline" data-close>${t('close')}</button>`,
+      onMount: () => {
+        document.getElementById('recordPaymentBtn').addEventListener('click', async () => {
+          const amt = Number(document.getElementById('paymentAmt').value) || 0;
+          if (amt <= 0) { toast(t('cust_err_amt'), 'err'); return; }
           await DB.recordPayment(id, amt);
-          toast(t('cust_pay_recorded'),'ok');
+          toast(t('cust_pay_recorded'), 'ok');
           closeModal();
           App.render();
         });
@@ -1372,13 +1500,13 @@ Views.customers = {
     });
   },
 
-  bind(){
+  bind() {
     document.getElementById('addCustBtn').addEventListener('click', Views.customers.openAddModal);
 
     document.querySelectorAll('[data-cust-tab]').forEach(btn => {
       btn.addEventListener('click', (e) => {
         Views.customers.activeTab = e.currentTarget.dataset.custTab;
-        document.querySelectorAll('[data-cust-tab]').forEach(b=>b.classList.toggle('active', b===e.currentTarget));
+        document.querySelectorAll('[data-cust-tab]').forEach(b => b.classList.toggle('active', b === e.currentTarget));
         document.getElementById('custTableWrap').innerHTML = Views.customers.tableHTML();
         Views.customers.bindRowActions();
       });
@@ -1386,7 +1514,7 @@ Views.customers = {
 
     const search = document.getElementById('custSearch');
     if (search) {
-      search.addEventListener('input', ()=>{
+      search.addEventListener('input', () => {
         Views.customers.searchQ = search.value;
         document.getElementById('custTableWrap').innerHTML = Views.customers.tableHTML();
         Views.customers.bindRowActions();
@@ -1396,18 +1524,21 @@ Views.customers = {
     Views.customers.bindRowActions();
   },
 
-  bindRowActions(){
-    document.querySelectorAll('[data-view-cust]').forEach(b=>{
-      b.addEventListener('click', ()=>Views.customers.openDetailModal(Number(b.dataset.viewCust)));
+  bindRowActions() {
+    document.querySelectorAll('[data-view-cust]').forEach(b => {
+      b.addEventListener('click', () => Views.customers.openDetailModal(Number(b.dataset.viewCust)));
     });
-    document.querySelectorAll('[data-del-cust]').forEach(b=>{
-      b.addEventListener('click', ()=>{
+    document.querySelectorAll('[data-edit-cust]').forEach(b => {
+      b.addEventListener('click', () => Views.customers.openEditModal(Number(b.dataset.editCust)));
+    });
+    document.querySelectorAll('[data-del-cust]').forEach(b => {
+      b.addEventListener('click', () => {
         const id = Number(b.dataset.delCust);
         const c = DB.getCustomer(id);
-        if(c.balance>0){ toast(t('cust_err_del_due'),'err'); return; }
-        confirmAction(`"${escapeHTML(c.name)}" ${t('items_del_confirm')}`, async ()=>{
+        if (c.balance > 0) { toast(t('cust_err_del_due'), 'err'); return; }
+        confirmAction(`"${escapeHTML(c.name)}" ${t('items_del_confirm')}`, async () => {
           await DB.deleteCustomer(id);
-          toast(t('items_deleted'),'ok');
+          toast(t('items_deleted'), 'ok');
           App.render();
         });
       });
@@ -1417,39 +1548,42 @@ Views.customers = {
 
 /* ================= SALES HISTORY ================= */
 Views.history = {
-  filterType:'all',
-  render(){
+  filterType: 'all',
+  render() {
     return `
-      <div class="section-head">
-        <h2>${t('hist_title')}</h2>
-        <div class="flex gap-8">
+      <div class="page-header">
+        <div class="page-header-left">
+          <i class="ph ph-clock-counter-clockwise page-header-icon"></i>
+          <h2 class="page-header-title">${t('hist_title')}</h2>
+        </div>
+        <div class="page-header-right">
           <select class="input" id="histFilter" style="width:160px">
-            <option value="all" ${Views.history.filterType==='all'?'selected':''}>${t('hist_filter_all')}</option>
-            <option value="cash" ${Views.history.filterType==='cash'?'selected':''}>${t('hist_filter_cash')}</option>
-            <option value="credit" ${Views.history.filterType==='credit'?'selected':''}>${t('hist_filter_credit')}</option>
+            <option value="all" ${Views.history.filterType === 'all' ? 'selected' : ''}>${t('hist_filter_all')}</option>
+            <option value="cash" ${Views.history.filterType === 'cash' ? 'selected' : ''}>${t('hist_filter_cash')}</option>
+            <option value="credit" ${Views.history.filterType === 'credit' ? 'selected' : ''}>${t('hist_filter_credit')}</option>
           </select>
         </div>
       </div>
       <div id="histTableWrap">${Views.history.tableHTML()}</div>
     `;
   },
-  tableHTML(){
+  tableHTML() {
     let sales = DB.allSales();
-    if(Views.history.filterType!=='all') sales = sales.filter(s=>s.paymentType===Views.history.filterType);
-    if(!sales.length) return `<div class="card"><div class="empty-state"><div class="em-ico">🧾</div><h3>${t('hist_no_sales')}</h3></div></div>`;
+    if (Views.history.filterType !== 'all') sales = sales.filter(s => s.paymentType === Views.history.filterType);
+    if (!sales.length) return `<div class="card"><div class="empty-state"><div class="em-ico"><i class="ph ph-receipt"></i></div><h3>${t('hist_no_sales')}</h3></div></div>`;
     return `
       <div class="table-wrap">
         <table>
           <thead><tr><th>#</th><th>${t('dash_date')}</th><th>${t('hist_items')}</th><th>${t('sale_payment')}</th><th class="num">${t('sale_total')}</th><th></th></tr></thead>
           <tbody>
-            ${sales.map(s=>`
+            ${sales.map(s => `
               <tr>
                 <td>${s.id}</td>
                 <td>${fmtDate(s.date)}</td>
-                <td class="small">${s.lines.map(l=>escapeHTML(l.name)+' x'+l.qty).join(', ')}</td>
-                <td>${s.paymentType==='credit' ? `<span class="pill pill-warn">${t('word_credit')}</span> <span class="small text-muted">${escapeHTML(s.customerName)}</span>` : `<span class="pill pill-ok">${t('word_cash')}</span>`}</td>
+                <td class="small">${s.lines.map(l => escapeHTML(l.name) + ' x' + l.qty).join(', ')}</td>
+                <td>${s.paymentType === 'credit' ? `<span class="pill pill-warn">${t('word_credit')}</span> <span class="small text-muted">${escapeHTML(s.customerName)}</span>` : `<span class="pill pill-ok">${t('word_cash')}</span>`}</td>
                 <td class="num" style="font-weight:700">${fmt(s.total)}</td>
-                <td><button class="icon-btn" data-del-sale="${s.id}" title="${t('hist_del_title')}">🗑</button></td>
+                <td><button class="icon-btn" data-del-sale="${s.id}" title="${t('hist_del_title')}"><i class="ph ph-trash"></i></button></td>
               </tr>
             `).join('')}
           </tbody>
@@ -1457,21 +1591,21 @@ Views.history = {
       </div>
     `;
   },
-  bind(){
-    document.getElementById('histFilter').addEventListener('change', (e)=>{
+  bind() {
+    document.getElementById('histFilter').addEventListener('change', (e) => {
       Views.history.filterType = e.target.value;
       document.getElementById('histTableWrap').innerHTML = Views.history.tableHTML();
       Views.history.bindRowActions();
     });
     Views.history.bindRowActions();
   },
-  bindRowActions(){
-    document.querySelectorAll('[data-del-sale]').forEach(b=>{
-      b.addEventListener('click', ()=>{
+  bindRowActions() {
+    document.querySelectorAll('[data-del-sale]').forEach(b => {
+      b.addEventListener('click', () => {
         const id = Number(b.dataset.delSale);
-        confirmAction(t('hist_del_confirm'), async ()=>{
+        confirmAction(t('hist_del_confirm'), async () => {
           await DB.deleteSale(id);
-          toast(t('hist_deleted'),'ok');
+          toast(t('hist_deleted'), 'ok');
           App.render();
         });
       });
@@ -1481,9 +1615,12 @@ Views.history = {
 
 /* ================= SETTINGS ================= */
 Views.settings = {
-  render(){
+  render() {
     return `
-      <div class="section-head"><h2>${t('settings_title')}</h2></div>
+      ${Views.renderPageHeader({
+      icon: 'ph-gear',
+      title: t('settings_title')
+    })}
       <div class="grid grid-2">
         <div class="card">
           <div class="card-title">${t('settings_shop_details')}</div>
@@ -1511,60 +1648,60 @@ Views.settings = {
         <div class="card-title">${currentLang === 'si' ? 'භාෂාව / Language' : 'Language / භාෂාව'}</div>
         <div class="card-sub" style="margin-bottom:14px">${currentLang === 'si' ? 'අදාල භාෂාව තෝරන්න' : 'Select your preferred language'}</div>
         <div style="display:flex; gap:10px;">
-          <button class="btn ${currentLang==='si' ? 'btn-primary' : 'btn-outline'}" id="langSiBtn" style="flex:1; font-size:14px;">
-            ${currentLang==='si' ? '✓ ' : ''}සිංහල
+          <button class="btn ${currentLang === 'si' ? 'btn-primary' : 'btn-outline'}" id="langSiBtn" style="flex:1; font-size:14px;">
+            ${currentLang === 'si' ? '✓ ' : ''}සිංහල
           </button>
-          <button class="btn ${currentLang==='en' ? 'btn-primary' : 'btn-outline'}" id="langEnBtn" style="flex:1; font-size:14px;">
-            ${currentLang==='en' ? '✓ ' : ''}English
+          <button class="btn ${currentLang === 'en' ? 'btn-primary' : 'btn-outline'}" id="langEnBtn" style="flex:1; font-size:14px;">
+            ${currentLang === 'en' ? '✓ ' : ''}English
           </button>
         </div>
       </div>
     `;
   },
-  bind(){
-    document.getElementById('saveShopNameBtn').addEventListener('click', async ()=>{
+  bind() {
+    document.getElementById('saveShopNameBtn').addEventListener('click', async () => {
       const name = document.getElementById('shopNameInput').value.trim() || 'HardwarePOS';
       await DB.updateShopName(name);
       const lbl = document.getElementById('shopNameLabel');
       if (lbl) lbl.textContent = DB.data.settings.shopName;
-      toast(t('settings_saved'),'ok');
+      toast(t('settings_saved'), 'ok');
     });
-    document.getElementById('exportBtn').addEventListener('click', async ()=>{
-      const blob = new Blob([JSON.stringify(await DB.exportJSON(), null, 2)], {type:'application/json'});
+    document.getElementById('exportBtn').addEventListener('click', async () => {
+      const blob = new Blob([JSON.stringify(await DB.exportJSON(), null, 2)], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
-      const d = new Date().toISOString().slice(0,10);
+      const d = new Date().toISOString().slice(0, 10);
       a.href = url; a.download = `hardwarepos-backup-${d}.json`;
       a.click();
       URL.revokeObjectURL(url);
-      toast(t('settings_backup_dl'),'ok');
+      toast(t('settings_backup_dl'), 'ok');
     });
-    document.getElementById('importFile').addEventListener('change', (e)=>{
+    document.getElementById('importFile').addEventListener('change', (e) => {
       const file = e.target.files[0];
-      if(!file) return;
+      if (!file) return;
       const reader = new FileReader();
-      reader.onload = (ev)=>{
-        confirmAction(t('settings_restore_confirm'), async ()=>{
-          try{
+      reader.onload = (ev) => {
+        confirmAction(t('settings_restore_confirm'), async () => {
+          try {
             await DB.importJSON(ev.target.result);
-            toast(t('settings_restore_ok'),'ok');
+            toast(t('settings_restore_ok'), 'ok');
             App.render();
-          }catch(err){
-            toast(t('settings_restore_err'),'err');
+          } catch (err) {
+            toast(t('settings_restore_err'), 'err');
           }
         });
       };
       reader.readAsText(file);
     });
-    document.getElementById('wipeBtn').addEventListener('click', ()=>{
-      confirmAction(t('settings_wipe_confirm'), async ()=>{
+    document.getElementById('wipeBtn').addEventListener('click', () => {
+      confirmAction(t('settings_wipe_confirm'), async () => {
         await DB.wipeAll();
-        toast(t('settings_wiped'),'ok');
+        toast(t('settings_wiped'), 'ok');
         App.render();
       });
     });
-    document.getElementById('langSiBtn').addEventListener('click', ()=>setLanguage('si'));
-    document.getElementById('langEnBtn').addEventListener('click', ()=>setLanguage('en'));
+    document.getElementById('langSiBtn').addEventListener('click', () => setLanguage('si'));
+    document.getElementById('langEnBtn').addEventListener('click', () => setLanguage('en'));
   }
 };
 
@@ -1573,16 +1710,19 @@ Views.purchases = {
   searchQ: '',
   filterStatus: 'all', // 'all' | 'due' | 'paid'
 
-  render(){
+  render() {
     const purchases = DB.allPurchases();
     const totalAmount = purchases.reduce((s, p) => s + (p.totalAmount || 0), 0);
     const totalDue = purchases.reduce((s, p) => s + (p.dueAmount || 0), 0);
     const dueCount = purchases.filter(p => (p.dueAmount || 0) > 0).length;
 
     return `
-      <div class="section-head">
-        <h2>කඩේට ගත් බිල්පත් කළමනාකරණය (${purchases.length})</h2>
-        <div class="flex gap-8">
+      <div class="page-header">
+        <div class="page-header-left">
+          <i class="ph ph-truck page-header-icon"></i>
+          <h2 class="page-header-title">කඩේට ගත් බිල්පත් කළමනාකරණය <span class="page-header-count">${purchases.length}</span></h2>
+        </div>
+        <div class="page-header-right">
           <input class="input" id="purchasesSearch" placeholder="🔍 සැපයුම්කරු / බිල් No..." style="width:220px" value="${escapeHTML(Views.purchases.searchQ)}">
           <select class="input" id="purchasesStatusFilter" style="width:150px">
             <option value="all" ${Views.purchases.filterStatus === 'all' ? 'selected' : ''}>සියලු බිල්පත්</option>
@@ -1615,11 +1755,11 @@ Views.purchases = {
     `;
   },
 
-  tableHTML(){
+  tableHTML() {
     let list = DB.allPurchases();
     const q = Views.purchases.searchQ.toLowerCase();
-    if(q) {
-      list = list.filter(p => 
+    if (q) {
+      list = list.filter(p =>
         (p.supplierName || '').toLowerCase().includes(q) ||
         (p.billNo || '').toLowerCase().includes(q) ||
         (p.note || '').toLowerCase().includes(q)
@@ -1631,7 +1771,7 @@ Views.purchases = {
       list = list.filter(p => (p.dueAmount || 0) <= 0);
     }
 
-    if(!list.length) return `<div class="card"><div class="empty-state"><div class="em-ico">🚚</div><h3>කඩේට ගත් බිල්පත් නැත</h3><div class="small">"+ අලුත් බිලක් එක් කරන්න" ක්ලික් කරන්න</div></div></div>`;
+    if (!list.length) return `<div class="card"><div class="empty-state"><div class="em-ico"><i class="ph ph-truck"></i></div><h3>කඩේට ගත් බිල්පත් නැත</h3><div class="small">"+ අලුත් බිලක් එක් කරන්න" ක්ලික් කරන්න</div></div></div>`;
 
     return `
       <div class="table-wrap">
@@ -1651,17 +1791,17 @@ Views.purchases = {
           </thead>
           <tbody>
             ${list.map(p => {
-              const statusBadge = (p.dueAmount || 0) <= 0 
-                ? `<span class="pill pill-ok">සම්පූර්ණ ගෙවා ඇත</span>`
-                : (p.paidAmount || 0) > 0
-                ? `<span class="pill pill-warn">කොටසක් ගෙවා ඇත</span>`
-                : `<span class="pill pill-danger">හිඟ ඇත</span>`;
-              
-              const itemsText = Array.isArray(p.items) && p.items.length 
-                ? p.items.map(i => `${escapeHTML(i.name)} (${i.qty} ${escapeHTML(i.unit || '')})`).join(', ')
-                : '-';
+      const statusBadge = (p.dueAmount || 0) <= 0
+        ? `<span class="pill pill-ok">සම්පූර්ණ ගෙවා ඇත</span>`
+        : (p.paidAmount || 0) > 0
+          ? `<span class="pill pill-warn">කොටසක් ගෙවා ඇත</span>`
+          : `<span class="pill pill-danger">හිඟ ඇත</span>`;
 
-              return `
+      const itemsText = Array.isArray(p.items) && p.items.length
+        ? p.items.map(i => `${escapeHTML(i.name)} (${i.qty} ${escapeHTML(i.unit || '')})`).join(', ')
+        : '-';
+
+      return `
                 <tr>
                   <td><b>#${p.id}</b><br><span class="small text-muted">${fmtDate(p.date)}</span></td>
                   <td><b>${escapeHTML(p.supplierName || 'වෙනත්')}</b></td>
@@ -1673,22 +1813,22 @@ Views.purchases = {
                   <td>${statusBadge}</td>
                   <td>
                     <button class="btn btn-sm btn-outline" data-view-purchase="${p.id}">👁 විස්තර / ගෙවීම්</button>
-                    <button class="icon-btn" data-del-purchase="${p.id}" title="මකන්න">🗑</button>
+                    <button class="icon-btn" data-del-purchase="${p.id}" title="මකන්න"><i class="ph ph-trash"></i></button>
                   </td>
                 </tr>
               `;
-            }).join('')}
+    }).join('')}
           </tbody>
         </table>
       </div>
     `;
   },
 
-  openAddPurchaseModal(){
+  openAddPurchaseModal() {
     let purchaseItems = [];
     const existingItems = DB.allItems();
 
-    function renderModalItemsHTML(){
+    function renderModalItemsHTML() {
       if (!purchaseItems.length) {
         return `<div class="text-muted small" style="padding:10px 0; text-align:center;">භාණ්ඩ එකතු කර නැත. පහතින් එකතු කරන්න.</div>`;
       }
@@ -1718,7 +1858,7 @@ Views.purchases = {
       `;
     }
 
-    function calcModalTotal(){
+    function calcModalTotal() {
       return purchaseItems.reduce((s, i) => s + (i.qty * i.costPrice), 0);
     }
 
@@ -1737,12 +1877,12 @@ Views.purchases = {
           </div>
           <div class="field">
             <label class="field-label">දිනය</label>
-            <input class="input" id="pb_date" type="date" value="${new Date().toISOString().slice(0,10)}">
+            <input class="input" id="pb_date" type="date" value="${new Date().toISOString().slice(0, 10)}">
           </div>
         </div>
 
         <div class="card" style="background:var(--paper); padding:12px; margin-bottom:14px; box-shadow:none;">
-          <div class="card-title" style="font-size:13px; margin-bottom:8px;">📦 ගත් භාණ්ඩ ලැයිස්තුව</div>
+          <div class="card-title" style="font-size:13px; margin-bottom:8px;"><i class="ph ph-package"></i> ගත් භාණ්ඩ ලැයිස්තුව</div>
           <div id="modalItemsTableWrap">${renderModalItemsHTML()}</div>
 
           <div style="background:#fff; border:1px solid var(--border); border-radius:8px; padding:8px; margin-top:8px;">
@@ -1806,7 +1946,7 @@ Views.purchases = {
           }
         });
 
-        function updateModalItemsList(){
+        function updateModalItemsList() {
           wrap.querySelector('#modalItemsTableWrap').innerHTML = renderModalItemsHTML();
           const calculatedTotal = calcModalTotal();
           if (calculatedTotal > 0) {
@@ -1873,7 +2013,7 @@ Views.purchases = {
             closeModal();
             toast('කඩේට ගත් බිල සාර්ථකව සුරකින ලදී!', 'ok');
             App.render();
-          } catch(err) {
+          } catch (err) {
             console.error("Failed to add purchase:", err);
             toast('බිල සුරැකීමට නොහැකි විය!', 'err');
           }
@@ -1882,7 +2022,7 @@ Views.purchases = {
     });
   },
 
-  openDetailModal(id){
+  openDetailModal(id) {
     const p = DB.getPurchase(id);
     if (!p) return;
     const due = p.dueAmount || 0;
@@ -1922,7 +2062,7 @@ Views.purchases = {
         </div>
 
         ${Array.isArray(p.items) && p.items.length ? `
-          <div class="card-title mt-14" style="font-size:13px;">📦 ගත් භාණ්ඩ විස්තරය</div>
+          <div class="card-title mt-14" style="font-size:13px;"><i class="ph ph-package"></i> ගත් භාණ්ඩ විස්තරය</div>
           <div class="table-wrap mb-14" style="margin-top:6px;">
             <table>
               <thead>
@@ -1979,7 +2119,7 @@ Views.purchases = {
               toast('ගෙවීම සාර්ථකව සටහන් විය!', 'ok');
               closeModal();
               App.render();
-            } catch(err) {
+            } catch (err) {
               console.error("Failed to record payment:", err);
               toast('ගෙවීම සටහන් කිරීමට නොහැකි විය!', 'err');
             }
@@ -1989,7 +2129,7 @@ Views.purchases = {
     });
   },
 
-  bind(){
+  bind() {
     document.getElementById('addPurchaseBtn')?.addEventListener('click', Views.purchases.openAddPurchaseModal);
 
     const search = document.getElementById('purchasesSearch');
@@ -2013,7 +2153,7 @@ Views.purchases = {
     Views.purchases.bindRowActions();
   },
 
-  bindRowActions(){
+  bindRowActions() {
     document.querySelectorAll('[data-view-purchase]').forEach(b => {
       b.addEventListener('click', () => Views.purchases.openDetailModal(Number(b.dataset.viewPurchase)));
     });
@@ -2026,7 +2166,7 @@ Views.purchases = {
             await DB.deletePurchase(id);
             toast('ගත් බිල ඉවත් කරන ලදී', 'ok');
             App.render();
-          } catch(err) {
+          } catch (err) {
             console.error("Failed to delete purchase:", err);
             toast('ඉවත් කිරීමට නොහැකි විය', 'err');
           }
