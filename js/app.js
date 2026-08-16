@@ -35,6 +35,14 @@ const App = {
       });
     });
 
+    document.addEventListener('focusin', (e) => {
+      if (['INPUT', 'TEXTAREA'].includes(e.target?.tagName)) {
+        if (typeof e.target.select === 'function') {
+          e.target.select();
+        }
+      }
+    });
+
     // Bell dropdown toggle
     document.getElementById('bellBtn')?.addEventListener('click', (e) => {
       e.stopPropagation();
@@ -96,6 +104,32 @@ const App = {
       }
 
       const isInput = ['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName) || document.activeElement?.isContentEditable;
+
+      // Universal Form & Modal Arrow Keys Navigation (ArrowDown / ArrowUp)
+      if (!e.defaultPrevented && isInput) {
+        if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+          const activeEl = document.activeElement;
+          const modal = document.getElementById('activeModal');
+          const container = modal ? modal : (activeEl.closest('form, .card, .view-wrap, main') || document.body);
+          const fields = Array.from(container.querySelectorAll('input:not([type="hidden"]), select, textarea, button.btn-primary, button.btn-success, button.btn-danger'))
+            .filter(el => el.offsetParent !== null && !el.disabled && el.tabIndex !== -1);
+          
+          const idx = fields.indexOf(activeEl);
+          if (idx !== -1) {
+            if (e.key === 'ArrowDown' && idx < fields.length - 1) {
+              e.preventDefault();
+              const next = fields[idx + 1];
+              next.focus();
+              if (typeof next.select === 'function') next.select();
+            } else if (e.key === 'ArrowUp' && idx > 0) {
+              e.preventDefault();
+              const prev = fields[idx - 1];
+              prev.focus();
+              if (typeof prev.select === 'function') prev.select();
+            }
+          }
+        }
+      }
 
       if (!isInput && !document.getElementById('activeModal')) {
         if (e.key === 's' || e.key === 'S' || e.code === 'KeyS') {

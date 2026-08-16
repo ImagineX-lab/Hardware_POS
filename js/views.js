@@ -150,47 +150,47 @@ Views.sale = {
           </div>
         </div>
 
-        <div class="card">
-          <div class="card-title" style="margin-bottom:10px">${t('sale_cart')}</div>
-          <div class="cart-list-wrap" id="cartBox">${Views.sale.cartHTML()}</div>
+        <div class="card" style="padding:14px; display:flex; flex-direction:column; gap:6px;">
+          <div class="card-title" style="margin-bottom:4px; font-size:16px;">${t('sale_cart')}</div>
+          <div class="cart-list-wrap" id="cartBox" style="padding:0; flex:1; min-height:0;">${Views.sale.cartHTML()}</div>
 
-          <div class="totals-box" id="totalsBox" style="margin-top:auto; padding-top:10px; border-top:none;">${Views.sale.totalsHTML()}</div>
+          <div class="totals-box" id="totalsBox" style="margin-top:auto; padding:6px 0 4px 0; border-top:1px dashed var(--border);">${Views.sale.totalsHTML()}</div>
 
           <!-- Payment Method Selector -->
-          <div class="field mt-8" style="margin-bottom:6px;">
-            <label class="field-label" style="margin-bottom:4px;">${t('sale_pay_method')}</label>
-            <div class="pay-toggle" style="margin:0;">
-              <button type="button" id="payCashBtn" class="${Views.sale.payType === 'cash' ? 'active' : ''}">${t('sale_cash')}</button>
-              <button type="button" id="payCreditBtn" class="credit ${Views.sale.payType === 'credit' ? 'active' : ''}">${t('sale_credit')}</button>
+          <div class="field" style="margin-bottom:4px;">
+            <label class="field-label" style="margin-bottom:2px; font-size:12px;">${t('sale_pay_method')}</label>
+            <div class="pay-toggle" style="margin:0; height:34px;">
+              <button type="button" id="payCashBtn" style="padding:4px 8px; font-size:13px;" class="${Views.sale.payType === 'cash' ? 'active' : ''}">${t('sale_cash')}</button>
+              <button type="button" id="payCreditBtn" style="padding:4px 8px; font-size:13px;" class="credit ${Views.sale.payType === 'credit' ? 'active' : ''}">${t('sale_credit')}</button>
             </div>
           </div>
 
           <!-- Customer Selection Box (For Cash or Credit) -->
-          <div class="field mt-8" style="margin-bottom:6px;">
-            <label class="field-label" style="margin-bottom:4px;">${t('sale_customer')} <small class="text-muted">(${Views.sale.payType === 'credit' ? 'අවශ්‍යයි' : 'විකල්පයි'})</small></label>
+          <div class="field" style="margin-bottom:4px;">
+            <label class="field-label" style="margin-bottom:2px; font-size:12px;">${t('sale_customer')} <small class="text-muted">(${Views.sale.payType === 'credit' ? 'අවශ්‍යයි' : 'විකල්පයි'})</small></label>
             <div id="customerSelectionWrap">
               ${Views.sale.customerWidgetHTML()}
             </div>
           </div>
 
           <!-- Amount Paid & Change Due for Cash -->
-          <div class="field mt-8" id="amountPaidWrap" style="display:${Views.sale.payType === 'cash' ? 'block' : 'none'}; margin-bottom:6px;">
-            <label class="field-label" style="margin-bottom:4px;">${t('sale_amount_paid')}</label>
-            <input class="input" id="saleAmountPaid" type="number" min="0" step="any" placeholder="0.00" value="${Views.sale.amountPaid || ''}">
-            <div id="changeDueWrap" class="change-due-box" style="display:${(Number(Views.sale.amountPaid) > 0) ? 'flex' : 'none'};">
-              <span>${t('sale_change_due')}</span>
-              <span id="changeDueAmount" style="font-size:16px;">${fmt(Math.max(0, (Number(Views.sale.amountPaid) || 0) - Views.sale.calcTotal()))}</span>
+          <div class="field" id="amountPaidWrap" style="display:${Views.sale.payType === 'cash' ? 'block' : 'none'}; margin-bottom:4px;">
+            <label class="field-label" style="margin-bottom:2px; font-size:12px;">${t('sale_amount_paid')}</label>
+            <input class="input" id="saleAmountPaid" type="number" min="0" step="any" placeholder="0.00" value="${Views.sale.amountPaid || ''}" style="height:36px; padding:6px 10px; font-size:15px;">
+            <div id="changeDueWrap" class="change-due-box" style="display:${(Number(Views.sale.amountPaid) > 0) ? 'flex' : 'none'}; margin-top:4px; padding:6px 10px;">
+              <span style="font-size:13px;">${t('sale_change_due')}</span>
+              <span id="changeDueAmount" style="font-size:15px; font-weight:700;">${fmt(Math.max(0, (Number(Views.sale.amountPaid) || 0) - Views.sale.calcTotal()))}</span>
             </div>
           </div>
 
           <!-- Overall Discount Field -->
-          <div class="field mt-8" style="margin-bottom:12px;">
-            <label class="field-label" style="margin-bottom:4px;">${t('sale_discount')}</label>
-            <input class="input" id="saleDiscount" type="number" min="0" step="any" value="0">
+          <div class="field" style="margin-bottom:6px;">
+            <label class="field-label" style="margin-bottom:2px; font-size:12px;">${t('sale_discount')}</label>
+            <input class="input" id="saleDiscount" type="number" min="0" step="any" value="0" style="height:36px; padding:6px 10px; font-size:15px;">
           </div>
 
-          <button class="btn btn-primary btn-block" id="completeSaleBtn" style="padding:13px; font-size:15px;">${t('sale_complete_btn')}</button>
-          <button class="btn btn-outline btn-block mt-8" id="clearCartBtn">${t('sale_clear_cart')}</button>
+          <button class="btn btn-primary btn-block" id="completeSaleBtn" style="padding:10px; font-size:15px; height:42px;">${t('sale_complete_btn')}</button>
+          <button class="btn btn-outline btn-block" id="clearCartBtn" style="padding:6px; font-size:13px; margin-top:2px;">${t('sale_clear_cart')}</button>
         </div>
       </div>
     `;
@@ -264,37 +264,23 @@ Views.sale = {
   },
 
   cartHTML() {
-    if (!cart.length) return `<div class="empty-state" style="padding:30px 10px"><div class="em-ico"><i class="ph ph-shopping-cart"></i></div><h3>${t('sale_empty_cart')}</h3><div class="small">${t('sale_empty_cart_sub')}</div></div>`;
+    if (!cart.length) return `<div class="empty-state" style="padding:20px 10px"><div class="em-ico"><i class="ph ph-shopping-cart"></i></div><h3>${t('sale_empty_cart')}</h3><div class="small">${t('sale_empty_cart_sub')}</div></div>`;
     return cart.map((l, idx) => `
-      <div class="cart-row">
-        <div class="cart-row-top">
-          <div style="display:flex; align-items:center; gap:12px; flex:1; min-width:0;">
-            <div class="cart-item-name" style="font-size:16px; font-weight:700;">${escapeHTML(l.name)}</div>
-          </div>
-          <button class="icon-btn" data-remove-idx="${idx}" title="${t('delete')}" style="font-size:20px; flex-shrink:0; padding:6px;">✕</button>
+      <div class="cart-row" style="padding:6px 0; border-bottom:1px solid var(--border);">
+        <div class="cart-row-top" style="display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:4px;">
+          <div class="cart-item-name" style="font-size:15px; font-weight:700; color:var(--charcoal);">${escapeHTML(l.name)}</div>
+          <button class="icon-btn" data-remove-idx="${idx}" title="${t('delete')}" style="font-size:16px; padding:2px 6px; border:none; background:none; color:var(--steel); cursor:pointer;">✕</button>
         </div>
-        <div class="cart-row-bottom" style="display:flex; flex-direction:column; gap:12px; align-items:stretch; width:100%;">
-          <div class="cart-item-meta" style="display:flex; flex-wrap:wrap; gap:8px 12px; font-size:13px; color:var(--steel);">
-            <span>${t('cart_unit_price')}: <b>${fmt(l.unitPrice)} / ${escapeHTML(l.unit)}</b></span>
-            <span>•</span>
-            <span>${t('cart_cost_price')}: <b>${fmt(l.costPrice)}</b></span>
-            <span>•</span>
-            <span>${t('cart_stock')}: <b>${l.maxQty}</b></span>
+        <div style="display:flex; align-items:center; justify-content:space-between; gap:8px;">
+          <div style="display:flex; align-items:center; gap:6px;">
+            <span style="font-size:11.5px; font-weight:700; color:var(--steel);">QTY</span>
+            <input type="number" min="0.01" step="any" max="${l.maxQty}" value="${l.qty}" data-qty-idx="${idx}" class="input" style="width:75px; height:32px; padding:4px 8px; font-size:14px; text-align:center;" title="Quantity">
+            
+            <span style="font-size:11.5px; font-weight:700; color:var(--steel); margin-left:6px;">DISC</span>
+            <input type="number" min="0" step="any" placeholder="0" value="${l.discount || ''}" data-discount-idx="${idx}" class="input" style="width:75px; height:32px; padding:4px 8px; font-size:14px; text-align:center;" title="Discount">
           </div>
-          <div style="display:flex; align-items:flex-end; justify-content:space-between; gap:12px; width:100%;">
-            <div style="display:flex; gap:12px;">
-              <div style="display:flex; flex-direction:column; gap:4px;">
-                <label style="font-size:11.5px; font-weight:600; color:var(--steel); text-transform:uppercase;">${t('cart_qty_label')}</label>
-                <input type="number" min="0.01" step="any" max="${l.maxQty}" value="${l.qty}" data-qty-idx="${idx}" class="input" style="width:90px; height:40px; padding:6px 10px; font-size:15px;" title="Quantity">
-              </div>
-              <div style="display:flex; flex-direction:column; gap:4px;">
-                <label style="font-size:11.5px; font-weight:600; color:var(--steel); text-transform:uppercase;">${t('cart_discount_label')}</label>
-                <input type="number" min="0" step="any" placeholder="0" value="${l.discount || ''}" data-discount-idx="${idx}" class="input" style="width:90px; height:40px; padding:6px 10px; font-size:15px;" title="Discount">
-              </div>
-            </div>
-            <div class="cart-row-price" style="font-size:20px; font-weight:700; color:var(--primary-dark); margin-bottom:2px;">
-              ${fmt(Math.max(0, l.qty * l.unitPrice - (l.discount || 0)))}
-            </div>
+          <div class="cart-row-price" style="font-size:17px; font-weight:700; color:var(--primary-dark);">
+            ${fmt(Math.max(0, l.qty * l.unitPrice - (l.discount || 0)))}
           </div>
         </div>
       </div>
@@ -393,7 +379,7 @@ Views.sale = {
       });
     });
 
-    // Arrow keys navigation between Cart rows and fields
+    // Arrow keys navigation between Cart rows and fields below Total
     document.querySelectorAll('[data-qty-idx], [data-discount-idx]').forEach(inp => {
       inp.addEventListener('focus', (e) => {
         if (typeof e.target.select === 'function') e.target.select();
@@ -409,6 +395,16 @@ Views.sale = {
           if (nextInp) {
             nextInp.focus();
             if (typeof nextInp.select === 'function') nextInp.select();
+          } else {
+            // From last item in cart -> move down to checkout fields below Total
+            const custInp = document.getElementById('saleCustomerSearch');
+            const paidInp = document.getElementById('saleAmountPaid');
+            const discInp = document.getElementById('saleDiscount');
+            const target = (custInp && custInp.offsetParent !== null) ? custInp : (paidInp && paidInp.offsetParent !== null) ? paidInp : discInp;
+            if (target) {
+              target.focus();
+              if (typeof target.select === 'function') target.select();
+            }
           }
         } else if (e.key === 'ArrowUp') {
           e.preventDefault();
@@ -417,12 +413,24 @@ Views.sale = {
             prevInp.focus();
             if (typeof prevInp.select === 'function') prevInp.select();
           }
-        } else if (e.key === 'ArrowRight' && isQty) {
+        } else if (e.key === 'ArrowRight') {
           e.preventDefault();
-          const discInp = document.querySelector(`[data-discount-idx="${idx}"]`);
-          if (discInp) {
-            discInp.focus();
-            if (typeof discInp.select === 'function') discInp.select();
+          if (isQty) {
+            const discInp = document.querySelector(`[data-discount-idx="${idx}"]`);
+            if (discInp) {
+              discInp.focus();
+              if (typeof discInp.select === 'function') discInp.select();
+            }
+          } else if (idx === cart.length - 1) {
+            // From last item's discount field -> move to checkout field
+            const custInp = document.getElementById('saleCustomerSearch');
+            const paidInp = document.getElementById('saleAmountPaid');
+            const discInp = document.getElementById('saleDiscount');
+            const target = (custInp && custInp.offsetParent !== null) ? custInp : (paidInp && paidInp.offsetParent !== null) ? paidInp : discInp;
+            if (target) {
+              target.focus();
+              if (typeof target.select === 'function') target.select();
+            }
           }
         } else if (e.key === 'ArrowLeft' && !isQty) {
           e.preventDefault();
@@ -430,6 +438,24 @@ Views.sale = {
           if (qtyInp) {
             qtyInp.focus();
             if (typeof qtyInp.select === 'function') qtyInp.select();
+          }
+        } else if (e.key === 'Backspace' || e.key === 'Delete') {
+          if (e.key === 'Delete' || e.target.value === '' || e.shiftKey || e.altKey) {
+            e.preventDefault();
+            cart.splice(idx, 1);
+            Views.sale.refreshCart();
+            Views.sale.applyCustomerHardwareDiscount();
+            const targetIdx = Math.min(idx, cart.length - 1);
+            if (targetIdx >= 0) {
+              const nextTarget = document.querySelector(`[data-qty-idx="${targetIdx}"]`);
+              if (nextTarget) {
+                nextTarget.focus();
+                if (typeof nextTarget.select === 'function') nextTarget.select();
+              }
+            } else {
+              const searchInp = document.getElementById('saleSearch');
+              if (searchInp) searchInp.focus();
+            }
           }
         } else if (e.key === 'Enter') {
           e.preventDefault();
@@ -536,17 +562,63 @@ Views.sale = {
 
     const discEl = document.getElementById('saleDiscount');
     if (discEl) {
+      discEl.addEventListener('focus', (e) => {
+        if (typeof e.target.select === 'function') e.target.select();
+      });
       discEl.addEventListener('input', () => {
         document.getElementById('totalsBox').innerHTML = Views.sale.totalsHTML();
         Views.sale.updateChangeDue();
+      });
+      discEl.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          document.getElementById('completeSaleBtn')?.click();
+        } else if (e.key === 'ArrowUp') {
+          e.preventDefault();
+          const paidInp = document.getElementById('saleAmountPaid');
+          const custInp = document.getElementById('saleCustomerSearch');
+          const target = (paidInp && paidInp.offsetParent !== null) ? paidInp : (custInp && custInp.offsetParent !== null) ? custInp : null;
+          if (target) {
+            target.focus();
+            if (typeof target.select === 'function') target.select();
+          } else {
+            const lastIdx = cart.length - 1;
+            const targetInp = document.querySelector(`[data-discount-idx="${lastIdx}"]`) || document.querySelector(`[data-qty-idx="${lastIdx}"]`);
+            if (targetInp) { targetInp.focus(); if (typeof targetInp.select === 'function') targetInp.select(); }
+          }
+        }
       });
     }
 
     const paidEl = document.getElementById('saleAmountPaid');
     if (paidEl) {
+      paidEl.addEventListener('focus', (e) => {
+        if (typeof e.target.select === 'function') e.target.select();
+      });
       paidEl.addEventListener('input', (e) => {
         Views.sale.amountPaid = e.target.value;
         Views.sale.updateChangeDue();
+      });
+      paidEl.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          document.getElementById('completeSaleBtn')?.click();
+        } else if (e.key === 'ArrowDown') {
+          e.preventDefault();
+          const discEl = document.getElementById('saleDiscount');
+          if (discEl) { discEl.focus(); if (typeof discEl.select === 'function') discEl.select(); }
+        } else if (e.key === 'ArrowUp') {
+          e.preventDefault();
+          const custInp = document.getElementById('saleCustomerSearch');
+          if (custInp && custInp.offsetParent !== null) {
+            custInp.focus();
+            if (typeof custInp.select === 'function') custInp.select();
+          } else {
+            const lastIdx = cart.length - 1;
+            const targetInp = document.querySelector(`[data-discount-idx="${lastIdx}"]`) || document.querySelector(`[data-qty-idx="${lastIdx}"]`);
+            if (targetInp) { targetInp.focus(); if (typeof targetInp.select === 'function') targetInp.select(); }
+          }
+        }
       });
     }
 
@@ -579,7 +651,68 @@ Views.sale = {
     const suggestBox = document.getElementById('custSuggestBox');
     if (!searchInp || !suggestBox) return;
 
+    let custSelectedIndex = -1;
+
+    searchInp.addEventListener('focus', (e) => {
+      if (typeof e.target.select === 'function') e.target.select();
+    });
+
+    searchInp.addEventListener('keydown', (e) => {
+      const items = suggestBox.querySelectorAll('.cust-suggest-item');
+      const isVisible = suggestBox.style.display === 'block' && items.length > 0;
+
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        if (isVisible) {
+          custSelectedIndex = (custSelectedIndex + 1) % items.length;
+          updateCustSelection(items);
+        } else {
+          const paidInp = document.getElementById('saleAmountPaid');
+          const discInp = document.getElementById('saleDiscount');
+          const target = (paidInp && paidInp.offsetParent !== null) ? paidInp : discInp;
+          if (target) { target.focus(); if (typeof target.select === 'function') target.select(); }
+        }
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        if (isVisible && custSelectedIndex > 0) {
+          custSelectedIndex = custSelectedIndex - 1;
+          updateCustSelection(items);
+        } else if (isVisible && custSelectedIndex === 0) {
+          custSelectedIndex = -1;
+          updateCustSelection(items);
+        } else {
+          const lastIdx = cart.length - 1;
+          const targetInp = document.querySelector(`[data-discount-idx="${lastIdx}"]`) || document.querySelector(`[data-qty-idx="${lastIdx}"]`);
+          if (targetInp) { targetInp.focus(); if (typeof targetInp.select === 'function') targetInp.select(); }
+        }
+      } else if (e.key === 'Enter') {
+        if (isVisible) {
+          e.preventDefault();
+          if (custSelectedIndex >= 0 && custSelectedIndex < items.length) {
+            items[custSelectedIndex].click();
+          } else if (items.length > 0) {
+            items[0].click();
+          }
+        }
+      }
+
+      function updateCustSelection(itemList) {
+        itemList.forEach((item, idx) => {
+          if (idx === custSelectedIndex) {
+            item.classList.add('selected-row');
+            item.style.background = 'var(--primary-light)';
+            item.style.borderColor = 'var(--primary)';
+          } else {
+            item.classList.remove('selected-row');
+            item.style.background = '';
+            item.style.borderColor = '';
+          }
+        });
+      }
+    });
+
     searchInp.addEventListener('input', () => {
+      custSelectedIndex = -1;
       const q = searchInp.value.trim();
       if (!q) {
         suggestBox.style.display = 'none';
@@ -619,6 +752,10 @@ Views.sale = {
             custWrap.innerHTML = Views.sale.customerWidgetHTML();
             Views.sale.bindCustomerSearch();
             Views.sale.applyCustomerHardwareDiscount();
+            setTimeout(() => {
+              const paidInp = document.getElementById('saleAmountPaid');
+              if (paidInp) { paidInp.focus(); if (typeof paidInp.select === 'function') paidInp.select(); }
+            }, 50);
           }
         });
       });
