@@ -3,7 +3,7 @@
    ========================================================= */
 
 const App = {
-  currentView: 'dashboard',
+  currentView: 'sale',
   titles: {},
 
   updateTitles(){

@@ -102,10 +102,10 @@ const DB = {
   getHardwareCustomers(){ return this.data.customers.filter(c => c.customerType === 'hardware').sort((a,b)=>a.name.localeCompare(b.name)); },
   getRetailCustomers(){ return this.data.customers.filter(c => c.customerType !== 'hardware').sort((a,b)=>a.name.localeCompare(b.name)); },
   searchCustomers(q){
-    q = (q || '').trim().toLowerCase();
+    q = (q || '').trim();
     if(!q) return this.allCustomers();
     return this.data.customers.filter(c => 
-      c.name.toLowerCase().includes(q) || (c.phone || '').includes(q)
+      (typeof Singlish !== 'undefined' ? Singlish.match(c.name, q) : c.name.toLowerCase().includes(q.toLowerCase())) || (c.phone || '').includes(q)
     ).sort((a,b)=>a.name.localeCompare(b.name));
   },
 

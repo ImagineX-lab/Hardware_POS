@@ -237,6 +237,10 @@ Views.sale = {
     if (Views.sale.currentCategory !== 'All') {
       items = items.filter(i => (i.category || 'Uncategorized') === Views.sale.currentCategory);
     }
+    const q = (document.getElementById('saleSearch')?.value || '').trim();
+    if (q) {
+      items = items.filter(i => Singlish.match(i.name, q) || Singlish.match(i.category || '', q) || Singlish.match(i.description || '', q));
+    }
     if (!items.length) {
       return `<div class="empty-state" style="grid-column:1/-1; padding:40px 20px;"><div class="em-ico"><i class="ph ph-package"></i></div><h3>${t('sale_no_matches') || 'No items'}</h3></div>`;
     }
@@ -252,6 +256,7 @@ Views.sale = {
         <div class="item-desc text-muted">${escapeHTML(i.description || '')}</div>
         <div>
           <div class="item-price">${fmt(i.sellPrice)}</div>
+          <div class="item-cost">${t('items_cost_price')}: <b>${fmt(i.costPrice || 0)}</b></div>
           <div class="item-qty">${i.qty} ${escapeHTML(i.unit)}</div>
         </div>
       </div>
@@ -263,34 +268,31 @@ Views.sale = {
     return cart.map((l, idx) => `
       <div class="cart-row">
         <div class="cart-row-top">
-          <div style="display:flex; align-items:center; gap:8px; flex:1; min-width:0;">
-            <div style="width:32px; height:32px; border-radius:6px; overflow:hidden; background:var(--paper); display:flex; align-items:center; justify-content:center; flex-shrink:0;">
-              ${l.image ? `<img src="${l.image}" style="width:100%; height:100%; object-fit:cover;">` : `<i class="ph ph-package" style="font-size:16px;"></i>`}
-            </div>
-            <div class="cart-item-name">${escapeHTML(l.name)}</div>
+          <div style="display:flex; align-items:center; gap:12px; flex:1; min-width:0;">
+            <div class="cart-item-name" style="font-size:16px; font-weight:700;">${escapeHTML(l.name)}</div>
           </div>
-          <button class="icon-btn" data-remove-idx="${idx}" title="${t('delete')}" style="font-size:16px; flex-shrink:0;">✕</button>
+          <button class="icon-btn" data-remove-idx="${idx}" title="${t('delete')}" style="font-size:20px; flex-shrink:0; padding:6px;">✕</button>
         </div>
-        <div class="cart-row-bottom" style="display:flex; flex-direction:column; gap:8px; align-items:stretch; width:100%;">
-          <div class="cart-item-meta" style="display:flex; flex-wrap:wrap; gap:6px 8px; font-size:11.5px; color:var(--steel);">
+        <div class="cart-row-bottom" style="display:flex; flex-direction:column; gap:12px; align-items:stretch; width:100%;">
+          <div class="cart-item-meta" style="display:flex; flex-wrap:wrap; gap:8px 12px; font-size:13px; color:var(--steel);">
             <span>${t('cart_unit_price')}: <b>${fmt(l.unitPrice)} / ${escapeHTML(l.unit)}</b></span>
             <span>•</span>
             <span>${t('cart_cost_price')}: <b>${fmt(l.costPrice)}</b></span>
             <span>•</span>
             <span>${t('cart_stock')}: <b>${l.maxQty}</b></span>
           </div>
-          <div style="display:flex; align-items:flex-end; justify-content:space-between; gap:10px; width:100%;">
-            <div style="display:flex; gap:8px;">
-              <div style="display:flex; flex-direction:column; gap:2px;">
-                <label style="font-size:10px; font-weight:600; color:var(--steel); text-transform:uppercase;">${t('cart_qty_label')}</label>
-                <input type="number" min="0.01" step="any" max="${l.maxQty}" value="${l.qty}" data-qty-idx="${idx}" class="input" style="width:70px; height:32px; padding:4px 6px;" title="Quantity">
+          <div style="display:flex; align-items:flex-end; justify-content:space-between; gap:12px; width:100%;">
+            <div style="display:flex; gap:12px;">
+              <div style="display:flex; flex-direction:column; gap:4px;">
+                <label style="font-size:11.5px; font-weight:600; color:var(--steel); text-transform:uppercase;">${t('cart_qty_label')}</label>
+                <input type="number" min="0.01" step="any" max="${l.maxQty}" value="${l.qty}" data-qty-idx="${idx}" class="input" style="width:90px; height:40px; padding:6px 10px; font-size:15px;" title="Quantity">
               </div>
-              <div style="display:flex; flex-direction:column; gap:2px;">
-                <label style="font-size:10px; font-weight:600; color:var(--steel); text-transform:uppercase;">${t('cart_discount_label')}</label>
-                <input type="number" min="0" step="any" placeholder="0" value="${l.discount || ''}" data-discount-idx="${idx}" class="input" style="width:70px; height:32px; padding:4px 6px;" title="Discount">
+              <div style="display:flex; flex-direction:column; gap:4px;">
+                <label style="font-size:11.5px; font-weight:600; color:var(--steel); text-transform:uppercase;">${t('cart_discount_label')}</label>
+                <input type="number" min="0" step="any" placeholder="0" value="${l.discount || ''}" data-discount-idx="${idx}" class="input" style="width:90px; height:40px; padding:6px 10px; font-size:15px;" title="Discount">
               </div>
             </div>
-            <div class="cart-row-price" style="font-size:16px; font-weight:700; color:var(--primary-dark); margin-bottom:2px;">
+            <div class="cart-row-price" style="font-size:20px; font-weight:700; color:var(--primary-dark); margin-bottom:2px;">
               ${fmt(Math.max(0, l.qty * l.unitPrice - (l.discount || 0)))}
             </div>
           </div>
@@ -400,9 +402,14 @@ Views.sale = {
     if (searchInp) {
       searchInp.addEventListener('input', () => {
         selectedIndex = -1;
-        const q = searchInp.value.trim().toLowerCase();
+        const q = searchInp.value.trim();
+        const grid = document.getElementById('posItemGrid');
+        if (grid) {
+          grid.innerHTML = Views.sale.posGridHTML();
+          Views.sale.bindGrid();
+        }
         if (!q) { suggestBox.innerHTML = ''; return; }
-        const matches = DB.allItems().filter(i => i.name.toLowerCase().includes(q) || (i.category || '').toLowerCase().includes(q)).slice(0, 8);
+        const matches = DB.allItems().filter(i => Singlish.match(i.name, q) || Singlish.match(i.category || '', q) || Singlish.match(i.description || '', q)).slice(0, 8);
         if (!matches.length) {
           suggestBox.innerHTML = `<div class="search-suggest"><div class="suggest-row text-muted">${t('sale_no_matches')}</div></div>`;
           return;
@@ -415,7 +422,7 @@ Views.sale = {
               </div>
               <div>
                 <div class="s-name">${escapeHTML(i.name)}</div>
-                <div class="s-meta">${escapeHTML(i.category)} • ${t('word_qty')}: ${i.qty} ${escapeHTML(i.unit)}</div>
+                <div class="s-meta">${escapeHTML(i.category)} • ${t('word_qty')}: ${i.qty} ${escapeHTML(i.unit)} • ${t('items_cost_price')}: ${fmt(i.costPrice || 0)}</div>
               </div>
             </div>
             <div style="font-weight:700">${fmt(i.sellPrice)}</div>
@@ -425,7 +432,12 @@ Views.sale = {
           row.addEventListener('click', () => {
             const id = Number(row.dataset.addItem);
             Views.sale.addToCart(id);
-            searchInp.value = ''; suggestBox.innerHTML = ''; searchInp.focus();
+            searchInp.value = ''; suggestBox.innerHTML = '';
+            if (grid) {
+              grid.innerHTML = Views.sale.posGridHTML();
+              Views.sale.bindGrid();
+            }
+            searchInp.focus();
           });
         });
       });
@@ -785,8 +797,8 @@ Views.items = {
 
   tableHTML() {
     let list = DB.allItems();
-    const q = Views.items.searchQ.toLowerCase();
-    if (q) list = list.filter(i => i.name.toLowerCase().includes(q) || (i.category || '').toLowerCase().includes(q));
+    const q = (Views.items.searchQ || '').trim();
+    if (q) list = list.filter(i => Singlish.match(i.name, q) || Singlish.match(i.category || '', q) || Singlish.match(i.description || '', q));
     if (!list.length) return `<div class="card"><div class="empty-state"><div class="em-ico"><i class="ph ph-package"></i></div><h3>${t('items_no_items')}</h3><div class="small">${t('items_no_items_sub')}</div></div></div>`;
     return `
       <div class="table-wrap">
@@ -1124,9 +1136,9 @@ Views.stock = {
 
   tableHTML() {
     let list = DB.allItems();
-    const q = Views.stock.searchQ.toLowerCase();
+    const q = (Views.stock.searchQ || '').trim();
     if (q) {
-      list = list.filter(i => (i.name || '').toLowerCase().includes(q) || (i.category || '').toLowerCase().includes(q));
+      list = list.filter(i => Singlish.match(i.name || '', q) || Singlish.match(i.category || '', q));
     }
 
     if (Views.stock.filterType === 'low') {
@@ -1288,8 +1300,8 @@ Views.customers = {
 
   tableHTML() {
     let list = Views.customers.activeTab === 'hardwares' ? DB.getHardwareCustomers() : DB.getRetailCustomers();
-    const q = Views.customers.searchQ.toLowerCase();
-    if (q) list = list.filter(c => c.name.toLowerCase().includes(q) || (c.phone || '').includes(q));
+    const q = (Views.customers.searchQ || '').trim();
+    if (q) list = list.filter(c => Singlish.match(c.name, q) || (c.phone || '').includes(q) || Singlish.match(c.address || '', q));
     if (!list.length) return `<div class="card"><div class="empty-state"><div class="em-ico"><i class="ph ph-user"></i></div><h3>${t('cust_no_cust')}</h3><div class="small">${t('cust_no_cust_sub')}</div></div></div>`;
     return `
       <div class="table-wrap">
@@ -1761,12 +1773,12 @@ Views.purchases = {
 
   tableHTML() {
     let list = DB.allPurchases();
-    const q = Views.purchases.searchQ.toLowerCase();
+    const q = (Views.purchases.searchQ || '').trim();
     if (q) {
       list = list.filter(p =>
-        (p.supplierName || '').toLowerCase().includes(q) ||
-        (p.billNo || '').toLowerCase().includes(q) ||
-        (p.note || '').toLowerCase().includes(q)
+        Singlish.match(p.supplierName || '', q) ||
+        (p.billNo || '').toLowerCase().includes(q.toLowerCase()) ||
+        Singlish.match(p.note || '', q)
       );
     }
     if (Views.purchases.filterStatus === 'due') {

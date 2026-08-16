@@ -247,6 +247,7 @@ const i18n = {
     nav_dashboard: "Dashboard",
     nav_sale: "Sales / Billing",
     nav_items: "Items",
+    nav_purchases: "Purchases",
     nav_stock: "Stock Report",
     nav_lowstock: "Low Stock",
     nav_customers: "Credit Customers",

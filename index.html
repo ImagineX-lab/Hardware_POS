@@ -25,11 +25,11 @@
     </div>
 
     <nav class="nav">
-      <button class="nav-btn active" data-view="dashboard" data-i18n="nav_dashboard">
-        <span class="nav-ico"><i class="ph ph-squares-four"></i></span> උපකරණ පුවරුව
-      </button>
-      <button class="nav-btn" data-view="sale" data-i18n="nav_sale">
+      <button class="nav-btn active" data-view="sale" data-i18n="nav_sale">
         <span class="nav-ico"><i class="ph ph-shopping-cart"></i></span> විකුණුම් / බිල්පත
+      </button>
+      <button class="nav-btn" data-view="dashboard" data-i18n="nav_dashboard">
+        <span class="nav-ico"><i class="ph ph-squares-four"></i></span> උපකරණ පුවරුව
       </button>
       <button class="nav-btn" data-view="items" data-i18n="nav_items">
         <span class="nav-ico"><i class="ph ph-package"></i></span> භාණ්ඩ (Items)
@@ -55,7 +55,7 @@
   <!-- ===== MAIN ===== -->
   <main class="main">
     <header class="topbar">
-      <div class="topbar-title" id="viewTitle">උපකරණ පුවරුව</div>
+      <div class="topbar-title" id="viewTitle">විකුණුම් / බිල්පත</div>
       <div class="topbar-right" style="display:flex; align-items:center; gap:16px;">
         <span id="todayDate"></span>
         
@@ -94,6 +94,7 @@
 <div id="modalRoot"></div>
 
 <script src="js/i18n.js"></script>
+<script src="js/singlish.js"></script>
 <script src="js/db.js"></script>
 <script src="js/ui.js"></script>
 <script src="js/views.js"></script>
