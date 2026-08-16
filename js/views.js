@@ -392,6 +392,51 @@ Views.sale = {
         Views.sale.applyCustomerHardwareDiscount();
       });
     });
+
+    // Arrow keys navigation between Cart rows and fields
+    document.querySelectorAll('[data-qty-idx], [data-discount-idx]').forEach(inp => {
+      inp.addEventListener('focus', (e) => {
+        if (typeof e.target.select === 'function') e.target.select();
+      });
+
+      inp.addEventListener('keydown', (e) => {
+        const isQty = e.target.hasAttribute('data-qty-idx');
+        const idx = Number(isQty ? e.target.dataset.qtyIdx : e.target.dataset.discountIdx);
+
+        if (e.key === 'ArrowDown') {
+          e.preventDefault();
+          const nextInp = document.querySelector(isQty ? `[data-qty-idx="${idx + 1}"]` : `[data-discount-idx="${idx + 1}"]`);
+          if (nextInp) {
+            nextInp.focus();
+            if (typeof nextInp.select === 'function') nextInp.select();
+          }
+        } else if (e.key === 'ArrowUp') {
+          e.preventDefault();
+          const prevInp = document.querySelector(isQty ? `[data-qty-idx="${idx - 1}"]` : `[data-discount-idx="${idx - 1}"]`);
+          if (prevInp) {
+            prevInp.focus();
+            if (typeof prevInp.select === 'function') prevInp.select();
+          }
+        } else if (e.key === 'ArrowRight' && isQty) {
+          e.preventDefault();
+          const discInp = document.querySelector(`[data-discount-idx="${idx}"]`);
+          if (discInp) {
+            discInp.focus();
+            if (typeof discInp.select === 'function') discInp.select();
+          }
+        } else if (e.key === 'ArrowLeft' && !isQty) {
+          e.preventDefault();
+          const qtyInp = document.querySelector(`[data-qty-idx="${idx}"]`);
+          if (qtyInp) {
+            qtyInp.focus();
+            if (typeof qtyInp.select === 'function') qtyInp.select();
+          }
+        } else if (e.key === 'Enter') {
+          e.preventDefault();
+          e.target.blur();
+        }
+      });
+    });
   },
 
   bind() {
@@ -437,31 +482,35 @@ Views.sale = {
               grid.innerHTML = Views.sale.posGridHTML();
               Views.sale.bindGrid();
             }
-            searchInp.focus();
+            searchInp.blur();
           });
         });
       });
 
       searchInp.addEventListener('keydown', (e) => {
         const rows = suggestBox.querySelectorAll('[data-add-item]');
-        if (!rows.length) return;
 
         if (e.key === 'ArrowDown') {
+          if (!rows.length) return;
           e.preventDefault();
           selectedIndex = (selectedIndex + 1) % rows.length;
           updateSelection();
         } else if (e.key === 'ArrowUp') {
+          if (!rows.length) return;
           e.preventDefault();
           selectedIndex = selectedIndex - 1;
           if (selectedIndex < 0) selectedIndex = rows.length - 1;
           updateSelection();
         } else if (e.key === 'Enter') {
           e.preventDefault();
-          if (selectedIndex >= 0 && selectedIndex < rows.length) {
-            rows[selectedIndex].click();
-          } else if (rows.length > 0) {
-            rows[0].click();
+          if (rows.length > 0) {
+            if (selectedIndex >= 0 && selectedIndex < rows.length) {
+              rows[selectedIndex].click();
+            } else {
+              rows[0].click();
+            }
           }
+          searchInp.blur();
         }
 
         function updateSelection() {

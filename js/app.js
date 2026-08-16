@@ -95,7 +95,38 @@ const App = {
         App.render();
       }
 
+      const isInput = ['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName) || document.activeElement?.isContentEditable;
+
+      if (!isInput && !document.getElementById('activeModal')) {
+        if (e.key === 's' || e.key === 'S' || e.code === 'KeyS') {
+          e.preventDefault();
+          const searchInp = document.getElementById('saleSearch') || document.getElementById('itemsSearch') || document.getElementById('stockSearch') || document.getElementById('custSearch') || document.getElementById('purchasesSearch');
+          if (searchInp) {
+            searchInp.focus();
+            if (typeof searchInp.select === 'function') searchInp.select();
+          }
+        }
+        if (e.key === 'q' || e.key === 'Q' || e.code === 'KeyQ') {
+          e.preventDefault();
+          const qtyInps = document.querySelectorAll('[data-qty-idx]');
+          if (qtyInps.length > 0) {
+            const lastQtyInp = qtyInps[qtyInps.length - 1];
+            lastQtyInp.focus();
+            if (typeof lastQtyInp.select === 'function') lastQtyInp.select();
+          }
+        }
+      }
+
       if (App.currentView === 'sale' && !document.getElementById('activeModal')) {
+        if (e.altKey && (e.code === 'KeyQ' || e.key === 'q' || e.key === 'Q')) {
+          e.preventDefault();
+          const qtyInps = document.querySelectorAll('[data-qty-idx]');
+          if (qtyInps.length > 0) {
+            const lastQtyInp = qtyInps[qtyInps.length - 1];
+            lastQtyInp.focus();
+            if (typeof lastQtyInp.select === 'function') lastQtyInp.select();
+          }
+        }
         if (e.key === 'F8') { e.preventDefault(); document.getElementById('saleDiscount')?.focus(); }
         if (e.key === 'F9') { e.preventDefault(); document.getElementById('completeSaleBtn')?.click(); }
         if (e.key === 'F10') { e.preventDefault(); document.getElementById('clearCartBtn')?.click(); }
