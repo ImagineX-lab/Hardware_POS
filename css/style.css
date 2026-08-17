@@ -23,6 +23,7 @@
   --border-dark: #374151;
   --radius: 12px;
   --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  --logo-size: 38px;
 }
 
 * {
@@ -111,9 +112,27 @@ textarea {
   border-bottom: 1px solid rgba(255, 255, 255, .08);
 }
 
+.brand-logo-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  overflow: hidden;
+}
+
+#brandLogoImg {
+  height: var(--logo-size, 38px);
+  max-height: 100px;
+  width: auto;
+  max-width: 100%;
+  object-fit: contain;
+  border-radius: 6px;
+  transition: height 0.15s ease;
+}
+
 .brand-mark {
-  width: 38px;
-  height: 38px;
+  width: var(--logo-size, 38px);
+  height: var(--logo-size, 38px);
   border-radius: 8px;
   background: var(--primary);
   display: flex;

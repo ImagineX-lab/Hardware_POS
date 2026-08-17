@@ -225,13 +225,16 @@ const DB = {
     await fetch('/api/wipe', { method: 'POST' });
     await this.reload();
   },
-  async updateShopName(name) {
+  async updateSettings(settingsObj) {
     await fetch('/api/settings', {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ shopName: name })
+      body: JSON.stringify(settingsObj)
     });
-    this.data.settings.shopName = name;
+    Object.assign(this.data.settings, settingsObj);
+  },
+  async updateShopName(name) {
+    await this.updateSettings({ shopName: name });
   }
 };
 

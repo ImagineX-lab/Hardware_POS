@@ -215,6 +215,10 @@ const i18n = {
     settings_restore_err: "Backup file එක හරිනැහැ",
     settings_wipe_confirm: "ඔක්කොම බඩු, ගනු සහ ගනු ස්ථිරවම මකන්නද? මෙය නැවත ගන්න බෑ!",
     settings_wiped: "ඔක්කොම මකා දමන ලදී",
+    settings_logo_title: "කඩේ ලෝගෝ එක (Shop Logo)",
+    settings_logo_upload: "ලෝගෝ එකක් තෝරන්න (Choose Image)",
+    settings_logo_remove: "ලෝගෝ එක ඉවත් කරන්න",
+    settings_logo_size: "ලෝගෝ ප්‍රමාණය (Logo Size)",
 
     // Other short words
     word_credit: "Credit",
@@ -445,6 +449,10 @@ const i18n = {
     settings_restore_err: "Invalid backup file",
     settings_wipe_confirm: "Permanently delete all items, customers, and sales? This cannot be undone!",
     settings_wiped: "All data wiped successfully",
+    settings_logo_title: "Shop Logo",
+    settings_logo_upload: "Choose Logo Image",
+    settings_logo_remove: "Remove Logo",
+    settings_logo_size: "Logo Display Size",
 
     // Other short words
     word_credit: "Credit",

@@ -23,8 +23,7 @@ app.get('/api/settings', async (req, res) => {
     res.json(await db.getSettings());
 });
 app.put('/api/settings', async (req, res) => {
-    const { shopName } = req.body;
-    await db.updateSettings(shopName);
+    await db.updateSettings(req.body);
     res.json({ success: true });
 });
 

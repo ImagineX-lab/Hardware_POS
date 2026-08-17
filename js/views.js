@@ -1818,18 +1818,46 @@ Views.history = {
 /* ================= SETTINGS ================= */
 Views.settings = {
   render() {
+    const s = DB.data.settings || {};
+    const logoSize = Number(s.logoSize) || 38;
+    const hasLogo = Boolean(s.logo);
+
     return `
       ${Views.renderPageHeader({
-      icon: 'ph-gear',
-      title: t('settings_title')
-    })}
+        icon: 'ph-gear',
+        title: t('settings_title')
+      })}
+
       <div class="grid grid-2">
         <div class="card">
           <div class="card-title">${t('settings_shop_details')}</div>
-          <div class="field mt-14"><label class="field-label">${t('settings_shop_name')}</label>
-            <input class="input" id="shopNameInput" value="${escapeHTML(DB.data.settings.shopName)}">
+          <div class="field mt-14">
+            <label class="field-label">${t('settings_shop_name')}</label>
+            <input class="input" id="shopNameInput" value="${escapeHTML(s.shopName || '')}">
           </div>
-          <button class="btn btn-primary" id="saveShopNameBtn">${t('save')}</button>
+
+          <div style="border-top: 1px solid var(--border); margin-top: 18px; padding-top: 16px;">
+            <div class="card-title">${t('settings_logo_title')}</div>
+            <div class="field mt-14">
+              <label class="field-label">${t('settings_logo_upload')}</label>
+              <input type="file" id="logoFileInput" accept="image/*" class="input">
+            </div>
+
+            <div id="logoPreviewWrap" class="mt-14" style="display: ${hasLogo ? 'flex' : 'none'}; align-items: center; gap: 14px; background: var(--paper); padding: 12px; border-radius: 8px;">
+              <img id="settingsLogoPreview" src="${s.logo || ''}" alt="Logo Preview" style="height: ${logoSize}px; max-height: 80px; object-fit: contain; border-radius: 6px;">
+              <button class="btn btn-danger" id="removeLogoBtn" style="font-size: 12px; padding: 6px 12px;">${t('settings_logo_remove')}</button>
+            </div>
+
+            <div class="field mt-14">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                <label class="field-label" style="margin-bottom: 0;">${t('settings_logo_size')}</label>
+                <span id="logoSizeVal" class="pill" style="font-weight: 700;">${logoSize}px</span>
+              </div>
+              <input type="range" id="logoSizeRange" min="20" max="100" step="2" value="${logoSize}" style="width: 100%; cursor: pointer;">
+            </div>
+          </div>
+
+          <button class="btn btn-primary mt-18" id="saveShopDetailsBtn">${t('save')}</button>
         </div>
 
         <div class="card">
@@ -1861,14 +1889,79 @@ Views.settings = {
     `;
   },
   bind() {
-    document.getElementById('saveShopNameBtn').addEventListener('click', async () => {
-      const name = document.getElementById('shopNameInput').value.trim() || 'HardwarePOS';
-      await DB.updateShopName(name);
-      const lbl = document.getElementById('shopNameLabel');
-      if (lbl) lbl.textContent = DB.data.settings.shopName;
-      toast(t('settings_saved'), 'ok');
-    });
-    document.getElementById('exportBtn').addEventListener('click', async () => {
+    let currentLogoBase64 = DB.data.settings.logo || '';
+
+    // Logo Upload
+    const logoFileInput = document.getElementById('logoFileInput');
+    const logoPreviewWrap = document.getElementById('logoPreviewWrap');
+    const settingsLogoPreview = document.getElementById('settingsLogoPreview');
+    const removeLogoBtn = document.getElementById('removeLogoBtn');
+
+    if (logoFileInput) {
+      logoFileInput.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+          currentLogoBase64 = ev.target.result;
+          if (settingsLogoPreview) settingsLogoPreview.src = currentLogoBase64;
+          if (logoPreviewWrap) logoPreviewWrap.style.display = 'flex';
+          
+          DB.data.settings.logo = currentLogoBase64;
+          App.applySettings();
+        };
+        reader.readAsDataURL(file);
+      });
+    }
+
+    if (removeLogoBtn) {
+      removeLogoBtn.addEventListener('click', async () => {
+        currentLogoBase64 = '';
+        if (logoPreviewWrap) logoPreviewWrap.style.display = 'none';
+        if (logoFileInput) logoFileInput.value = '';
+        DB.data.settings.logo = '';
+        App.applySettings();
+        await DB.updateSettings({ logo: '' });
+        toast(t('settings_saved'), 'ok');
+      });
+    }
+
+    // Logo Size Slider
+    const logoSizeRange = document.getElementById('logoSizeRange');
+    const logoSizeVal = document.getElementById('logoSizeVal');
+    if (logoSizeRange) {
+      logoSizeRange.addEventListener('input', (e) => {
+        const val = Number(e.target.value) || 38;
+        if (logoSizeVal) logoSizeVal.textContent = val + 'px';
+        if (settingsLogoPreview) settingsLogoPreview.style.height = val + 'px';
+        DB.data.settings.logoSize = val;
+        App.applySettings();
+      });
+      logoSizeRange.addEventListener('change', async (e) => {
+        const val = Number(e.target.value) || 38;
+        await DB.updateSettings({ logoSize: val });
+      });
+    }
+
+    // Save Shop Details & Logo Button
+    const saveShopDetailsBtn = document.getElementById('saveShopDetailsBtn');
+    if (saveShopDetailsBtn) {
+      saveShopDetailsBtn.addEventListener('click', async () => {
+        const shopName = document.getElementById('shopNameInput').value.trim() || 'HardwarePOS';
+        const logoSize = Number(document.getElementById('logoSizeRange')?.value) || 38;
+        
+        await DB.updateSettings({
+          shopName,
+          logo: currentLogoBase64,
+          logoSize
+        });
+        App.applySettings();
+        toast(t('settings_saved'), 'ok');
+      });
+    }
+
+    // Backup & Restore & Language
+    document.getElementById('exportBtn')?.addEventListener('click', async () => {
       const blob = new Blob([JSON.stringify(await DB.exportJSON(), null, 2)], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -1878,7 +1971,8 @@ Views.settings = {
       URL.revokeObjectURL(url);
       toast(t('settings_backup_dl'), 'ok');
     });
-    document.getElementById('importFile').addEventListener('change', (e) => {
+
+    document.getElementById('importFile')?.addEventListener('change', (e) => {
       const file = e.target.files[0];
       if (!file) return;
       const reader = new FileReader();
@@ -1895,15 +1989,17 @@ Views.settings = {
       };
       reader.readAsText(file);
     });
-    document.getElementById('wipeBtn').addEventListener('click', () => {
+
+    document.getElementById('wipeBtn')?.addEventListener('click', () => {
       confirmAction(t('settings_wipe_confirm'), async () => {
         await DB.wipeAll();
         toast(t('settings_wiped'), 'ok');
         App.render();
       });
     });
-    document.getElementById('langSiBtn').addEventListener('click', () => setLanguage('si'));
-    document.getElementById('langEnBtn').addEventListener('click', () => setLanguage('en'));
+
+    document.getElementById('langSiBtn')?.addEventListener('click', () => setLanguage('si'));
+    document.getElementById('langEnBtn')?.addEventListener('click', () => setLanguage('en'));
   }
 };
 

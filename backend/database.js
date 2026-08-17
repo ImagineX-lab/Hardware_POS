@@ -120,11 +120,25 @@ module.exports = {
     },
 
     getSettings: async () => {
-        const row = await get(`SELECT value FROM settings WHERE key = 'shopName'`);
-        return { shopName: row ? row.value : 'HardwarePOS' };
+        const rows = await all(`SELECT * FROM settings`);
+        const defaults = { shopName: 'HardwarePOS', logo: '', logoSize: 38 };
+        const result = { ...defaults };
+        if (rows) {
+            rows.forEach(r => {
+                if (r.key === 'logoSize') {
+                    result[r.key] = Number(r.value) || defaults[r.key];
+                } else {
+                    result[r.key] = r.value;
+                }
+            });
+        }
+        return result;
     },
-    updateSettings: async (shopName) => {
-        await run(`UPDATE settings SET value = ? WHERE key = 'shopName'`, [shopName]);
+    updateSettings: async (settingsObj) => {
+        if (!settingsObj || typeof settingsObj !== 'object') return;
+        for (const [key, value] of Object.entries(settingsObj)) {
+            await run(`INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)`, [key, String(value ?? '')]);
+        }
     },
 
     getAllItems: async () => {
