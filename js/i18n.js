@@ -219,6 +219,8 @@ const i18n = {
     settings_logo_upload: "ලෝගෝ එකක් තෝරන්න (Choose Image)",
     settings_logo_remove: "ලෝගෝ එක ඉවත් කරන්න",
     settings_logo_size: "ලෝගෝ ප්‍රමාණය (Logo Size)",
+    settings_font_size: "අකුරු ප්‍රමාණය (Font Size)",
+    settings_font_size_desc: "පද්ධතියේ අකුරු සහ සංදර්ශක ප්‍රමාණය",
 
     // Other short words
     word_credit: "Credit",
@@ -453,6 +455,8 @@ const i18n = {
     settings_logo_upload: "Choose Logo Image",
     settings_logo_remove: "Remove Logo",
     settings_logo_size: "Logo Display Size",
+    settings_font_size: "Font Size",
+    settings_font_size_desc: "System Font and Display Size",
 
     // Other short words
     word_credit: "Credit",

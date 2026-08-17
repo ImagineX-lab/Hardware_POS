@@ -121,11 +121,11 @@ module.exports = {
 
     getSettings: async () => {
         const rows = await all(`SELECT * FROM settings`);
-        const defaults = { shopName: 'HardwarePOS', logo: '', logoSize: 38 };
+        const defaults = { shopName: 'HardwarePOS', logo: '', logoSize: 38, fontSize: 15 };
         const result = { ...defaults };
         if (rows) {
             rows.forEach(r => {
-                if (r.key === 'logoSize') {
+                if (r.key === 'logoSize' || r.key === 'fontSize') {
                     result[r.key] = Number(r.value) || defaults[r.key];
                 } else {
                     result[r.key] = r.value;

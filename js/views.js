@@ -396,14 +396,19 @@ Views.sale = {
             nextInp.focus();
             if (typeof nextInp.select === 'function') nextInp.select();
           } else {
-            // From last item in cart -> move down to checkout fields below Total
-            const custInp = document.getElementById('saleCustomerSearch');
-            const paidInp = document.getElementById('saleAmountPaid');
-            const discInp = document.getElementById('saleDiscount');
-            const target = (custInp && custInp.offsetParent !== null) ? custInp : (paidInp && paidInp.offsetParent !== null) ? paidInp : discInp;
-            if (target) {
-              target.focus();
-              if (typeof target.select === 'function') target.select();
+            // From last item in cart -> move down to Cash/Credit selector
+            const activeBtn = Views.sale.payType === 'cash' ? document.getElementById('payCashBtn') : document.getElementById('payCreditBtn');
+            if (activeBtn) {
+              activeBtn.focus();
+            } else {
+              const custInp = document.getElementById('saleCustomerSearch');
+              const paidInp = document.getElementById('saleAmountPaid');
+              const discInp = document.getElementById('saleDiscount');
+              const target = (custInp && custInp.offsetParent !== null) ? custInp : (paidInp && paidInp.offsetParent !== null) ? paidInp : discInp;
+              if (target) {
+                target.focus();
+                if (typeof target.select === 'function') target.select();
+              }
             }
           }
         } else if (e.key === 'ArrowUp') {
@@ -422,14 +427,19 @@ Views.sale = {
               if (typeof discInp.select === 'function') discInp.select();
             }
           } else if (idx === cart.length - 1) {
-            // From last item's discount field -> move to checkout field
-            const custInp = document.getElementById('saleCustomerSearch');
-            const paidInp = document.getElementById('saleAmountPaid');
-            const discInp = document.getElementById('saleDiscount');
-            const target = (custInp && custInp.offsetParent !== null) ? custInp : (paidInp && paidInp.offsetParent !== null) ? paidInp : discInp;
-            if (target) {
-              target.focus();
-              if (typeof target.select === 'function') target.select();
+            // From last item's discount field -> move to Cash/Credit selector
+            const activeBtn = Views.sale.payType === 'cash' ? document.getElementById('payCashBtn') : document.getElementById('payCreditBtn');
+            if (activeBtn) {
+              activeBtn.focus();
+            } else {
+              const custInp = document.getElementById('saleCustomerSearch');
+              const paidInp = document.getElementById('saleAmountPaid');
+              const discInp = document.getElementById('saleDiscount');
+              const target = (custInp && custInp.offsetParent !== null) ? custInp : (paidInp && paidInp.offsetParent !== null) ? paidInp : discInp;
+              if (target) {
+                target.focus();
+                if (typeof target.select === 'function') target.select();
+              }
             }
           }
         } else if (e.key === 'ArrowLeft' && !isQty) {
@@ -557,8 +567,49 @@ Views.sale = {
 
     Views.sale.bindCustomerSearch();
 
-    document.getElementById('payCashBtn').addEventListener('click', () => Views.sale.setPayType('cash'));
-    document.getElementById('payCreditBtn').addEventListener('click', () => Views.sale.setPayType('credit'));
+    const payCashBtn = document.getElementById('payCashBtn');
+    const payCreditBtn = document.getElementById('payCreditBtn');
+
+    if (payCashBtn && payCreditBtn) {
+      payCashBtn.addEventListener('click', () => Views.sale.setPayType('cash'));
+      payCreditBtn.addEventListener('click', () => Views.sale.setPayType('credit'));
+
+      const handlePayBtnKeydown = (e) => {
+        const isCashFocused = document.activeElement === payCashBtn;
+        if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
+          e.preventDefault();
+          if (isCashFocused && e.key === 'ArrowRight') {
+            Views.sale.setPayType('credit');
+            payCreditBtn.focus();
+          } else if (!isCashFocused && e.key === 'ArrowLeft') {
+            Views.sale.setPayType('cash');
+            payCashBtn.focus();
+          }
+        } else if (e.key === 'ArrowDown') {
+          e.preventDefault();
+          const custInp = document.getElementById('saleCustomerSearch');
+          const paidInp = document.getElementById('saleAmountPaid');
+          const target = (custInp && custInp.offsetParent !== null) ? custInp : (paidInp && paidInp.offsetParent !== null) ? paidInp : null;
+          if (target) {
+            target.focus();
+            if (typeof target.select === 'function') target.select();
+          }
+        } else if (e.key === 'ArrowUp') {
+          e.preventDefault();
+          const lastIdx = cart.length - 1;
+          if (lastIdx >= 0) {
+            const targetInp = document.querySelector(`[data-discount-idx="${lastIdx}"]`) || document.querySelector(`[data-qty-idx="${lastIdx}"]`);
+            if (targetInp) {
+              targetInp.focus();
+              if (typeof targetInp.select === 'function') targetInp.select();
+            }
+          }
+        }
+      };
+
+      payCashBtn.addEventListener('keydown', handlePayBtnKeydown);
+      payCreditBtn.addEventListener('keydown', handlePayBtnKeydown);
+    }
 
     const discEl = document.getElementById('saleDiscount');
     if (discEl) {
@@ -582,9 +633,14 @@ Views.sale = {
             target.focus();
             if (typeof target.select === 'function') target.select();
           } else {
-            const lastIdx = cart.length - 1;
-            const targetInp = document.querySelector(`[data-discount-idx="${lastIdx}"]`) || document.querySelector(`[data-qty-idx="${lastIdx}"]`);
-            if (targetInp) { targetInp.focus(); if (typeof targetInp.select === 'function') targetInp.select(); }
+            const activeBtn = Views.sale.payType === 'cash' ? payCashBtn : payCreditBtn;
+            if (activeBtn) {
+              activeBtn.focus();
+            } else {
+              const lastIdx = cart.length - 1;
+              const targetInp = document.querySelector(`[data-discount-idx="${lastIdx}"]`) || document.querySelector(`[data-qty-idx="${lastIdx}"]`);
+              if (targetInp) { targetInp.focus(); if (typeof targetInp.select === 'function') targetInp.select(); }
+            }
           }
         }
       });
@@ -614,9 +670,14 @@ Views.sale = {
             custInp.focus();
             if (typeof custInp.select === 'function') custInp.select();
           } else {
-            const lastIdx = cart.length - 1;
-            const targetInp = document.querySelector(`[data-discount-idx="${lastIdx}"]`) || document.querySelector(`[data-qty-idx="${lastIdx}"]`);
-            if (targetInp) { targetInp.focus(); if (typeof targetInp.select === 'function') targetInp.select(); }
+            const activeBtn = Views.sale.payType === 'cash' ? payCashBtn : payCreditBtn;
+            if (activeBtn) {
+              activeBtn.focus();
+            } else {
+              const lastIdx = cart.length - 1;
+              const targetInp = document.querySelector(`[data-discount-idx="${lastIdx}"]`) || document.querySelector(`[data-qty-idx="${lastIdx}"]`);
+              if (targetInp) { targetInp.focus(); if (typeof targetInp.select === 'function') targetInp.select(); }
+            }
           }
         }
       });
@@ -681,9 +742,14 @@ Views.sale = {
           custSelectedIndex = -1;
           updateCustSelection(items);
         } else {
-          const lastIdx = cart.length - 1;
-          const targetInp = document.querySelector(`[data-discount-idx="${lastIdx}"]`) || document.querySelector(`[data-qty-idx="${lastIdx}"]`);
-          if (targetInp) { targetInp.focus(); if (typeof targetInp.select === 'function') targetInp.select(); }
+          const activeBtn = Views.sale.payType === 'cash' ? document.getElementById('payCashBtn') : document.getElementById('payCreditBtn');
+          if (activeBtn) {
+            activeBtn.focus();
+          } else {
+            const lastIdx = cart.length - 1;
+            const targetInp = document.querySelector(`[data-discount-idx="${lastIdx}"]`) || document.querySelector(`[data-qty-idx="${lastIdx}"]`);
+            if (targetInp) { targetInp.focus(); if (typeof targetInp.select === 'function') targetInp.select(); }
+          }
         }
       } else if (e.key === 'Enter') {
         if (isVisible) {
@@ -1820,6 +1886,7 @@ Views.settings = {
   render() {
     const s = DB.data.settings || {};
     const logoSize = Number(s.logoSize) || 38;
+    const fontSize = Number(s.fontSize) || 15;
     const hasLogo = Boolean(s.logo);
 
     return `
@@ -1854,6 +1921,18 @@ Views.settings = {
                 <span id="logoSizeVal" class="pill" style="font-weight: 700;">${logoSize}px</span>
               </div>
               <input type="range" id="logoSizeRange" min="20" max="100" step="2" value="${logoSize}" style="width: 100%; cursor: pointer;">
+            </div>
+          </div>
+
+          <div style="border-top: 1px solid var(--border); margin-top: 18px; padding-top: 16px;">
+            <div class="card-title">${t('settings_font_size')}</div>
+            <div class="card-sub" style="font-size: 12px; margin-bottom: 10px; color: var(--steel);">${t('settings_font_size_desc')}</div>
+            <div class="field mt-14">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                <label class="field-label" style="margin-bottom: 0;">${t('settings_font_size')}</label>
+                <span id="fontSizeVal" class="pill" style="font-weight: 700;">${fontSize}px</span>
+              </div>
+              <input type="range" id="fontSizeRange" min="12" max="22" step="1" value="${fontSize}" style="width: 100%; cursor: pointer;">
             </div>
           </div>
 
@@ -1943,17 +2022,35 @@ Views.settings = {
       });
     }
 
+    // Font Size Slider
+    const fontSizeRange = document.getElementById('fontSizeRange');
+    const fontSizeVal = document.getElementById('fontSizeVal');
+    if (fontSizeRange) {
+      fontSizeRange.addEventListener('input', (e) => {
+        const val = Number(e.target.value) || 15;
+        if (fontSizeVal) fontSizeVal.textContent = val + 'px';
+        DB.data.settings.fontSize = val;
+        App.applySettings();
+      });
+      fontSizeRange.addEventListener('change', async (e) => {
+        const val = Number(e.target.value) || 15;
+        await DB.updateSettings({ fontSize: val });
+      });
+    }
+
     // Save Shop Details & Logo Button
     const saveShopDetailsBtn = document.getElementById('saveShopDetailsBtn');
     if (saveShopDetailsBtn) {
       saveShopDetailsBtn.addEventListener('click', async () => {
         const shopName = document.getElementById('shopNameInput').value.trim() || 'HardwarePOS';
         const logoSize = Number(document.getElementById('logoSizeRange')?.value) || 38;
+        const fontSize = Number(document.getElementById('fontSizeRange')?.value) || 15;
         
         await DB.updateSettings({
           shopName,
           logo: currentLogoBase64,
-          logoSize
+          logoSize,
+          fontSize
         });
         App.applySettings();
         toast(t('settings_saved'), 'ok');

@@ -110,6 +110,19 @@ textarea {
   gap: 10px;
   padding: 20px 18px 16px;
   border-bottom: 1px solid rgba(255, 255, 255, .08);
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.sidebar:hover .brand {
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 8px;
+}
+
+.sidebar:hover .brand-text {
+  align-items: center;
+  text-align: center;
 }
 
 .brand-logo-wrap {
@@ -1537,6 +1550,18 @@ th.num {
 
   .brand {
     padding: 10px 14px;
+  }
+
+  .sidebar:hover .brand {
+    flex-direction: row;
+    align-items: center;
+    text-align: left;
+    gap: 10px;
+  }
+
+  .sidebar:hover .brand-text {
+    align-items: flex-start;
+    text-align: left;
   }
 
   .nav {

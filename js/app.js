@@ -47,6 +47,10 @@ const App = {
       if (logoWrap) logoWrap.style.display = 'none';
       if (brandMark) brandMark.style.display = 'flex';
     }
+
+    // Apply font size
+    const fontSize = Number(s.fontSize) || 15;
+    document.body.style.zoom = fontSize / 15;
   },
 
   async init(){
