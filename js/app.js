@@ -23,9 +23,35 @@ const App = {
     }
   },
 
+  applySettings(){
+    const s = DB.data.settings || {};
+    
+    const shopNameLabel = document.getElementById('shopNameLabel');
+    if (shopNameLabel) {
+      shopNameLabel.textContent = s.shopName || 'HardwarePOS';
+    }
+
+    const logoWrap = document.getElementById('brandLogoWrap');
+    const logoImg = document.getElementById('brandLogoImg');
+    const brandMark = document.getElementById('brandMark');
+    const logoSize = Number(s.logoSize) || 38;
+
+    document.documentElement.style.setProperty('--logo-size', logoSize + 'px');
+
+    if (s.logo && logoWrap && logoImg) {
+      logoImg.src = s.logo;
+      logoImg.style.height = logoSize + 'px';
+      logoWrap.style.display = 'flex';
+      if (brandMark) brandMark.style.display = 'none';
+    } else {
+      if (logoWrap) logoWrap.style.display = 'none';
+      if (brandMark) brandMark.style.display = 'flex';
+    }
+  },
+
   async init(){
     await DB.load();
-    document.getElementById('shopNameLabel').textContent = DB.data.settings.shopName || 'HardwarePOS';
+    this.applySettings();
     this.setDate();
     this.updateTitles();
     document.querySelectorAll('.nav-btn').forEach(btn=>{
