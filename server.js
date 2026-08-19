@@ -11,6 +11,8 @@ app.use(express.urlencoded({ limit: '50mb', extended: true }));
 // Serve static files
 app.use('/css', express.static(path.join(__dirname, 'css')));
 app.use('/js', express.static(path.join(__dirname, 'js')));
+app.use('/fonts', express.static(path.join(__dirname, 'fonts')));
+app.use('/phosphor-icons', express.static(path.join(__dirname, 'phosphor-icons')));
 
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'index.html'));

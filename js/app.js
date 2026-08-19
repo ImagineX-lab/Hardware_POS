@@ -138,6 +138,10 @@ const App = {
       // Universal Form & Modal Arrow Keys Navigation (ArrowDown / ArrowUp)
       if (!e.defaultPrevented && isInput) {
         if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+          // If a search suggest dropdown is open, let the view handle navigation
+          const activeSuggest = document.querySelector('#saleSuggest [data-add-item], #custSuggestBox .cust-suggest-item');
+          if (activeSuggest) return;
+
           const activeEl = document.activeElement;
           const modal = document.getElementById('activeModal');
           const container = modal ? modal : (activeEl.closest('form, .card, .view-wrap, main') || document.body);

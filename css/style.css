@@ -1035,14 +1035,25 @@ th.num {
 }
 
 .pay-toggle button.active {
-  background: var(--charcoal);
+  background: var(--primary);
   color: #fff;
-  border-color: var(--charcoal);
+  border-color: var(--primary);
 }
 
 .pay-toggle button.active.credit {
   background: var(--orange);
   border-color: var(--orange);
+}
+
+.pay-toggle button:focus-visible {
+  outline: 3px solid var(--primary);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.22);
+}
+
+.pay-toggle button.credit:focus-visible {
+  outline-color: var(--orange);
+  box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.22);
 }
 
 .search-suggest {
@@ -1070,6 +1081,13 @@ th.num {
 
 .suggest-row:hover {
   background: var(--orange-light);
+  cursor: pointer;
+}
+
+.suggest-row.selected-row {
+  background: var(--orange-light);
+  border-left: 3px solid var(--primary);
+  padding-left: 9px;
   cursor: pointer;
 }
 

@@ -553,12 +553,9 @@ Views.sale = {
           rows.forEach((r, idx) => {
             if (idx === selectedIndex) {
               r.classList.add('selected-row');
-              r.style.background = 'var(--bg-hover)';
-              r.style.borderColor = 'var(--primary)';
+              r.scrollIntoView({ block: 'nearest' });
             } else {
               r.classList.remove('selected-row');
-              r.style.background = '';
-              r.style.borderColor = '';
             }
           });
         }
