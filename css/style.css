@@ -114,15 +114,15 @@ textarea {
 }
 
 .sidebar:hover .brand {
-  flex-direction: column;
+  flex-direction: row;
   align-items: center;
-  text-align: center;
-  gap: 8px;
+  text-align: left;
+  gap: 10px;
 }
 
 .sidebar:hover .brand-text {
-  align-items: center;
-  text-align: center;
+  align-items: flex-start;
+  text-align: left;
 }
 
 .brand-logo-wrap {

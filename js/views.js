@@ -417,6 +417,12 @@ Views.sale = {
           if (prevInp) {
             prevInp.focus();
             if (typeof prevInp.select === 'function') prevInp.select();
+          } else {
+            const searchInp = document.getElementById('saleSearch');
+            if (searchInp) {
+              searchInp.focus();
+              if (typeof searchInp.select === 'function') searchInp.select();
+            }
           }
         } else if (e.key === 'ArrowRight') {
           e.preventDefault();
@@ -527,10 +533,18 @@ Views.sale = {
         const rows = suggestBox.querySelectorAll('[data-add-item]');
 
         if (e.key === 'ArrowDown') {
-          if (!rows.length) return;
-          e.preventDefault();
-          selectedIndex = (selectedIndex + 1) % rows.length;
-          updateSelection();
+          if (rows.length > 0) {
+            e.preventDefault();
+            selectedIndex = (selectedIndex + 1) % rows.length;
+            updateSelection();
+          } else {
+            const firstQty = document.querySelector('[data-qty-idx="0"]');
+            if (firstQty) {
+              e.preventDefault();
+              firstQty.focus();
+              if (typeof firstQty.select === 'function') firstQty.select();
+            }
+          }
         } else if (e.key === 'ArrowUp') {
           if (!rows.length) return;
           e.preventDefault();
@@ -585,8 +599,12 @@ Views.sale = {
         } else if (e.key === 'ArrowDown') {
           e.preventDefault();
           const custInp = document.getElementById('saleCustomerSearch');
+          const unselectBtn = document.getElementById('unselectCustBtn');
           const paidInp = document.getElementById('saleAmountPaid');
-          const target = (custInp && custInp.offsetParent !== null) ? custInp : (paidInp && paidInp.offsetParent !== null) ? paidInp : null;
+          const target = (custInp && custInp.offsetParent !== null) ? custInp :
+                         (unselectBtn && unselectBtn.offsetParent !== null) ? unselectBtn :
+                         (paidInp && paidInp.offsetParent !== null) ? paidInp :
+                         document.getElementById('saleDiscount');
           if (target) {
             target.focus();
             if (typeof target.select === 'function') target.select();
@@ -621,11 +639,18 @@ Views.sale = {
         if (e.key === 'Enter') {
           e.preventDefault();
           document.getElementById('completeSaleBtn')?.click();
+        } else if (e.key === 'ArrowDown') {
+          e.preventDefault();
+          const completeBtn = document.getElementById('completeSaleBtn');
+          if (completeBtn) completeBtn.focus();
         } else if (e.key === 'ArrowUp') {
           e.preventDefault();
           const paidInp = document.getElementById('saleAmountPaid');
           const custInp = document.getElementById('saleCustomerSearch');
-          const target = (paidInp && paidInp.offsetParent !== null) ? paidInp : (custInp && custInp.offsetParent !== null) ? custInp : null;
+          const unselectBtn = document.getElementById('unselectCustBtn');
+          const target = (paidInp && paidInp.offsetParent !== null) ? paidInp : 
+                         (custInp && custInp.offsetParent !== null) ? custInp : 
+                         (unselectBtn && unselectBtn.offsetParent !== null) ? unselectBtn : null;
           if (target) {
             target.focus();
             if (typeof target.select === 'function') target.select();
@@ -663,9 +688,12 @@ Views.sale = {
         } else if (e.key === 'ArrowUp') {
           e.preventDefault();
           const custInp = document.getElementById('saleCustomerSearch');
-          if (custInp && custInp.offsetParent !== null) {
-            custInp.focus();
-            if (typeof custInp.select === 'function') custInp.select();
+          const unselectBtn = document.getElementById('unselectCustBtn');
+          const target = (custInp && custInp.offsetParent !== null) ? custInp :
+                         (unselectBtn && unselectBtn.offsetParent !== null) ? unselectBtn : null;
+          if (target) {
+            target.focus();
+            if (typeof target.select === 'function') target.select();
           } else {
             const activeBtn = Views.sale.payType === 'cash' ? payCashBtn : payCreditBtn;
             if (activeBtn) {
@@ -680,11 +708,39 @@ Views.sale = {
       });
     }
 
-    document.getElementById('clearCartBtn').addEventListener('click', () => {
-      cart = [];
-      Views.sale.refreshCart();
-    });
-    document.getElementById('completeSaleBtn').addEventListener('click', Views.sale.completeSale);
+    const clearCartBtn = document.getElementById('clearCartBtn');
+    if (clearCartBtn) {
+      clearCartBtn.addEventListener('click', () => {
+        cart = [];
+        Views.sale.refreshCart();
+      });
+      clearCartBtn.addEventListener('keydown', (e) => {
+        if (e.key === 'ArrowUp') {
+          e.preventDefault();
+          const completeBtn = document.getElementById('completeSaleBtn');
+          if (completeBtn) completeBtn.focus();
+        }
+      });
+    }
+
+    const completeSaleBtn = document.getElementById('completeSaleBtn');
+    if (completeSaleBtn) {
+      completeSaleBtn.addEventListener('click', Views.sale.completeSale);
+      completeSaleBtn.addEventListener('keydown', (e) => {
+        if (e.key === 'ArrowUp') {
+          e.preventDefault();
+          const discEl = document.getElementById('saleDiscount');
+          if (discEl) {
+            discEl.focus();
+            if (typeof discEl.select === 'function') discEl.select();
+          }
+        } else if (e.key === 'ArrowDown') {
+          e.preventDefault();
+          const clearBtn = document.getElementById('clearCartBtn');
+          if (clearBtn) clearBtn.focus();
+        }
+      });
+    }
 
     Views.sale.bindCartRows();
     Views.sale.bindGrid();
@@ -701,6 +757,32 @@ Views.sale = {
         Views.sale.selectedCustomer = null;
         custWrap.innerHTML = Views.sale.customerWidgetHTML();
         Views.sale.bindCustomerSearch();
+        Views.sale.applyCustomerHardwareDiscount();
+      });
+      unselectBtn.addEventListener('keydown', (e) => {
+        if (e.key === 'ArrowDown') {
+          e.preventDefault();
+          const paidInp = document.getElementById('saleAmountPaid');
+          const discInp = document.getElementById('saleDiscount');
+          const target = (paidInp && paidInp.offsetParent !== null) ? paidInp : discInp;
+          if (target) {
+            target.focus();
+            if (typeof target.select === 'function') target.select();
+          }
+        } else if (e.key === 'ArrowUp') {
+          e.preventDefault();
+          const activeBtn = Views.sale.payType === 'cash' ? document.getElementById('payCashBtn') : document.getElementById('payCreditBtn');
+          if (activeBtn) {
+            activeBtn.focus();
+          } else {
+            const lastIdx = cart.length - 1;
+            const targetInp = document.querySelector(`[data-discount-idx="${lastIdx}"]`) || document.querySelector(`[data-qty-idx="${lastIdx}"]`);
+            if (targetInp) {
+              targetInp.focus();
+              if (typeof targetInp.select === 'function') targetInp.select();
+            }
+          }
+        }
       });
       return;
     }
