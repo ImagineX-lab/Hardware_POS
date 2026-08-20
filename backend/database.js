@@ -121,7 +121,7 @@ module.exports = {
 
     getSettings: async () => {
         const rows = await all(`SELECT * FROM settings`);
-        const defaults = { shopName: 'HardwarePOS', logo: '', logoSize: 38, fontSize: 15 };
+        const defaults = { shopName: 'HardwarePOS', shopDescription: '', logo: '', logoSize: 38, fontSize: 15 };
         const result = { ...defaults };
         if (rows) {
             rows.forEach(r => {

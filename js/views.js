@@ -1067,8 +1067,10 @@ Views.sale = {
   showReceipt(sale) {
     const html = `
       <div class="receipt" id="printArea">
+        ${DB.data.settings.logo ? `<img class="receipt-watermark" src="${DB.data.settings.logo}" alt="Watermark Logo">` : ''}
         <h2>${escapeHTML(DB.data.settings.shopName || 'HardwarePOS')}</h2>
-        <div class="r-center">${t('receipt_title')}<br>${fmtDate(sale.date)} • ${t('receipt_thanks')} #${sale.id}</div>
+        ${DB.data.settings.shopDescription ? `<div class="r-center" style="font-size:11px; color:#555; margin-top:-4px; margin-bottom:4px; white-space:pre-line;">${escapeHTML(DB.data.settings.shopDescription)}</div>` : ''}
+        <div class="r-center">${fmtDate(sale.date)} • #${sale.id}</div>
         <hr>
         <table>
           <thead><tr><th style="text-align:left">${t('receipt_qty')}</th><th class="num">${t('word_qty')}</th><th class="num">${t('receipt_amount') || t('sale_total')}</th></tr></thead>
@@ -1093,6 +1095,7 @@ Views.sale = {
         ` : ''}
         <hr>
         <div class="r-center">${t('receipt_thanks')}</div>
+        <div class="r-center" style="font-size: 9px; color: #777; margin-top: 8px; border-top: 1px dotted #ccc; padding-top: 4px;">imagineX software solution - 0761945587</div>
       </div>
     `;
     openModal({
@@ -1982,6 +1985,12 @@ Views.settings = {
             <input class="input" id="shopNameInput" value="${escapeHTML(s.shopName || '')}">
           </div>
 
+          <div class="field mt-14">
+            <label class="field-label">${t('settings_shop_description')}</label>
+            <textarea class="input" id="shopDescInput" rows="3" placeholder="${t('settings_shop_description_ph')}" style="resize:vertical; min-height:64px; line-height:1.5;">${escapeHTML(s.shopDescription || '')}</textarea>
+            <div class="card-sub" style="font-size:11px; margin-top:4px;">${currentLang === 'si' ? 'Invoice / Receipt eke pennaui' : 'This will appear on the printed Invoice / Receipt'}</div>
+          </div>
+
           <div style="border-top: 1px solid var(--border); margin-top: 18px; padding-top: 16px;">
             <div class="card-title">${t('settings_logo_title')}</div>
             <div class="field mt-14">
@@ -2122,11 +2131,13 @@ Views.settings = {
     if (saveShopDetailsBtn) {
       saveShopDetailsBtn.addEventListener('click', async () => {
         const shopName = document.getElementById('shopNameInput').value.trim() || 'HardwarePOS';
+        const shopDescription = document.getElementById('shopDescInput')?.value.trim() || '';
         const logoSize = Number(document.getElementById('logoSizeRange')?.value) || 38;
         const fontSize = Number(document.getElementById('fontSizeRange')?.value) || 15;
         
         await DB.updateSettings({
           shopName,
+          shopDescription,
           logo: currentLogoBase64,
           logoSize,
           fontSize

@@ -1192,45 +1192,75 @@ th.num {
   background: var(--success);
 }
 
-/* ===== RECEIPT (print) ===== */
+/* ===== RECEIPT (on-screen preview) ===== */
 .receipt {
-  width: 300px;
+  position: relative;
+  width: 302px;          /* ≈ 80mm at 96dpi */
   margin: 0 auto;
-  font-family: 'Noto Sans Sinhala', monospace;
-  font-size: 12.5px;
+  font-family: 'Noto Sans Sinhala', 'Courier New', monospace;
+  font-size: 12px;
   color: #111;
+  line-height: 1.4;
+  padding: 6px 4px;
+  box-sizing: border-box;
+}
+
+.receipt-watermark {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 140px;
+  height: auto;
+  opacity: 0.08; /* Low opacity watermark */
+  z-index: 0;
+  pointer-events: none;
 }
 
 .receipt h2 {
   text-align: center;
-  font-size: 15px;
-  margin-bottom: 2px;
+  font-size: 14px;
+  font-weight: 700;
+  margin: 0 0 2px;
+  letter-spacing: 0.3px;
 }
 
 .receipt .r-center {
   text-align: center;
-  font-size: 11px;
+  font-size: 10.5px;
   color: #444;
-  margin-bottom: 8px;
+  margin-bottom: 6px;
 }
 
 .receipt table {
   width: 100%;
-  font-size: 11.5px;
+  font-size: 11px;
+  border-collapse: collapse;
 }
 
 .receipt td,
 .receipt th {
-  padding: 3px 0;
+  padding: 2px 0;
+}
+
+.receipt th {
+  font-weight: 700;
+  border-bottom: 1px dashed #999;
 }
 
 .receipt hr {
   border: none;
   border-top: 1px dashed #999;
-  margin: 8px 0;
+  margin: 6px 0;
 }
 
+/* ===== 80mm THERMAL PRINT ===== */
 @media print {
+  @page {
+    size: 80mm auto;     /* 80mm wide, height auto (continuous roll) */
+    margin: 4mm 3mm;     /* narrow margins for thermal paper */
+  }
+
   body * {
     visibility: hidden;
   }
@@ -1241,10 +1271,36 @@ th.num {
   }
 
   #printArea {
-    position: absolute;
+    position: fixed;
     left: 0;
     top: 0;
-    width: 100%;
+    width: 74mm;         /* 80mm − 3mm×2 side margins */
+    font-size: 11px;
+    line-height: 1.35;
+    color: #000 !important;
+    background: #fff !important;
+    padding: 0;
+    margin: 0;
+  }
+
+  #printArea h2 {
+    font-size: 13px;
+  }
+
+  #printArea table {
+    font-size: 10px;
+  }
+
+  #printArea .r-center {
+    font-size: 10px;
+  }
+
+  /* Hide modal chrome and footer buttons when printing */
+  .modal-overlay,
+  .modal-footer,
+  #printReceiptBtn,
+  [data-close] {
+    display: none !important;
   }
 }
 
