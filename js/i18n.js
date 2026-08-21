@@ -71,6 +71,11 @@ const i18n = {
     sale_exceeds_stock: "Stock එකට වඩා වැඩියි",
     sale_select_credit_customer: "ණයට දෙන්න Customer කෙනෙක් තෝරන්න",
     sale_success: "බිල සාර්ථකයි! #",
+    sale_quick_tab: "⚡ ඉක්මන් විකිණීම",
+    sale_quick_tab_add: "+ ඉක්මන් බිල",
+    sale_quick_done: "ඉක්මන් බිල ගෙවිලා!",
+    sale_max_tabs: "Tab 3 ක් ඇති. ඒකෙන් ගෙවන්න.",
+    sale_main_bill: "🛒 ප්‍රධාන බිල",
 
     sale_subtotal: "එකතුව",
     sale_total: "මුළු එකතුව",
@@ -309,6 +314,11 @@ const i18n = {
     sale_exceeds_stock: "Selected quantity exceeds available stock",
     sale_select_credit_customer: "Select a customer for credit sales",
     sale_success: "Sale completed! #",
+    sale_quick_tab: "⚡ Quick Sale",
+    sale_quick_tab_add: "+ Quick Sale",
+    sale_quick_done: "Quick Sale done!",
+    sale_max_tabs: "Max 3 tabs. Complete one first.",
+    sale_main_bill: "🛒 Main Bill",
 
     sale_subtotal: "Subtotal",
     sale_total: "Total",

@@ -130,6 +130,73 @@ Views.sale = {
   selectedCustomer: null,
   amountPaid: '',
 
+  /* ===== MULTI-CART SESSION SYSTEM ===== */
+  sessions: [{ cart: [], payType: 'cash', selectedCustomer: null, amountPaid: '', discount: 0 }],
+  activeIdx: 0,
+
+  saveSession() {
+    const discEl = document.getElementById('saleDiscount');
+    Views.sale.sessions[Views.sale.activeIdx] = {
+      cart: cart.map(i => Object.assign({}, i)),
+      payType: Views.sale.payType || 'cash',
+      selectedCustomer: Views.sale.selectedCustomer,
+      amountPaid: Views.sale.amountPaid,
+      discount: discEl ? Number(discEl.value) : 0
+    };
+  },
+
+  loadSession(idx) {
+    const s = Views.sale.sessions[idx];
+    cart = s.cart.map(i => Object.assign({}, i));
+    Views.sale.payType = s.payType || 'cash';
+    Views.sale.selectedCustomer = s.selectedCustomer || null;
+    Views.sale.amountPaid = s.amountPaid || '';
+  },
+
+  switchTab(idx) {
+    Views.sale.saveSession();
+    Views.sale.activeIdx = idx;
+    Views.sale.loadSession(idx);
+    App.render();
+  },
+
+  addTab() {
+    if (Views.sale.sessions.length >= 3) { toast(t('sale_max_tabs'), 'err'); return; }
+    Views.sale.saveSession();
+    Views.sale.sessions.push({ cart: [], payType: 'cash', selectedCustomer: null, amountPaid: '', discount: 0 });
+    Views.sale.activeIdx = Views.sale.sessions.length - 1;
+    Views.sale.loadSession(Views.sale.activeIdx);
+    App.render();
+  },
+
+  closeTab(idx) {
+    if (idx === 0 || idx >= Views.sale.sessions.length) return;
+    Views.sale.sessions.splice(idx, 1);
+    const newIdx = Math.min(Views.sale.activeIdx, Views.sale.sessions.length - 1);
+    Views.sale.activeIdx = newIdx;
+    Views.sale.loadSession(newIdx);
+    App.render();
+  },
+
+  tabsHTML() {
+    const tabsHtml = Views.sale.sessions.map((s, i) => {
+      const isActive = (i === Views.sale.activeIdx);
+      const count = isActive ? cart.length : s.cart.length;
+      const isMain = (i === 0);
+      const label = isMain ? (t('sale_main_bill') || '🛒 Main Bill') : (t('sale_quick_tab') || '⚡ Quick Sale');
+      const custShort = s.selectedCustomer ? ` · ${s.selectedCustomer.name.split(' ')[0]}` : '';
+      const badgeHTML = count > 0 ? `<span class="cart-tab-badge">${count}</span>` : '';
+      const closeHTML = !isMain ? `<span class="cart-tab-x" data-tab-close="${i}" title="Close">✕</span>` : '';
+      return `<div class="cart-tab${isActive ? ' active' : ''}${isMain ? ' main-tab' : ''}" data-tab-idx="${i}">
+        <span class="cart-tab-label">${label}${custShort}</span>${badgeHTML}${closeHTML}
+      </div>`;
+    }).join('');
+    const addBtn = Views.sale.sessions.length < 3
+      ? `<div class="cart-tab cart-tab-new" id="addCartTabBtn" title="${t('sale_quick_tab_add') || 'Add Quick Sale'}"><i class="ph ph-lightning"></i> ${t('sale_quick_tab_add') || '+ Quick Sale'}</div>`
+      : '';
+    return `<div class="cart-tabs-wrap">${tabsHtml}${addBtn}</div>`;
+  },
+
   render() {
     cart = cart || [];
     if (!Views.sale.payType) Views.sale.payType = 'cash';
@@ -151,7 +218,7 @@ Views.sale = {
         </div>
 
         <div class="card" style="padding:14px; display:flex; flex-direction:column; gap:6px;">
-          <div class="card-title" style="margin-bottom:4px; font-size:16px;">${t('sale_cart')}</div>
+          <div class="cart-tabs-bar">${Views.sale.tabsHTML()}</div>
           <div class="cart-list-wrap" id="cartBox" style="padding:0; flex:1; min-height:0;">${Views.sale.cartHTML()}</div>
 
           <div class="totals-box" id="totalsBox" style="margin-top:auto; padding:6px 0 4px 0; border-top:1px dashed var(--border);">${Views.sale.totalsHTML()}</div>
@@ -744,8 +811,33 @@ Views.sale = {
 
     Views.sale.bindCartRows();
     Views.sale.bindGrid();
+    Views.sale.bindTabs();
     if (searchInp) setTimeout(() => searchInp.focus(), 100);
   },
+
+  bindTabs() {
+    // Tab click to switch
+    document.querySelectorAll('[data-tab-idx]').forEach(tab => {
+      tab.addEventListener('click', (e) => {
+        if (e.target.closest('[data-tab-close]')) return;
+        const idx = Number(tab.dataset.tabIdx);
+        if (idx !== Views.sale.activeIdx) Views.sale.switchTab(idx);
+      });
+    });
+    // Tab × to close
+    document.querySelectorAll('[data-tab-close]').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const idx = Number(btn.dataset.tabClose);
+        Views.sale.closeTab(idx);
+      });
+    });
+    // Add new quick sale tab
+    document.getElementById('addCartTabBtn')?.addEventListener('click', () => {
+      Views.sale.addTab();
+    });
+  },
+
 
   bindCustomerSearch() {
     const custWrap = document.getElementById('customerSelectionWrap');
@@ -1062,6 +1154,14 @@ Views.sale = {
     Views.sale.refreshCart();
     Views.sale.showReceipt(sale);
     App.updateSidebarCounts();
+    // If this was a Quick Sale tab (not primary), close it to return to the main bill
+    if (Views.sale.activeIdx > 0) {
+      const closedIdx = Views.sale.activeIdx;
+      Views.sale.sessions.splice(closedIdx, 1);
+      Views.sale.activeIdx = 0;
+      Views.sale.loadSession(0);
+      App.render();
+    }
   },
 
   showReceipt(sale) {
@@ -1070,7 +1170,11 @@ Views.sale = {
         ${DB.data.settings.logo ? `<img class="receipt-watermark" src="${DB.data.settings.logo}" alt="Watermark Logo">` : ''}
         <h2>${escapeHTML(DB.data.settings.shopName || 'HardwarePOS')}</h2>
         ${DB.data.settings.shopDescription ? `<div class="r-center" style="font-size:11px; color:#555; margin-top:-4px; margin-bottom:4px; white-space:pre-line;">${escapeHTML(DB.data.settings.shopDescription)}</div>` : ''}
-        <div class="r-center">${fmtDate(sale.date)} • #${sale.id}</div>
+        <div style="display:flex; justify-content:space-between; align-items:center; font-size:12px; margin:4px 0;">
+          <span>${(()=>{ const d=new Date(sale.date); return d.toLocaleDateString('en-GB'); })()}</span>
+          <span>${(()=>{ const d=new Date(sale.date); return d.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}); })()}</span>
+          <span>#${sale.id}</span>
+        </div>
         <hr>
         <table>
           <thead><tr><th style="text-align:left">${t('receipt_qty')}</th><th class="num">${t('word_qty')}</th><th class="num">${t('receipt_amount') || t('sale_total')}</th></tr></thead>

@@ -225,6 +225,11 @@ const App = {
   },
 
   render(){
+    // Save current sale session before navigating away from sale view
+    if (this.currentView !== 'sale' && Views.sale && Views.sale.saveSession) {
+      try { Views.sale.saveSession(); } catch(e) {}
+    }
+
     document.querySelectorAll('.nav-btn').forEach(b=>{
       b.classList.toggle('active', b.dataset.view === this.currentView);
     });
