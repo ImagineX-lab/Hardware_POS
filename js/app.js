@@ -189,7 +189,8 @@ const App = {
         // Tab switching and creation key handlers
         const activeEl = document.activeElement;
         const isAlt = e.altKey;
-        const canSwitchTabs = !isInput || (activeEl?.id === 'saleSearch' && !activeEl.value) || isAlt;
+        const isPayBtn = activeEl?.id === 'payCashBtn' || activeEl?.id === 'payCreditBtn';
+        const canSwitchTabs = (!isInput && !isPayBtn) || (activeEl?.id === 'saleSearch' && !activeEl.value) || isAlt;
 
         if (!isInput && (e.key === 'n' || e.key === 'N' || e.code === 'KeyN')) {
           e.preventDefault();

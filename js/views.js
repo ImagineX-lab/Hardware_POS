@@ -653,13 +653,12 @@ Views.sale = {
       payCreditBtn.addEventListener('click', () => Views.sale.setPayType('credit'));
 
       const handlePayBtnKeydown = (e) => {
-        const isCashFocused = document.activeElement === payCashBtn;
         if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
           e.preventDefault();
-          if (isCashFocused && e.key === 'ArrowRight') {
+          if (Views.sale.payType === 'cash') {
             Views.sale.setPayType('credit');
             payCreditBtn.focus();
-          } else if (!isCashFocused && e.key === 'ArrowLeft') {
+          } else {
             Views.sale.setPayType('cash');
             payCashBtn.focus();
           }
