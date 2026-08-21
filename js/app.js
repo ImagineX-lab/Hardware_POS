@@ -186,6 +186,32 @@ const App = {
       }
 
       if (App.currentView === 'sale' && !document.getElementById('activeModal')) {
+        // Tab switching and creation key handlers
+        const activeEl = document.activeElement;
+        const isAlt = e.altKey;
+        const canSwitchTabs = !isInput || (activeEl?.id === 'saleSearch' && !activeEl.value) || isAlt;
+
+        if (!isInput && (e.key === 'n' || e.key === 'N' || e.code === 'KeyN')) {
+          e.preventDefault();
+          if (Views.sale && typeof Views.sale.addTab === 'function') {
+            Views.sale.addTab();
+          }
+        } else if (canSwitchTabs && e.key === 'ArrowLeft') {
+          if (Views.sale && Views.sale.sessions && Views.sale.sessions.length > 1) {
+            e.preventDefault();
+            let newIdx = Views.sale.activeIdx - 1;
+            if (newIdx < 0) newIdx = Views.sale.sessions.length - 1;
+            Views.sale.switchTab(newIdx);
+          }
+        } else if (canSwitchTabs && e.key === 'ArrowRight') {
+          if (Views.sale && Views.sale.sessions && Views.sale.sessions.length > 1) {
+            e.preventDefault();
+            let newIdx = Views.sale.activeIdx + 1;
+            if (newIdx >= Views.sale.sessions.length) newIdx = 0;
+            Views.sale.switchTab(newIdx);
+          }
+        }
+
         if (e.altKey && (e.code === 'KeyQ' || e.key === 'q' || e.key === 'Q')) {
           e.preventDefault();
           const qtyInps = document.querySelectorAll('[data-qty-idx]');

@@ -233,7 +233,7 @@ Views.sale = {
           </div>
 
           <!-- Customer Selection Box (For Cash or Credit) -->
-          <div class="field" style="margin-bottom:4px;">
+          <div class="field" id="customerSelectionField" style="margin-bottom:4px; display:${Views.sale.payType === 'credit' ? 'block' : 'none'};">
             <label class="field-label" style="margin-bottom:2px; font-size:12px;">${t('sale_customer')} <small class="text-muted">(${Views.sale.payType === 'credit' ? 'අවශ්‍යයි' : 'විකල්පයි'})</small></label>
             <div id="customerSelectionWrap">
               ${Views.sale.customerWidgetHTML()}
@@ -990,8 +990,13 @@ Views.sale = {
             Views.sale.bindCustomerSearch();
             Views.sale.applyCustomerHardwareDiscount();
             setTimeout(() => {
-              const paidInp = document.getElementById('saleAmountPaid');
-              if (paidInp) { paidInp.focus(); if (typeof paidInp.select === 'function') paidInp.select(); }
+              if (Views.sale.payType === 'credit') {
+                const discEl = document.getElementById('saleDiscount');
+                if (discEl) { discEl.focus(); if (typeof discEl.select === 'function') discEl.select(); }
+              } else {
+                const paidInp = document.getElementById('saleAmountPaid');
+                if (paidInp) { paidInp.focus(); if (typeof paidInp.select === 'function') paidInp.select(); }
+              }
             }, 50);
           }
         });
@@ -1054,6 +1059,15 @@ Views.sale = {
             custWrap.innerHTML = Views.sale.customerWidgetHTML();
             Views.sale.bindCustomerSearch();
             Views.sale.applyCustomerHardwareDiscount();
+            setTimeout(() => {
+              if (Views.sale.payType === 'credit') {
+                const discEl = document.getElementById('saleDiscount');
+                if (discEl) { discEl.focus(); if (typeof discEl.select === 'function') discEl.select(); }
+              } else {
+                const paidInp = document.getElementById('saleAmountPaid');
+                if (paidInp) { paidInp.focus(); if (typeof paidInp.select === 'function') paidInp.select(); }
+              }
+            }, 50);
           }
         });
       }
@@ -1094,6 +1108,8 @@ Views.sale = {
     document.getElementById('payCreditBtn').classList.toggle('active', type === 'credit');
     const paidWrap = document.getElementById('amountPaidWrap');
     if (paidWrap) paidWrap.style.display = type === 'cash' ? 'block' : 'none';
+    const custField = document.getElementById('customerSelectionField');
+    if (custField) custField.style.display = type === 'credit' ? 'block' : 'none';
   },
 
   addToCart(itemId) {
