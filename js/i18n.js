@@ -14,13 +14,13 @@ const i18n = {
     all: "ඔක්කොම",
 
     // Sidebar
-    nav_dashboard: "Dashboard",
+    nav_dashboard: "ප්‍රධාන පිටුව",
     nav_sale: "විකිණීම / බිල්",
     nav_items: "Stock",
-    nav_purchases: "ගෙන්නන් බිල්",
-    nav_stock: "තොග කළමනාකරණය",
+    nav_purchases: "කඩේට දාන බිල්",
+    nav_stock: "බඩු list එක",
     nav_lowstock: "Stock අඩුයි",
-    nav_customers: "ණය ගනු",
+    nav_customers: "ණය ගනුදෙනු",
     nav_history: "බිල් History",
     nav_settings: "Settings",
     sidebar_msg1: "දත්ත ගබඩා වෙන්නෙ මේ browser එකේ විතරයි.",
