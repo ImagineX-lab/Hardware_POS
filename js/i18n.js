@@ -229,6 +229,10 @@ const i18n = {
     settings_logo_size: "ලෝගෝ ප්‍රමාණය (Logo Size)",
     settings_font_size: "අකුරු ප්‍රමාණය (Font Size)",
     settings_font_size_desc: "පද්ධතියේ අකුරු සහ සංදර්ශක ප්‍රමාණය",
+    settings_default_disc_type: "ඩිෆෝල්ට් වට්ටම් ක්‍රමය (Default Discount Mode)",
+    settings_default_disc_type_desc: "බිලට භාණ්ඩ එකතු කිරීමේදී ඩිෆෝල්ට් ලෙස Discount ගණනය වන ආකාරය",
+    disc_type_unit: "එකකට / Per Item (x QTY)",
+    disc_type_line: "මුළු බිලටම / Fixed Line Total",
 
     // Other short words
     word_credit: "Credit",
@@ -473,6 +477,10 @@ const i18n = {
     settings_logo_size: "Logo Display Size",
     settings_font_size: "Font Size",
     settings_font_size_desc: "System Font and Display Size",
+    settings_default_disc_type: "Default Discount Mode",
+    settings_default_disc_type_desc: "How item discounts are calculated by default when adding items to cart",
+    disc_type_unit: "Per Item (x QTY)",
+    disc_type_line: "Fixed Line Total",
 
     // Other short words
     word_credit: "Credit",

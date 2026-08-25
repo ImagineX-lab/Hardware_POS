@@ -349,28 +349,49 @@ Views.sale = {
     `).join('');
   },
 
+  calcLineDiscount(l) {
+    const d = Number(l.discount) || 0;
+    if (!d) return 0;
+    const type = l.discountType || (DB.data.settings && DB.data.settings.defaultDiscType) || 'unit';
+    if (type === 'line') return d;
+    return Math.round(d * (Number(l.qty) || 1) * 100) / 100;
+  },
+
   cartHTML() {
     if (!cart.length) return `<div class="empty-state" style="padding:20px 10px"><div class="em-ico"><i class="ph ph-shopping-cart"></i></div><h3>${t('sale_empty_cart')}</h3><div class="small">${t('sale_empty_cart_sub')}</div></div>`;
-    return cart.map((l, idx) => `
-      <div class="cart-row" style="padding:6px 0; border-bottom:1px solid var(--border);">
-        <div class="cart-row-top" style="display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:4px;">
-          <div class="cart-item-name" style="font-size:15px; font-weight:700; color:var(--charcoal);">${escapeHTML(l.name)}</div>
-          <button class="icon-btn" data-remove-idx="${idx}" title="${t('delete')}" style="font-size:16px; padding:2px 6px; border:none; background:none; color:var(--steel); cursor:pointer;">✕</button>
-        </div>
-        <div style="display:flex; align-items:center; justify-content:space-between; gap:8px;">
-          <div style="display:flex; align-items:center; gap:6px;">
-            <span style="font-size:11.5px; font-weight:700; color:var(--steel);">QTY</span>
-            <input type="number" min="0.01" step="any" max="${l.maxQty}" value="${l.qty}" data-qty-idx="${idx}" class="input" style="width:75px; height:32px; padding:4px 8px; font-size:14px; text-align:center;" title="Quantity">
-            
-            <span style="font-size:11.5px; font-weight:700; color:var(--steel); margin-left:6px;">DISC</span>
-            <input type="number" min="0" step="any" placeholder="0" value="${l.discount || ''}" data-discount-idx="${idx}" class="input" style="width:75px; height:32px; padding:4px 8px; font-size:14px; text-align:center;" title="Discount">
+    return cart.map((l, idx) => {
+      const lineDisc = Views.sale.calcLineDiscount(l);
+      const lineTotal = Math.max(0, l.qty * l.unitPrice - lineDisc);
+      const isPerUnit = (l.discountType || (DB.data.settings && DB.data.settings.defaultDiscType) || 'unit') === 'unit';
+      return `
+        <div class="cart-row" style="padding:6px 0; border-bottom:1px solid var(--border);">
+          <div class="cart-row-top" style="display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:4px;">
+            <div class="cart-item-name" style="font-size:15px; font-weight:700; color:var(--charcoal);">${escapeHTML(l.name)}</div>
+            <button class="icon-btn" data-remove-idx="${idx}" title="${t('delete')}" style="font-size:16px; padding:2px 6px; border:none; background:none; color:var(--steel); cursor:pointer;">✕</button>
           </div>
-          <div class="cart-row-price" style="font-size:17px; font-weight:700; color:var(--primary-dark);">
-            ${fmt(Math.max(0, l.qty * l.unitPrice - (l.discount || 0)))}
+          <div style="display:flex; align-items:center; justify-content:space-between; gap:8px;">
+            <div style="display:flex; align-items:center; gap:4px; flex-wrap:wrap;">
+              <span style="font-size:11px; font-weight:700; color:var(--steel);">QTY</span>
+              <input type="number" min="0.01" step="any" max="${l.maxQty}" value="${l.qty}" data-qty-idx="${idx}" class="input" style="width:65px; height:32px; padding:4px 6px; font-size:14px; text-align:center;" title="Quantity">
+              
+              <span style="font-size:11px; font-weight:700; color:var(--steel); margin-left:4px;">DISC</span>
+              <div style="display:inline-flex; align-items:center;">
+                <input type="number" min="0" step="any" placeholder="0" value="${l.discount || ''}" data-discount-idx="${idx}" class="input" style="width:60px; height:32px; padding:4px 6px; font-size:14px; text-align:center; border-top-right-radius:0; border-bottom-right-radius:0;" title="Discount">
+                <button type="button" class="btn-disc-toggle" data-disc-type-toggle="${idx}" title="${isPerUnit ? 'එකකට Discount: Rs ' + (l.discount||0) + ' x ' + l.qty + ' QTY = ' + fmt(lineDisc) + ' (Click to switch to Total Line Discount)' : 'මුළු බිලටම Fixed Discount: ' + fmt(lineDisc) + ' (Click to switch to Per Unit Discount)'}" style="height:32px; padding:0 6px; font-size:11px; font-weight:700; border:1px solid var(--border); border-left:none; border-top-right-radius:6px; border-bottom-right-radius:6px; background:${isPerUnit ? 'var(--primary-light, #e0f2fe)' : '#f1f5f9'}; color:${isPerUnit ? 'var(--primary, #0284c7)' : '#475569'}; cursor:pointer; white-space:nowrap;">
+                  ${isPerUnit ? '/එකකට' : '/මුළු'}
+                </button>
+              </div>
+            </div>
+            <div style="text-align:right;">
+              <div class="cart-row-price" style="font-size:16px; font-weight:700; color:var(--primary-dark);">
+                ${fmt(lineTotal)}
+              </div>
+              ${(l.discount > 0 && isPerUnit && l.qty > 1) ? `<div style="font-size:10.5px; color:var(--success); font-weight:600;">(-${fmt(lineDisc)})</div>` : ''}
+            </div>
           </div>
         </div>
-      </div>
-    `).join('');
+      `;
+    }).join('');
   },
 
   calcSubtotal() {
@@ -378,7 +399,7 @@ Views.sale = {
   },
 
   calcItemDiscounts() {
-    return cart.reduce((s, l) => s + (Number(l.discount) || 0), 0);
+    return cart.reduce((s, l) => s + Views.sale.calcLineDiscount(l), 0);
   },
 
   calcTotal() {
@@ -453,6 +474,14 @@ Views.sale = {
         let v = Number(e.target.value) || 0;
         v = Math.max(0, v);
         cart[idx].discount = v;
+        Views.sale.refreshCart();
+      });
+    });
+    document.querySelectorAll('[data-disc-type-toggle]').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        const idx = Number(e.currentTarget.dataset.discTypeToggle);
+        const currType = cart[idx].discountType || (DB.data.settings && DB.data.settings.defaultDiscType) || 'unit';
+        cart[idx].discountType = currType === 'line' ? 'unit' : 'line';
         Views.sale.refreshCart();
       });
     });
@@ -1152,7 +1181,8 @@ Views.sale = {
         costPrice: item.costPrice || 0,
         qty: 1,
         maxQty: item.qty,
-        discount: 0
+        discount: 0,
+        discountType: (DB.data.settings && DB.data.settings.defaultDiscType) || 'unit'
       });
     }
     Views.sale.refreshCart();
@@ -1180,7 +1210,16 @@ Views.sale = {
     const total = Views.sale.calcTotal();
     const changeAmount = Math.max(0, amountPaid - total);
 
-    const lines = cart.map(l => ({ itemId: l.itemId, name: l.name, unit: l.unit, qty: l.qty, unitPrice: l.unitPrice, discount: l.discount || 0 }));
+    const lines = cart.map(l => ({
+      itemId: l.itemId,
+      name: l.name,
+      unit: l.unit,
+      qty: l.qty,
+      unitPrice: l.unitPrice,
+      discount: l.discount || 0,
+      discountType: l.discountType || (DB.data.settings && DB.data.settings.defaultDiscType) || 'unit',
+      lineDiscountTotal: Views.sale.calcLineDiscount(l)
+    }));
 
     const sale = await DB.createSale({ lines, paymentType: payType, customerId, customerName, discount, amountPaid, changeAmount });
     toast(`${t('sale_success')}#${sale.id}`, 'ok');
@@ -2364,6 +2403,17 @@ Views.settings = {
                 <span id="fontSizeVal" class="pill" style="font-weight: 700;">${fontSize}px</span>
               </div>
               <input type="range" id="fontSizeRange" min="12" max="22" step="1" value="${fontSize}" style="width: 100%; cursor: pointer;">
+            </div>
+          </div>
+
+          <div style="border-top: 1px solid var(--border); margin-top: 18px; padding-top: 16px;">
+            <div class="card-title">${t('settings_default_disc_type')}</div>
+            <div class="card-sub" style="font-size: 12px; margin-bottom: 10px; color: var(--steel);">${t('settings_default_disc_type_desc')}</div>
+            <div class="field mt-14">
+              <select class="input" id="defaultDiscTypeSelect">
+                <option value="unit" ${(s.defaultDiscType || 'unit') === 'unit' ? 'selected' : ''}>${t('disc_type_unit')}</option>
+                <option value="line" ${s.defaultDiscType === 'line' ? 'selected' : ''}>${t('disc_type_line')}</option>
+              </select>
             </div>
           </div>
 
