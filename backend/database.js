@@ -80,6 +80,7 @@ module.exports = {
         try { await run(`ALTER TABLE sales ADD COLUMN changeAmount REAL DEFAULT 0`); } catch(e) {}
         try { await run(`ALTER TABLE items ADD COLUMN description TEXT`); } catch(e) {}
         try { await run(`ALTER TABLE items ADD COLUMN image TEXT`); } catch(e) {}
+        try { await run(`ALTER TABLE purchases ADD COLUMN image TEXT`); } catch(e) {}
 
         await run(`CREATE TABLE IF NOT EXISTS purchases (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -94,6 +95,7 @@ module.exports = {
             dueAmount REAL,
             paymentStatus TEXT,
             note TEXT,
+            image TEXT,
             createdAt INTEGER
         )`);
 
@@ -286,7 +288,7 @@ module.exports = {
         else if (dueAmount > 0) paymentStatus = 'partial';
 
         const res = await run(
-            `INSERT INTO purchases (supplierName, billNo, date, items, subtotal, discount, totalAmount, paidAmount, dueAmount, paymentStatus, note, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            `INSERT INTO purchases (supplierName, billNo, date, items, subtotal, discount, totalAmount, paidAmount, dueAmount, paymentStatus, note, image, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
             [
                 p.supplierName?.trim() || 'වෙනත් සැපයුම්කරු',
                 p.billNo?.trim() || '',
@@ -299,6 +301,7 @@ module.exports = {
                 dueAmount,
                 paymentStatus,
                 p.note?.trim() || '',
+                p.image || '',
                 Date.now()
             ]
         );
@@ -335,7 +338,7 @@ module.exports = {
         else if (dueAmount > 0) paymentStatus = 'partial';
 
         await run(
-            `UPDATE purchases SET supplierName=?, billNo=?, date=?, items=?, subtotal=?, discount=?, totalAmount=?, paidAmount=?, dueAmount=?, paymentStatus=?, note=? WHERE id=?`,
+            `UPDATE purchases SET supplierName=?, billNo=?, date=?, items=?, subtotal=?, discount=?, totalAmount=?, paidAmount=?, dueAmount=?, paymentStatus=?, note=?, image=? WHERE id=?`,
             [
                 merged.supplierName?.trim(),
                 merged.billNo?.trim(),
@@ -348,6 +351,7 @@ module.exports = {
                 dueAmount,
                 paymentStatus,
                 merged.note?.trim() || '',
+                merged.image || '',
                 id
             ]
         );

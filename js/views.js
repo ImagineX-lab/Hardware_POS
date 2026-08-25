@@ -2534,6 +2534,20 @@ Views.purchases = {
     `;
   },
 
+  viewImageModal(imgSrc, titleText) {
+    if (!imgSrc) return;
+    openModal({
+      title: `📷 ${escapeHTML(titleText || 'බිල්පතේ ඡායාරූපය')}`,
+      wide: true,
+      bodyHTML: `
+        <div style="text-align:center; background:#0e1117; padding:16px; border-radius:8px; overflow:auto; max-height:75vh;">
+          <img src="${imgSrc}" style="max-width:100%; height:auto; border-radius:4px; box-shadow:0 4px 12px rgba(0,0,0,0.5);">
+        </div>
+      `,
+      footHTML: `<button class="btn btn-outline" data-close>වහන්න (Close)</button>`
+    });
+  },
+
   tableHTML() {
     let list = DB.allPurchases();
     
@@ -2577,6 +2591,7 @@ Views.purchases = {
           <thead>
             <tr>
               <th># / දිනය</th>
+              <th>ඡායාරූපය</th>
               <th>සැපයුම්කරු (Supplier)</th>
               <th>බිල් No</th>
               <th>භාණ්ඩ විස්තරය</th>
@@ -2602,6 +2617,13 @@ Views.purchases = {
       return `
                 <tr>
                   <td><b>#${p.id}</b><br><span class="small text-muted">${fmtDate(p.date)}</span></td>
+                  <td>
+                    ${p.image ? `
+                      <div data-view-bill-img="${p.id}" style="width:38px; height:38px; border-radius:6px; overflow:hidden; cursor:pointer; border:1px solid var(--border); background:#f0f0f0; display:flex; align-items:center; justify-content:center;" title="බිල්පතේ Photo එක බලන්න">
+                        <img src="${p.image}" style="width:100%; height:100%; object-fit:cover;">
+                      </div>
+                    ` : `<span class="text-muted small">-</span>`}
+                  </td>
                   <td><b>${escapeHTML(p.supplierName || 'වෙනත්')}</b></td>
                   <td>${escapeHTML(p.billNo || '-')}</td>
                   <td class="small" style="max-width:200px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${escapeHTML(itemsText)}">${itemsText}</td>
@@ -2610,6 +2632,7 @@ Views.purchases = {
                   <td class="num">${p.dueAmount > 0 ? `<span style="color:var(--danger); font-weight:700;">${fmt(p.dueAmount)}</span>` : `<span class="pill pill-ok">රු. 0.00</span>`}</td>
                   <td>${statusBadge}</td>
                   <td>
+                    ${p.image ? `<button class="btn btn-sm btn-outline" data-view-bill-img="${p.id}"><i class="ph ph-image"></i> 📷 Photo</button>` : ''}
                     <button class="btn btn-sm btn-outline" data-view-purchase="${p.id}">👁 විස්තර / ගෙවීම්</button>
                     <button class="icon-btn" data-del-purchase="${p.id}" title="මකන්න"><i class="ph ph-trash"></i></button>
                   </td>
@@ -2716,7 +2739,31 @@ Views.purchases = {
           </div>
         </div>
 
-        <div class="field">
+        <div class="field" style="margin-top:14px;">
+          <label class="field-label">📷 බිල්පතේ ඡායාරූපය (Bill Image / Photo)</label>
+          <div style="background:var(--paper); padding:12px; border-radius:8px; border:1px solid var(--border);">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; flex-wrap:wrap; gap:8px;">
+              <div style="display:flex; gap:8px; align-items:center;">
+                <label for="pb_image_file" class="btn btn-sm btn-outline" style="cursor:pointer; display:inline-flex; align-items:center; gap:6px; margin:0;">
+                  <i class="ph ph-image"></i> 📁 Photo එකක් තෝරන්න
+                </label>
+                <input type="file" id="pb_image_file" accept="image/*" style="display:none;">
+                <input type="hidden" id="pb_image_data" value="">
+                <button type="button" class="btn btn-sm btn-outline danger" id="pb_remove_img_btn" style="display:none;"><i class="ph ph-trash"></i> ✕ ඉවත් කරන්න</button>
+              </div>
+              <button type="button" class="btn btn-sm btn-outline" id="pb_zoom_preview_btn" style="display:none; font-size:11px;"><i class="ph ph-magnifying-glass-plus"></i> 🔍 විශාල කර බලන්න</button>
+            </div>
+
+            <!-- Live Preview Box -->
+            <div id="pb_img_preview_box" style="display:none; text-align:center; background:#000; border-radius:8px; overflow:hidden; border:1px solid var(--border); max-height:220px; cursor:pointer;" title="විශාල කර බලන්න">
+              <img id="pb_img_preview_el" src="" style="max-width:100%; max-height:220px; object-fit:contain; margin:0 auto; display:block;">
+            </div>
+            
+            <div id="pb_img_hint" class="small text-muted" style="margin-top:6px;">සැපයුම්කරු දුන් බිල්පතේ / ලැබීම් සටහනේ Photo එකක් තෝරාගත් විට මෙහි Preview එක පෙනෙනු ඇත.</div>
+          </div>
+        </div>
+
+        <div class="field" style="margin-top:10px;">
           <label style="display:flex; align-items:center; gap:8px; cursor:pointer; font-weight:600;">
             <input type="checkbox" id="pb_autoStock" checked>
             <span>☑ මෙම භාණ්ඩ කඩේ තොගයට (Stock Qty) ස්වයංක්‍රීයව එකතු කරන්න</span>
@@ -2735,6 +2782,68 @@ Views.purchases = {
         const nameInp = wrap.querySelector('#pi_name');
         const qtyInp = wrap.querySelector('#pi_qty');
         const costInp = wrap.querySelector('#pi_cost');
+
+        const fileInput = wrap.querySelector('#pb_image_file');
+        const hiddenImgInput = wrap.querySelector('#pb_image_data');
+        const previewBox = wrap.querySelector('#pb_img_preview_box');
+        const previewImgEl = wrap.querySelector('#pb_img_preview_el');
+        const removeBtn = wrap.querySelector('#pb_remove_img_btn');
+        const zoomBtn = wrap.querySelector('#pb_zoom_preview_btn');
+        const hintEl = wrap.querySelector('#pb_img_hint');
+
+        if (fileInput) {
+          fileInput.addEventListener('change', () => {
+            const file = fileInput.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (e) => {
+              const img = new Image();
+              img.onload = () => {
+                const maxDim = 1200;
+                let w = img.width, h = img.height;
+                if (w > maxDim || h > maxDim) {
+                  if (w > h) { h = Math.round((h * maxDim) / w); w = maxDim; }
+                  else { w = Math.round((w * maxDim) / h); h = maxDim; }
+                }
+                const canvas = document.createElement('canvas');
+                canvas.width = w;
+                canvas.height = h;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0, w, h);
+                const resizedBase64 = canvas.toDataURL('image/jpeg', 0.8);
+                hiddenImgInput.value = resizedBase64;
+                
+                previewImgEl.src = resizedBase64;
+                previewBox.style.display = 'block';
+                removeBtn.style.display = 'inline-flex';
+                zoomBtn.style.display = 'inline-flex';
+                if (hintEl) hintEl.textContent = 'ඡායාරූපය සාර්ථකව තෝරා ගන්නා ලදී. (Preview එක මත ක්ලික් කිරීමෙන් විශාල කර බැලිය හැක)';
+              };
+              img.src = e.target.result;
+            };
+            reader.readAsDataURL(file);
+          });
+        }
+
+        const openAddZoom = () => {
+          if (hiddenImgInput.value) {
+            Views.purchases.viewImageModal(hiddenImgInput.value, 'බිල්පතේ ඡායාරූපය Preview');
+          }
+        };
+        zoomBtn?.addEventListener('click', openAddZoom);
+        previewBox?.addEventListener('click', openAddZoom);
+
+        if (removeBtn) {
+          removeBtn.addEventListener('click', () => {
+            fileInput.value = '';
+            hiddenImgInput.value = '';
+            previewImgEl.src = '';
+            previewBox.style.display = 'none';
+            removeBtn.style.display = 'none';
+            zoomBtn.style.display = 'none';
+            if (hintEl) hintEl.textContent = 'සැපයුම්කරු දුන් බිල්පතේ / ලැබීම් සටහනේ Photo එකක් තෝරාගත් විට මෙහි Preview එක පෙනෙනු ඇත.';
+          });
+        }
 
         nameInp.addEventListener('change', () => {
           const val = nameInp.value.trim();
@@ -2791,9 +2900,10 @@ Views.purchases = {
           const paidAmount = Number(paidInp.value) || 0;
           const autoUpdateStock = wrap.querySelector('#pb_autoStock').checked;
           const note = wrap.querySelector('#pb_note').value.trim();
+          const image = hiddenImgInput ? hiddenImgInput.value : '';
 
-          if (!supplierName && !billNo && !purchaseItems.length) {
-            toast('කරුණාකර සැපයුම්කරුගේ නම හෝ බිල් අංකය ඇතුළත් කරන්න', 'err');
+          if (!supplierName && !billNo && !purchaseItems.length && !image) {
+            toast('කරුණාකර සැපයුම්කරුගේ නම, බිල් අංකය හෝ බිල්පතේ Photo එකක් ඇතුළත් කරන්න', 'err');
             return;
           }
 
@@ -2806,7 +2916,8 @@ Views.purchases = {
               totalAmount,
               paidAmount,
               autoUpdateStock,
-              note
+              note,
+              image
             });
             closeModal();
             toast('කඩේට ගත් බිල සාර්ථකව සුරකින ලදී!', 'ok');
@@ -2859,6 +2970,32 @@ Views.purchases = {
           </div>
         </div>
 
+        <div class="card mb-14" style="background:var(--paper); padding:12px; box-shadow:none; border:1px solid var(--border);">
+          <div class="card-title" style="font-size:13px; margin-bottom:8px; display:flex; justify-content:space-between; align-items:center;">
+            <span><i class="ph ph-image"></i> බිල්පතේ ඡායාරූපය (Bill Photo)</span>
+            <div style="display:flex; gap:6px;">
+              ${p.image ? `
+                <button class="btn btn-sm btn-outline" id="btnZoomBillImg" style="font-size:11px;"><i class="ph ph-magnifying-glass-plus"></i> විශාල කර බලන්න</button>
+                <label for="detailBillImgFile" class="btn btn-sm btn-outline" style="font-size:11px; cursor:pointer; margin:0;"><i class="ph ph-pencil-simple"></i> වෙනස් කරන්න</label>
+                <button class="btn btn-sm btn-outline danger" id="btnRemoveDetailBillImg" style="font-size:11px;"><i class="ph ph-trash"></i> මකන්න</button>
+              ` : `
+                <label for="detailBillImgFile" class="btn btn-sm btn-outline" style="font-size:11px; cursor:pointer; margin:0;"><i class="ph ph-plus"></i> 📷 Photo එකක් එකතු කරන්න</label>
+              `}
+              <input type="file" id="detailBillImgFile" accept="image/*" style="display:none;">
+            </div>
+          </div>
+          ${p.image ? `
+            <div style="max-height:260px; overflow:hidden; border-radius:8px; border:1px solid var(--border); text-align:center; background:#000; cursor:pointer;" id="imgBillContainer" title="විශාල කර බලන්න">
+              <img src="${p.image}" style="max-width:100%; max-height:260px; object-fit:contain;">
+            </div>
+          ` : `
+            <div style="text-align:center; padding:16px; border:2px dashed var(--border); border-radius:8px; background:#fff; color:var(--text-muted);">
+              <div>මෙම බිල සඳහා තවම ඡායාරූපයක් (Photo) එකතු කර නැත.</div>
+              <label for="detailBillImgFile" class="btn btn-sm btn-outline mt-8" style="cursor:pointer; display:inline-block;"><i class="ph ph-image"></i> 📁 Photo එකක් තෝරන්න</label>
+            </div>
+          `}
+        </div>
+
         ${Array.isArray(p.items) && p.items.length ? `
           <div class="card-title mt-14" style="font-size:13px;"><i class="ph ph-package"></i> ගත් භාණ්ඩ විස්තරය</div>
           <div class="table-wrap mb-14" style="margin-top:6px;">
@@ -2907,6 +3044,66 @@ Views.purchases = {
       `,
       footHTML: `<button class="btn btn-outline" data-close>${t('close')}</button>`,
       onMount: (wrap) => {
+        if (p.image) {
+          const openZoom = () => Views.purchases.viewImageModal(p.image, `${p.supplierName} - ${p.billNo || 'බිල්පත'}`);
+          wrap.querySelector('#btnZoomBillImg')?.addEventListener('click', openZoom);
+          wrap.querySelector('#imgBillContainer')?.addEventListener('click', openZoom);
+        }
+
+        const fileInp = wrap.querySelector('#detailBillImgFile');
+        if (fileInp) {
+          fileInp.addEventListener('change', () => {
+            const file = fileInp.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (e) => {
+              const img = new Image();
+              img.onload = async () => {
+                const maxDim = 1200;
+                let w = img.width, h = img.height;
+                if (w > maxDim || h > maxDim) {
+                  if (w > h) { h = Math.round((h * maxDim) / w); w = maxDim; }
+                  else { w = Math.round((w * maxDim) / h); h = maxDim; }
+                }
+                const canvas = document.createElement('canvas');
+                canvas.width = w;
+                canvas.height = h;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0, w, h);
+                const resizedBase64 = canvas.toDataURL('image/jpeg', 0.8);
+                try {
+                  await DB.updatePurchase(id, { image: resizedBase64 });
+                  toast('බිල්පතේ ඡායාරූපය සාර්ථකව යාවත්කාලීන විය!', 'ok');
+                  closeModal();
+                  Views.purchases.openDetailModal(id);
+                  App.render();
+                } catch (err) {
+                  toast('ඡායාරූපය සුරැකීමට නොහැකි විය!', 'err');
+                }
+              };
+              img.src = e.target.result;
+            };
+            reader.readAsDataURL(file);
+          });
+        }
+
+        const removeImgBtn = wrap.querySelector('#btnRemoveDetailBillImg');
+        if (removeImgBtn) {
+          removeImgBtn.addEventListener('click', () => {
+            confirmAction('මෙම බිල්පතේ ඡායාරූපය ඉවත් කිරීමට තහවුරු කරන්නද?', async () => {
+              try {
+                await DB.updatePurchase(id, { image: '' });
+                toast('ඡායාරූපය ඉවත් කරන ලදී', 'ok');
+                closeModal();
+                Views.purchases.openDetailModal(id);
+                App.render();
+              } catch (err) {
+                toast('ඡායාරූපය ඉවත් කිරීමට නොහැකි විය!', 'err');
+              }
+            });
+          });
+        }
+
         const payBtn = wrap.querySelector('#recordPPayBtn');
         if (payBtn) {
           payBtn.addEventListener('click', async () => {
@@ -2961,6 +3158,17 @@ Views.purchases = {
   },
 
   bindRowActions() {
+    document.querySelectorAll('[data-view-bill-img]').forEach(b => {
+      b.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const id = Number(b.dataset.viewBillImg);
+        const p = DB.getPurchase(id);
+        if (p && p.image) {
+          Views.purchases.viewImageModal(p.image, `${p.supplierName} - ${p.billNo || 'බිල්පත'}`);
+        }
+      });
+    });
+
     document.querySelectorAll('[data-view-purchase]').forEach(b => {
       b.addEventListener('click', () => Views.purchases.openDetailModal(Number(b.dataset.viewPurchase)));
     });

@@ -165,10 +165,7 @@ const DB = {
       body: JSON.stringify(p)
     });
     const newP = await res.json();
-    this.data.purchases.unshift(newP);
-    if (p.autoUpdateStock) {
-      await this.reload();
-    }
+    await this.reload();
     return newP;
   },
   async updatePurchase(id, patch){
@@ -179,8 +176,7 @@ const DB = {
     });
     if(res.ok) {
       const updated = await res.json();
-      const idx = this.data.purchases.findIndex(p => p.id === id);
-      if(idx !== -1) this.data.purchases[idx] = updated;
+      await this.reload();
       return updated;
     }
     return null;
