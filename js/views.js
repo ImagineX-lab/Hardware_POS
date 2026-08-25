@@ -102,14 +102,15 @@ Views.dashboard = {
           ${recent.length ? `
             <div class="table-wrap">
               <table>
-                <thead><tr><th>#</th><th>${t('dash_date')}</th><th>${t('dash_type')}</th><th class="num">${t('dash_amount')}</th></tr></thead>
+                <thead><tr><th>#</th><th>${t('dash_date')}</th><th>${t('dash_type')}</th><th class="num">${t('dash_amount')}</th><th></th></tr></thead>
                 <tbody>
                   ${recent.map(s => `
-                    <tr>
-                      <td>${s.id}</td>
+                    <tr data-dash-sale-row="${s.id}" style="cursor:pointer;" title="${t('hist_preview')}">
+                      <td>#${s.id}</td>
                       <td>${fmtDate(s.date)}</td>
                       <td>${s.paymentType === 'credit' ? `<span class="pill pill-warn">${t('word_credit')}</span>` : `<span class="pill pill-ok">${t('word_cash')}</span>`}</td>
                       <td class="num">${fmt(s.total)}</td>
+                      <td><button class="icon-btn" data-view-sale="${s.id}" title="${t('hist_preview')}"><i class="ph ph-eye"></i></button></td>
                     </tr>
                   `).join('')}
                 </tbody>
@@ -120,7 +121,24 @@ Views.dashboard = {
       </div>
     `;
   },
-  bind() { }
+  bind() {
+    document.querySelectorAll('[data-dash-sale-row]').forEach(row => {
+      row.addEventListener('click', (e) => {
+        if (e.target.closest('[data-view-sale]')) return;
+        const id = Number(row.dataset.dashSaleRow);
+        const sale = DB.allSales().find(s => s.id === id);
+        if (sale) Views.sale.showReceipt(sale);
+      });
+    });
+    document.querySelectorAll('[data-view-sale]').forEach(b => {
+      b.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const id = Number(b.dataset.viewSale);
+        const sale = DB.allSales().find(s => s.id === id);
+        if (sale) Views.sale.showReceipt(sale);
+      });
+    });
+  }
 };
 
 /* ================= SALE / BILLING ================= */
@@ -273,6 +291,7 @@ Views.sale = {
             <div class="cust-name-title"><i class="ph ph-user"></i> ${escapeHTML(c.name)} ${isHardware ? `<span class="pill pill-ok" style="font-size:10px; margin-left:4px;">${t('cust_tab_hardwares')}</span>` : ''}</div>
             <div class="cust-meta">
               ${c.phone ? `📞 ${escapeHTML(c.phone)}` : ''} 
+              ${c.nic ? ` • 🆔 ${escapeHTML(c.nic)}` : ''}
               ${c.balance > 0 ? ` • <span style="color:var(--danger); font-weight:700;">${t('word_due')}: ${fmt(c.balance)}</span>` : ''}
               ${isHardware && c.discountPercent > 0 ? ` • <span style="color:var(--orange-dark); font-weight:700;">${t('cust_hardware_discount_badge')}: ${c.discountPercent}%</span>` : ''}
             </div>
@@ -963,7 +982,7 @@ Views.sale = {
           <div class="cust-suggest-item" data-select-cust="${c.id}">
             <div>
               <div style="font-weight:700;">${escapeHTML(c.name)} ${isHardware ? `<span class="pill pill-ok" style="font-size:10px;">${t('cust_tab_hardwares')}</span>` : ''}</div>
-              <div class="small text-muted">${c.phone ? `📞 ${escapeHTML(c.phone)}` : ''} ${c.balance > 0 ? ` • ${t('word_due')} ${fmt(c.balance)}` : ''}</div>
+              <div class="small text-muted">${c.phone ? `📞 ${escapeHTML(c.phone)}` : ''}${c.nic ? ` • 🆔 ${escapeHTML(c.nic)}` : ''}${c.balance > 0 ? ` • ${t('word_due')} ${fmt(c.balance)}` : ''}</div>
             </div>
             ${isHardware && c.discountPercent > 0 ? `<div style="font-weight:700; font-size:11px; color:var(--orange-dark);">${c.discountPercent}% off</div>` : ''}
           </div>
@@ -1030,7 +1049,10 @@ Views.sale = {
           </div>
         </div>
         <div class="field" id="qc_discount_wrap" style="display:none;"><label class="field-label">${t('cust_form_discount')}</label><input class="input" id="qc_discount" type="number" min="0" max="100" value="0"></div>
-        <div class="field"><label class="field-label">${t('cust_form_address')}</label><input class="input" id="qc_address"></div>
+        <div class="grid grid-2">
+          <div class="field"><label class="field-label">${t('cust_form_address')}</label><input class="input" id="qc_address"></div>
+          <div class="field"><label class="field-label">${t('cust_form_nic')}</label><input class="input" id="qc_nic" placeholder="e.g. 199012345678 / 901234567V"></div>
+        </div>
       `,
       footHTML: `<button class="btn btn-outline" data-close>${t('cancel')}</button><button class="btn btn-primary" id="saveQCustBtn">${t('confirm')}</button>`,
       onMount: (wrap) => {
@@ -1046,6 +1068,7 @@ Views.sale = {
           const newC = await DB.addCustomer({
             name,
             phone: wrap.querySelector('#qc_phone').value,
+            nic: wrap.querySelector('#qc_nic')?.value || '',
             address: wrap.querySelector('#qc_address').value,
             customerType: typeSelect.value,
             discountPercent: Number(wrap.querySelector('#qc_discount')?.value) || 0
@@ -1218,7 +1241,7 @@ Views.sale = {
       </div>
     `;
     openModal({
-      title: t('receipt_completed'),
+      title: `${t('hist_preview') || 'බිල්පත'} #${sale.id}`,
       bodyHTML: html,
       footHTML: `
         <button class="btn btn-outline" data-close>${t('close')}</button>
@@ -1866,7 +1889,7 @@ Views.customers = {
   tableHTML() {
     let list = Views.customers.activeTab === 'hardwares' ? DB.getHardwareCustomers() : DB.getRetailCustomers();
     const q = (Views.customers.searchQ || '').trim();
-    if (q) list = list.filter(c => Singlish.match(c.name, q) || (c.phone || '').includes(q) || Singlish.match(c.address || '', q));
+    if (q) list = list.filter(c => Singlish.match(c.name, q) || (c.phone || '').includes(q) || (c.nic || '').toLowerCase().includes(q.toLowerCase()) || Singlish.match(c.address || '', q));
     if (!list.length) return `<div class="card"><div class="empty-state"><div class="em-ico"><i class="ph ph-user"></i></div><h3>${t('cust_no_cust')}</h3><div class="small">${t('cust_no_cust_sub')}</div></div></div>`;
     return `
       <div class="table-wrap">
@@ -1874,6 +1897,7 @@ Views.customers = {
           <thead>
             <tr>
               <th>${t('cust_name')}</th>
+              <th>${t('cust_form_nic')}</th>
               <th>${t('cust_phone')}</th>
               <th>${t('cust_address')}</th>
               ${Views.customers.activeTab === 'hardwares' ? `<th>${t('cust_hardware_discount_badge')}</th>` : ''}
@@ -1885,6 +1909,7 @@ Views.customers = {
             ${list.map(c => `
               <tr>
                 <td><b>${escapeHTML(c.name)}</b></td>
+                <td>${c.nic ? `<span class="pill pill-outline" style="font-family:monospace; font-weight:600;">🆔 ${escapeHTML(c.nic)}</span>` : '-'}</td>
                 <td>${escapeHTML(c.phone) || '-'}</td>
                 <td class="text-muted">${escapeHTML(c.address) || '-'}</td>
                 ${Views.customers.activeTab === 'hardwares' ? `<td><span class="pill pill-ok">${c.discountPercent || 0}% Discount</span></td>` : ''}
@@ -2013,6 +2038,8 @@ Views.customers = {
           <div>
             <div class="small text-muted">${t('cust_phone')}</div>
             <div style="font-weight:600; margin-bottom:8px;">${escapeHTML(c.phone) || '-'}</div>
+            <div class="small text-muted">${t('cust_form_nic')}</div>
+            <div style="font-weight:600; margin-bottom:8px;">${escapeHTML(c.nic) || '-'}</div>
             <div class="small text-muted">${t('cust_address')}</div>
             <div style="font-weight:600; margin-bottom:8px;">${escapeHTML(c.address) || '-'}</div>
             <div class="small text-muted">${t('cust_form_type')}</div>
@@ -2201,13 +2228,16 @@ Views.history = {
           <thead><tr><th>#</th><th>${t('dash_date')}</th><th>${t('hist_items')}</th><th>${t('sale_payment')}</th><th class="num">${t('sale_total')}</th><th></th></tr></thead>
           <tbody>
             ${sales.map(s => `
-              <tr>
-                <td>${s.id}</td>
+              <tr data-sale-row="${s.id}" style="cursor:pointer;" title="${t('hist_preview')}">
+                <td>#${s.id}</td>
                 <td>${fmtDate(s.date)}</td>
                 <td class="small">${s.lines.map(l => escapeHTML(l.name) + ' x' + l.qty).join(', ')}</td>
                 <td>${s.paymentType === 'credit' ? `<span class="pill pill-warn">${t('word_credit')}</span> <span class="small text-muted">${escapeHTML(s.customerName)}</span>` : `<span class="pill pill-ok">${t('word_cash')}</span>`}</td>
                 <td class="num" style="font-weight:700">${fmt(s.total)}</td>
-                <td><button class="icon-btn" data-del-sale="${s.id}" title="${t('hist_del_title')}"><i class="ph ph-trash"></i></button></td>
+                <td style="white-space:nowrap;">
+                  <button class="icon-btn" data-view-sale="${s.id}" title="${t('hist_preview')}" style="color:var(--primary); margin-right:4px;"><i class="ph ph-eye" style="font-size:18px;"></i></button>
+                  <button class="icon-btn" data-del-sale="${s.id}" title="${t('hist_del_title')}"><i class="ph ph-trash" style="font-size:18px;"></i></button>
+                </td>
               </tr>
             `).join('')}
           </tbody>
@@ -2242,13 +2272,34 @@ Views.history = {
     Views.history.bindRowActions();
   },
   bindRowActions() {
+    document.querySelectorAll('[data-view-sale]').forEach(b => {
+      b.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const id = Number(b.dataset.viewSale);
+        const sale = DB.allSales().find(s => s.id === id);
+        if (sale) Views.sale.showReceipt(sale);
+      });
+    });
+
+    document.querySelectorAll('tr[data-sale-row]').forEach(row => {
+      row.addEventListener('click', (e) => {
+        if (e.target.closest('[data-del-sale]') || e.target.closest('[data-view-sale]')) return;
+        const id = Number(row.dataset.saleRow);
+        const sale = DB.allSales().find(s => s.id === id);
+        if (sale) Views.sale.showReceipt(sale);
+      });
+    });
+
     document.querySelectorAll('[data-del-sale]').forEach(b => {
-      b.addEventListener('click', () => {
+      b.addEventListener('click', (e) => {
+        e.stopPropagation();
         const id = Number(b.dataset.delSale);
         confirmAction(t('hist_del_confirm'), async () => {
           await DB.deleteSale(id);
           toast(t('hist_deleted'), 'ok');
-          App.render();
+          document.getElementById('histTableWrap').innerHTML = Views.history.tableHTML();
+          Views.history.bindRowActions();
+          App.updateSidebarCounts();
         });
       });
     });

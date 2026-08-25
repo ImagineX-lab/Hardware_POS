@@ -105,7 +105,9 @@ const DB = {
     q = (q || '').trim();
     if(!q) return this.allCustomers();
     return this.data.customers.filter(c => 
-      (typeof Singlish !== 'undefined' ? Singlish.match(c.name, q) : c.name.toLowerCase().includes(q.toLowerCase())) || (c.phone || '').includes(q)
+      (typeof Singlish !== 'undefined' ? Singlish.match(c.name, q) : c.name.toLowerCase().includes(q.toLowerCase())) ||
+      (c.phone || '').includes(q) ||
+      (c.nic || '').toLowerCase().includes(q.toLowerCase())
     ).sort((a,b)=>a.name.localeCompare(b.name));
   },
 

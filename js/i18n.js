@@ -167,7 +167,7 @@ const i18n = {
     cust_form_name_ph: "සම්පූර්ණ නම",
     cust_form_phone: "දුරකථනය",
     cust_form_phone_ph: "07XXXXXXXX",
-    cust_form_nic: "NIC",
+    cust_form_nic: "ජා.හැ. අංකය / NIC",
     cust_form_address: "ලිපිනය",
     cust_form_limit: "ණය සීමාව (Credit Limit, රු.) — අවශ්‍ය නැත්නම් හිස් කරන්න",
     cust_form_type: "ගනු ටයිප් *",
@@ -201,6 +201,7 @@ const i18n = {
     hist_no_sales: "ගනු නැහැ",
     hist_items: "බඩු",
     hist_del_title: "අවලංගු",
+    hist_preview: "බිල්පත බලන්න (Preview)",
     hist_del_confirm: "මේ බිල අවලංගු කරන්නද? ස්ටොක් සහ ණය ශේෂය නැවත ගැලපෙයි.",
     hist_deleted: "බිල අවලංගු කෙරුණා",
 
@@ -444,6 +445,7 @@ const i18n = {
     hist_no_sales: "No sales",
     hist_items: "Items",
     hist_del_title: "Cancel Sale",
+    hist_preview: "View Receipt",
     hist_del_confirm: "Cancel this sale? Stock and credit balances will be restored.",
     hist_deleted: "Sale cancelled successfully",
 
