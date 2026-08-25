@@ -125,7 +125,7 @@ const App = {
         App.render();
       } else if (e.key === 'F3') {
         e.preventDefault();
-        App.currentView = 'items';
+        App.currentView = 'stock';
         App.render();
       } else if (e.key === 'F4') {
         e.preventDefault();
@@ -228,10 +228,10 @@ const App = {
         if (e.altKey && e.code === 'KeyC') { e.preventDefault(); Views.sale.setPayType('cash'); }
         if (e.altKey && e.code === 'KeyR') { e.preventDefault(); Views.sale.setPayType('credit'); }
         if (e.key === '/') { e.preventDefault(); document.getElementById('saleSearch')?.focus(); }
-      } else if ((App.currentView === 'items' || App.currentView === 'customers') && !document.getElementById('activeModal')) {
+      } else if (((App.currentView === 'stock' && Views.stock.activeTab === 'items') || App.currentView === 'customers') && !document.getElementById('activeModal')) {
         if (e.altKey && e.code === 'KeyN') {
           e.preventDefault();
-          if (App.currentView === 'items') Views.items.openAddModal();
+          if (App.currentView === 'stock') Views.items.openAddModal();
           if (App.currentView === 'customers') Views.customers.openAddModal();
         }
       }
@@ -311,12 +311,14 @@ const App = {
           const itemId = Number(el.dataset.notifItemId);
           const item = DB.allItems().find(i => i.id === itemId);
           if (item) {
-            Views.items.searchQ = item.name;
-            App.currentView = 'items';
+            Views.stock.activeTab = 'report';
+            Views.stock.itemsSearchQ = item.name;
+            Views.stock.reportSearchQ = item.name;
+            App.currentView = 'stock';
             App.render();
             // Focus and select the search input
             setTimeout(() => {
-              const inp = document.getElementById('itemsSearch');
+              const inp = document.getElementById('stockSearch') || document.getElementById('itemsSearch');
               if (inp) {
                 inp.value = item.name;
                 inp.focus();

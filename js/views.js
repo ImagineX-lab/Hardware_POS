@@ -1542,7 +1542,9 @@ Views.items = {
 
 /* ================= STOCK REPORT & LOW STOCK ================= */
 Views.stock = {
-  searchQ: '',
+  activeTab: 'items', // 'items' | 'report'
+  itemsSearchQ: '',
+  reportSearchQ: '',
   filterType: 'all', // 'all' | 'low'
 
   render() {
@@ -1551,18 +1553,46 @@ Views.stock = {
     const totalValue = DB.stockValue();
 
     return `
-      <div class="page-header">
+      <div class="page-header" style="margin-bottom: 12px;">
         <div class="page-header-left">
-          <i class="ph ph-chart-bar page-header-icon"></i>
-          <h2 class="page-header-title">${t('stock_report')} <span class="page-header-count">${allItems.length}</span></h2>
+          <i class="ph ph-archive-box page-header-icon"></i>
+          <h2 class="page-header-title">තොග කළමනාකරණය (Stock Management)</h2>
         </div>
-        <div class="page-header-right">
-          <input class="input" id="stockSearch" placeholder="${t('search_placeholder')}" style="width:220px" value="${escapeHTML(Views.stock.searchQ)}">
-          <select class="input" id="stockFilter" style="width:170px">
-            <option value="all" ${Views.stock.filterType === 'all' ? 'selected' : ''}>සියලුම තොග</option>
-            <option value="low" ${Views.stock.filterType === 'low' ? 'selected' : ''}>⚠ අඩු තොග පමණක් (${lowItems.length})</option>
-          </select>
-        </div>
+      </div>
+
+      <div class="tabs-nav mb-20" style="display:flex; gap:10px; margin-bottom:20px; border-bottom:1px solid var(--border); padding-bottom:8px;">
+        <button class="btn btn-sm ${Views.stock.activeTab === 'items' ? 'btn-primary' : 'btn-outline'}" id="stockTabItemsBtn">📦 භාණ්ඩ ලැයිස්තුව (Items List)</button>
+        <button class="btn btn-sm ${Views.stock.activeTab === 'report' ? 'btn-primary' : 'btn-outline'}" id="stockTabReportBtn">📊 තොග වාර්තාව (Stock Report)</button>
+      </div>
+
+      <div id="stockTabContent">
+        ${Views.stock.activeTab === 'items' ? Views.stock.itemsTabHTML() : Views.stock.reportTabHTML()}
+      </div>
+    `;
+  },
+
+  itemsTabHTML() {
+    return `
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; gap:16px; flex-wrap:wrap;">
+        <input class="input" id="itemsSearch" placeholder="🔍 සොයන්න (නම, කාණ්ඩය...)" style="width:260px" value="${escapeHTML(Views.stock.itemsSearchQ || '')}">
+        <button class="btn btn-primary" id="addItemBtn">＋ අලුත් භාණ්ඩයක් එක් කරන්න</button>
+      </div>
+      <div id="itemsTableWrap">${Views.stock.itemsTableHTML()}</div>
+    `;
+  },
+
+  reportTabHTML() {
+    const allItems = DB.allItems();
+    const lowItems = DB.lowStockItems();
+    const totalValue = DB.stockValue();
+
+    return `
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; gap:16px; flex-wrap:wrap;">
+        <input class="input" id="stockSearch" placeholder="🔍 සොයන්න (භාණ්ඩයේ නම...)" style="width:260px" value="${escapeHTML(Views.stock.reportSearchQ || '')}">
+        <select class="input" id="stockFilter" style="width:200px">
+          <option value="all" ${Views.stock.filterType === 'all' ? 'selected' : ''}>සියලුම තොග</option>
+          <option value="low" ${Views.stock.filterType === 'low' ? 'selected' : ''}>⚠ අඩු තොග පමණක් (${lowItems.length})</option>
+        </select>
       </div>
 
       <div class="grid grid-3 mb-20" style="margin-bottom:16px;">
@@ -1577,19 +1607,62 @@ Views.stock = {
           <div class="stat-sub">Reorder level එකට ළඟින්/පහළින්</div>
         </div>
         <div class="card stat-card accent-success">
-          <div class="stat-label">${t('stock_total_val')}</div>
+          <div class="stat-label">${t('stock_total_val') || 'තොගයේ මුළු වටිනාකම'}</div>
           <div class="stat-value" style="font-size:22px">${fmt(totalValue)}</div>
           <div class="stat-sub">ගැනුම් වටිනාකම එකතුව</div>
         </div>
       </div>
 
-      <div id="stockTableWrap">${Views.stock.tableHTML()}</div>
+      <div id="stockTableWrap">${Views.stock.reportTableHTML()}</div>
     `;
   },
 
-  tableHTML() {
+  itemsTableHTML() {
     let list = DB.allItems();
-    const q = (Views.stock.searchQ || '').trim();
+    const q = (Views.stock.itemsSearchQ || '').trim();
+    if (q) list = list.filter(i => Singlish.match(i.name, q) || Singlish.match(i.category || '', q) || Singlish.match(i.description || '', q));
+    if (!list.length) return `<div class="card"><div class="empty-state"><div class="em-ico"><i class="ph ph-package"></i></div><h3>${t('items_no_items')}</h3><div class="small">${t('items_no_items_sub')}</div></div></div>`;
+    return `
+      <div class="table-wrap">
+        <table>
+          <thead><tr>
+            <th style="width:46px;">Photo</th><th>${t('items_name')}</th><th>${t('items_category')}</th><th class="num">${t('items_cost_price')}</th><th class="num">${t('items_sell_price')}</th>
+            <th class="num">${t('word_qty')}</th><th>${t('items_status')}</th><th></th>
+          </tr></thead>
+          <tbody>
+            ${list.map(i => {
+      const status = i.qty <= 0 ? `<span class="pill pill-danger">${t('status_out')}</span>`
+        : i.qty <= i.reorderLevel ? `<span class="pill pill-warn">${t('status_low')}</span>`
+          : `<span class="pill pill-ok">${t('status_ok')}</span>`;
+      return `
+              <tr>
+                <td>
+                  <div style="width:36px; height:36px; border-radius:6px; overflow:hidden; background:var(--paper); display:flex; align-items:center; justify-content:center; border:1px solid var(--border);">
+                    ${i.image ? `<img src="${i.image}" style="width:100%; height:100%; object-fit:cover;">` : `<i class="ph ph-package" style="font-size:18px;"></i>`}
+                  </div>
+                </td>
+                <td><b>${escapeHTML(i.name)}</b></td>
+                <td>${escapeHTML(i.category || 'වෙනත්')}</td>
+                <td class="num">${fmt(i.costPrice)}</td>
+                <td class="num"><b>${fmt(i.sellPrice)}</b></td>
+                <td class="num">${i.qty} ${escapeHTML(i.unit || '')}</td>
+                <td>${status}</td>
+                <td>
+                  <button class="icon-btn" data-edit-item="${i.id}" title="${t('items_edit')}"><i class="ph ph-pencil-simple"></i></button>
+                  <button class="icon-btn" data-del-item="${i.id}" title="${t('delete')}"><i class="ph ph-trash"></i></button>
+                </td>
+              </tr>
+            `;
+    }).join('')}
+          </tbody>
+        </table>
+      </div>
+    `;
+  },
+
+  reportTableHTML() {
+    let list = DB.allItems();
+    const q = (Views.stock.reportSearchQ || '').trim();
     if (q) {
       list = list.filter(i => Singlish.match(i.name || '', q) || Singlish.match(i.category || '', q));
     }
@@ -1656,67 +1729,106 @@ Views.stock = {
   },
 
   bind() {
-    const search = document.getElementById('stockSearch');
-    if (search) {
-      search.addEventListener('input', () => {
-        Views.stock.searchQ = search.value;
-        document.getElementById('stockTableWrap').innerHTML = Views.stock.tableHTML();
-        Views.stock.bindRowActions();
+    const btnItems = document.getElementById('stockTabItemsBtn');
+    const btnReport = document.getElementById('stockTabReportBtn');
+
+    if (btnItems) {
+      btnItems.addEventListener('click', () => {
+        Views.stock.activeTab = 'items';
+        App.render();
+      });
+    }
+    if (btnReport) {
+      btnReport.addEventListener('click', () => {
+        Views.stock.activeTab = 'report';
+        App.render();
       });
     }
 
-    const filter = document.getElementById('stockFilter');
-    if (filter) {
-      filter.addEventListener('change', (e) => {
-        Views.stock.filterType = e.target.value;
-        document.getElementById('stockTableWrap').innerHTML = Views.stock.tableHTML();
-        Views.stock.bindRowActions();
-      });
-    }
+    if (Views.stock.activeTab === 'items') {
+      document.getElementById('addItemBtn')?.addEventListener('click', Views.items.openAddModal);
+      const search = document.getElementById('itemsSearch');
+      if (search) {
+        search.addEventListener('input', () => {
+          Views.stock.itemsSearchQ = search.value;
+          document.getElementById('itemsTableWrap').innerHTML = Views.stock.itemsTableHTML();
+          Views.stock.bindRowActions();
+        });
+        setTimeout(() => search.focus(), 100);
+      }
+    } else {
+      const search = document.getElementById('stockSearch');
+      if (search) {
+        search.addEventListener('input', () => {
+          Views.stock.reportSearchQ = search.value;
+          document.getElementById('stockTableWrap').innerHTML = Views.stock.reportTableHTML();
+          Views.stock.bindRowActions();
+        });
+        setTimeout(() => search.focus(), 100);
+      }
 
-    document.getElementById('showOnlyLowBtn')?.addEventListener('click', () => {
-      Views.stock.filterType = 'low';
-      const filterSel = document.getElementById('stockFilter');
-      if (filterSel) filterSel.value = 'low';
-      document.getElementById('stockTableWrap').innerHTML = Views.stock.tableHTML();
-      Views.stock.bindRowActions();
-    });
+      const filter = document.getElementById('stockFilter');
+      if (filter) {
+        filter.addEventListener('change', (e) => {
+          Views.stock.filterType = e.target.value;
+          document.getElementById('stockTableWrap').innerHTML = Views.stock.reportTableHTML();
+          Views.stock.bindRowActions();
+        });
+      }
+    }
 
     Views.stock.bindRowActions();
   },
 
   bindRowActions() {
-    document.querySelectorAll('[data-restock]').forEach(b => {
-      b.addEventListener('click', () => {
-        const id = Number(b.dataset.restock);
-        const item = DB.getItem(id);
-        if (!item) return;
-
-        openModal({
-          title: `"${escapeHTML(item.name)}" ${t('ls_add_stock_title')}`,
-          bodyHTML: `
-            <div class="field"><label class="field-label">${t('ls_current')}</label><input class="input" value="${item.qty} ${escapeHTML(item.unit)}" disabled></div>
-            <div class="field"><label class="field-label">එකතු කරන ප්‍රමාණය (Qty to Add)</label><input class="input" id="restockQty" type="number" min="0.01" step="any" value="10"></div>
-          `,
-          footHTML: `<button class="btn btn-outline" data-close>${t('cancel')}</button><button class="btn btn-primary" id="restockSaveBtn">${t('ls_add_btn')}</button>`,
-          onMount: () => {
-            document.getElementById('restockSaveBtn').addEventListener('click', async () => {
-              const add = Number(document.getElementById('restockQty').value) || 0;
-              if (add <= 0) { toast(t('ls_err_qty'), 'err'); return; }
-              try {
-                await DB.updateItem(id, { qty: item.qty + add });
-                closeModal();
-                toast(t('ls_updated'), 'ok');
-                App.render();
-              } catch (err) {
-                console.error("Failed to update stock:", err);
-                toast('තොගය යාවත්කාලීන කිරීමට නොහැකි විය!', 'err');
-              }
-            });
-          }
+    if (Views.stock.activeTab === 'items') {
+      document.querySelectorAll('[data-edit-item]').forEach(b => {
+        b.addEventListener('click', () => Views.items.openEditModal(Number(b.dataset.editItem)));
+      });
+      document.querySelectorAll('[data-del-item]').forEach(b => {
+        b.addEventListener('click', () => {
+          const id = Number(b.dataset.delItem);
+          const item = DB.getItem(id);
+          confirmAction(`"${escapeHTML(item.name)}" ${t('items_del_confirm')}`, async () => {
+            await DB.deleteItem(id);
+            toast(t('items_deleted'), 'ok');
+            App.render();
+          });
         });
       });
-    });
+    } else {
+      document.querySelectorAll('[data-restock]').forEach(b => {
+        b.addEventListener('click', () => {
+          const id = Number(b.dataset.restock);
+          const item = DB.getItem(id);
+          if (!item) return;
+
+          openModal({
+            title: `"${escapeHTML(item.name)}" ${t('ls_add_stock_title')}`,
+            bodyHTML: `
+              <div class="field"><label class="field-label">${t('ls_current')}</label><input class="input" value="${item.qty} ${escapeHTML(item.unit)}" disabled></div>
+              <div class="field"><label class="field-label">එකතු කරන ප්‍රමාණය (Qty to Add)</label><input class="input" id="restockQty" type="number" min="0.01" step="any" value="10"></div>
+            `,
+            footHTML: `<button class="btn btn-outline" data-close>${t('cancel')}</button><button class="btn btn-primary" id="restockSaveBtn">${t('ls_add_btn')}</button>`,
+            onMount: () => {
+              document.getElementById('restockSaveBtn').addEventListener('click', async () => {
+                const add = Number(document.getElementById('restockQty').value) || 0;
+                if (add <= 0) { toast(t('ls_err_qty'), 'err'); return; }
+                try {
+                  await DB.updateItem(id, { qty: item.qty + add });
+                  closeModal();
+                  toast(t('ls_updated'), 'ok');
+                  App.render();
+                } catch (err) {
+                  console.error("Failed to update stock:", err);
+                  toast('තොගය යාවත්කාලීන කිරීමට නොහැකි විය!', 'err');
+                }
+              });
+            }
+          });
+        });
+      });
+    }
   }
 };
 
@@ -2018,6 +2130,8 @@ Views.customers = {
 /* ================= SALES HISTORY ================= */
 Views.history = {
   filterType: 'all',
+  searchQ: '',
+  filterDate: '',
   render() {
     return `
       <div class="page-header">
@@ -2026,6 +2140,8 @@ Views.history = {
           <h2 class="page-header-title">${t('hist_title')}</h2>
         </div>
         <div class="page-header-right">
+          <input class="input" id="historySearch" placeholder="🔍 බිල් No / පාරිභෝගිකයා / බඩු..." style="width:230px" value="${escapeHTML(Views.history.searchQ || '')}">
+          <input class="input" id="historyDateFilter" type="date" style="width:150px" value="${escapeHTML(Views.history.filterDate || '')}" title="දිනයෙන් පෙරන්න">
           <select class="input" id="histFilter" style="width:160px">
             <option value="all" ${Views.history.filterType === 'all' ? 'selected' : ''}>${t('hist_filter_all')}</option>
             <option value="cash" ${Views.history.filterType === 'cash' ? 'selected' : ''}>${t('hist_filter_cash')}</option>
@@ -2038,7 +2154,46 @@ Views.history = {
   },
   tableHTML() {
     let sales = DB.allSales();
-    if (Views.history.filterType !== 'all') sales = sales.filter(s => s.paymentType === Views.history.filterType);
+    
+    // Filter by type
+    if (Views.history.filterType !== 'all') {
+      sales = sales.filter(s => s.paymentType === Views.history.filterType);
+    }
+    
+    // Filter by date picker
+    const filterDate = Views.history.filterDate;
+    if (filterDate) {
+      sales = sales.filter(s => {
+        const d = new Date(s.date);
+        const ymd = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+        return ymd === filterDate;
+      });
+    }
+
+    // Filter by search query (which includes searching by date formats!)
+    const q = (Views.history.searchQ || '').trim();
+    if (q) {
+      sales = sales.filter(s => {
+        const idStr = String(s.id);
+        const custName = (s.customerName || '').toLowerCase();
+        const itemsStr = s.lines.map(l => l.name).join(' ').toLowerCase();
+        
+        // Date formats to match
+        const d = new Date(s.date);
+        const ymd = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+        const dmy = String(d.getDate()).padStart(2, '0') + '/' + String(d.getMonth()+1).padStart(2, '0') + '/' + d.getFullYear();
+        const formattedDate = fmtDate(s.date);
+        
+        return idStr.includes(q) ||
+          custName.includes(q.toLowerCase()) ||
+          itemsStr.includes(q.toLowerCase()) ||
+          Singlish.match(s.customerName || '', q) ||
+          ymd.includes(q) ||
+          dmy.includes(q) ||
+          formattedDate.toLowerCase().includes(q.toLowerCase());
+      });
+    }
+
     if (!sales.length) return `<div class="card"><div class="empty-state"><div class="em-ico"><i class="ph ph-receipt"></i></div><h3>${t('hist_no_sales')}</h3></div></div>`;
     return `
       <div class="table-wrap">
@@ -2061,6 +2216,24 @@ Views.history = {
     `;
   },
   bind() {
+    const search = document.getElementById('historySearch');
+    if (search) {
+      search.addEventListener('input', () => {
+        Views.history.searchQ = search.value;
+        document.getElementById('histTableWrap').innerHTML = Views.history.tableHTML();
+        Views.history.bindRowActions();
+      });
+    }
+
+    const dateFilter = document.getElementById('historyDateFilter');
+    if (dateFilter) {
+      dateFilter.addEventListener('input', () => {
+        Views.history.filterDate = dateFilter.value;
+        document.getElementById('histTableWrap').innerHTML = Views.history.tableHTML();
+        Views.history.bindRowActions();
+      });
+    }
+
     document.getElementById('histFilter').addEventListener('change', (e) => {
       Views.history.filterType = e.target.value;
       document.getElementById('histTableWrap').innerHTML = Views.history.tableHTML();
@@ -2313,6 +2486,7 @@ Views.settings = {
 Views.purchases = {
   searchQ: '',
   filterStatus: 'all', // 'all' | 'due' | 'paid'
+  filterDate: '',
 
   render() {
     const purchases = DB.allPurchases();
@@ -2328,6 +2502,7 @@ Views.purchases = {
         </div>
         <div class="page-header-right">
           <input class="input" id="purchasesSearch" placeholder="🔍 සැපයුම්කරු / බිල් No..." style="width:220px" value="${escapeHTML(Views.purchases.searchQ)}">
+          <input class="input" id="purchasesDateFilter" type="date" style="width:150px" value="${escapeHTML(Views.purchases.filterDate || '')}" title="දිනයෙන් පෙරන්න">
           <select class="input" id="purchasesStatusFilter" style="width:150px">
             <option value="all" ${Views.purchases.filterStatus === 'all' ? 'selected' : ''}>සියලු බිල්පත්</option>
             <option value="due" ${Views.purchases.filterStatus === 'due' ? 'selected' : ''}>ගෙවීමට ඇති බිල්</option>
@@ -2361,13 +2536,32 @@ Views.purchases = {
 
   tableHTML() {
     let list = DB.allPurchases();
+    
+    // Filter by date picker
+    const filterDate = Views.purchases.filterDate;
+    if (filterDate) {
+      list = list.filter(p => {
+        const d = new Date(p.date);
+        const ymd = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+        return ymd === filterDate;
+      });
+    }
+
     const q = (Views.purchases.searchQ || '').trim();
     if (q) {
-      list = list.filter(p =>
-        Singlish.match(p.supplierName || '', q) ||
-        (p.billNo || '').toLowerCase().includes(q.toLowerCase()) ||
-        Singlish.match(p.note || '', q)
-      );
+      list = list.filter(p => {
+        const d = new Date(p.date);
+        const ymd = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+        const dmy = String(d.getDate()).padStart(2, '0') + '/' + String(d.getMonth()+1).padStart(2, '0') + '/' + d.getFullYear();
+        const formattedDate = fmtDate(p.date);
+        
+        return Singlish.match(p.supplierName || '', q) ||
+          (p.billNo || '').toLowerCase().includes(q.toLowerCase()) ||
+          Singlish.match(p.note || '', q) ||
+          ymd.includes(q) ||
+          dmy.includes(q) ||
+          formattedDate.toLowerCase().includes(q.toLowerCase());
+      });
     }
     if (Views.purchases.filterStatus === 'due') {
       list = list.filter(p => (p.dueAmount || 0) > 0);
@@ -2740,6 +2934,15 @@ Views.purchases = {
     if (search) {
       search.addEventListener('input', () => {
         Views.purchases.searchQ = search.value;
+        document.getElementById('purchasesTableWrap').innerHTML = Views.purchases.tableHTML();
+        Views.purchases.bindRowActions();
+      });
+    }
+
+    const dateFilter = document.getElementById('purchasesDateFilter');
+    if (dateFilter) {
+      dateFilter.addEventListener('input', () => {
+        Views.purchases.filterDate = dateFilter.value;
         document.getElementById('purchasesTableWrap').innerHTML = Views.purchases.tableHTML();
         Views.purchases.bindRowActions();
       });
