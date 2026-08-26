@@ -1,3 +1,12 @@
+/* 4u Derana x — Sinhala decorative font for receipt shop name */
+@font-face {
+  font-family: '4u_Derana_x';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url(../fonts/4u_Derana_x.ttf) format('truetype');
+}
+
 /* sinhala */
 @font-face {
   font-family: 'Noto Sans Sinhala';

@@ -4,7 +4,7 @@
 
 const DB = {
   data: {
-    settings: { shopName: "HardwarePOS" },
+    settings: { shopName: "රත්න හාඩ්වෙයාර්" },
     items: [],
     customers: [],
     sales: [],

@@ -28,7 +28,7 @@ const App = {
     
     const shopNameLabel = document.getElementById('shopNameLabel');
     if (shopNameLabel) {
-      shopNameLabel.textContent = s.shopName || 'HardwarePOS';
+      shopNameLabel.textContent = s.shopName || 'රත්න හාඩ්වෙයාර්';
     }
 
     const logoWrap = document.getElementById('brandLogoWrap');
