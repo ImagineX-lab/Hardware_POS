@@ -42,11 +42,13 @@ const App = {
       logoImg.src = s.logo;
       logoImg.style.height = logoSize + 'px';
       logoWrap.style.display = 'flex';
-      if (brandMark) brandMark.style.display = 'none';
     } else {
       if (logoWrap) logoWrap.style.display = 'none';
-      if (brandMark) brandMark.style.display = 'flex';
     }
+    // Always hide brand mark and shop name text — logo only
+    if (brandMark) brandMark.style.display = 'none';
+    const brandText = document.querySelector('.brand-text');
+    if (brandText) brandText.style.display = 'none';
 
     // Apply font size
     const fontSize = Number(s.fontSize) || 15;

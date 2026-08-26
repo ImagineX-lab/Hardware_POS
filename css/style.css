@@ -1374,8 +1374,9 @@ th.num {
 }
 
 .receipt th {
-  font-weight: 700;
-  border-bottom: 1px dashed #999;
+  font-weight: 800;
+  color: #000;
+  border-bottom: 1px dashed #000;
 }
 
 .receipt hr {
@@ -1421,6 +1422,11 @@ th.num {
 
   #printArea table {
     font-size: 10px;
+  }
+
+  #printArea th {
+    font-weight: 800;
+    color: #000 !important;
   }
 
   #printArea .r-center {

@@ -1246,7 +1246,7 @@ Views.sale = {
       <div class="receipt" id="printArea">
         ${DB.data.settings.logo ? `<img class="receipt-watermark" src="${DB.data.settings.logo}" alt="Watermark Logo">` : ''}
         <h2>${escapeHTML(DB.data.settings.shopName || 'රත්න හාඩ්වෙයාර්')}</h2>
-        ${DB.data.settings.shopDescription ? `<div class="r-center" style="font-size:11px; color:#555; margin-top:-4px; margin-bottom:4px; white-space:pre-line;">${escapeHTML(DB.data.settings.shopDescription)}</div>` : ''}
+        ${DB.data.settings.shopDescription ? `<div class="r-center" style="font-size:12px; font-weight:700; color:#111; margin-top:2px; margin-bottom:4px; white-space:pre-line; font-family:'Noto Sans Sinhala', sans-serif; line-height:1.6;">${escapeHTML(DB.data.settings.shopDescription)}</div>` : ''}
         <div style="display:flex; justify-content:space-between; align-items:center; font-size:12px; margin:4px 0;">
           <span>${(()=>{ const d=new Date(sale.date); return d.toLocaleDateString('en-GB'); })()}</span>
           <span>${(()=>{ const d=new Date(sale.date); return d.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}); })()}</span>
@@ -1277,7 +1277,7 @@ Views.sale = {
         <hr>
         <div class="r-center">${t('receipt_thanks')}</div>
         <div class="r-center" style="font-size: 10px; font-weight: 700; color: #111; margin-top: 6px; border-top: 1px dashed #999; padding-top: 6px; line-height: 1.5; font-family: 'Noto Sans Sinhala', sans-serif;">භාණ්ඩය ආපසු භාරදීමේදී මෙම බිල්පත/ඉන්වොයිසිය ඉදිරිපත් කිරීම අනිවාර්ය වේ</div>
-        <div class="r-center" style="font-size: 9px; color: #777; margin-top: 8px; border-top: 1px dotted #ccc; padding-top: 4px;">imagineX software solution - 0761945587</div>
+        <div class="r-center" style="font-size: 9px; color: #111; margin-top: 8px; border-top: 1px dotted #ccc; padding-top: 4px;">imagineX software solution - 0761945587</div>
       </div>
     `;
     openModal({
