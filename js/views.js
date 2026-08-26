@@ -1357,6 +1357,33 @@ Views.items = {
     const v = item || { name: '', category: '', unit: 'pcs', costPrice: '', sellPrice: '', qty: '', reorderLevel: 5, image: '', description: '' };
     const existingCategories = [...new Set(DB.data.items.map(i => i.category).filter(c => c && c.trim()))].sort();
     const catOptions = existingCategories.map(c => `<div class="combo-opt" data-val="${escapeHTML(c)}">${escapeHTML(c)}</div>`).join('');
+    const unitsList = [
+      { val: 'pcs', label: 'pcs (කෑලි)' },
+      { val: 'kg', label: 'kg (කිලෝග්‍රෑම්)' },
+      { val: 'g', label: 'g (ග්‍රෑම්)' },
+      { val: 'L', label: 'L (ලීටර්)' },
+      { val: 'ml', label: 'ml (මිලිලීටර්)' },
+      { val: 'bag', label: 'bag (මලු / බෑග්)' },
+      { val: 'box', label: 'box (පෙට්ටි)' },
+      { val: 'm', label: 'm (මීටර්)' },
+      { val: 'ft', label: 'ft (අඩි)' },
+      { val: 'set', label: 'set (කට්ටල)' },
+      { val: 'roll', label: 'roll (රෝල්)' },
+      { val: 'sheet', label: 'sheet (තහඩු / ෂීට්)' },
+      { val: 'bundle', label: 'bundle (බණ්ඩල් / මිටි)' },
+      { val: 'pkt', label: 'pkt (පැකට්)' },
+      { val: 'pair', label: 'pair (යුගල)' },
+      { val: 'cube', label: 'cube (කියුබ්)' },
+      { val: 'sqft', label: 'sqft (වර්ග අඩි)' },
+      { val: 'can', label: 'can (කෑන්)' },
+      { val: 'bottle', label: 'bottle (බෝතල්)' },
+      { val: 'tube', label: 'tube (ටියුබ්)' },
+      { val: 'length', label: 'length (දිග / බට)' }
+    ];
+    let unitOptsHTML = unitsList.map(u => `<option value="${u.val}" ${v.unit === u.val ? 'selected' : ''}>${u.label}</option>`).join('');
+    if (v.unit && !unitsList.some(u => u.val === v.unit)) {
+      unitOptsHTML += `<option value="${escapeHTML(v.unit)}" selected>${escapeHTML(v.unit)}</option>`;
+    }
     return `
       <!-- Image Upload -->
       <div class="field" style="margin-bottom:14px;">
@@ -1394,7 +1421,7 @@ Views.items = {
       <div class="grid grid-2">
         <div class="field"><label class="field-label">${t('items_form_unit')}</label>
           <select class="input" id="f_unit">
-            ${['pcs', 'kg', 'g', 'L', 'ml', 'bag', 'box', 'm', 'ft', 'set', 'roll', 'sheet', 'bundle'].map(u => `<option value="${u}" ${v.unit === u ? 'selected' : ''}>${u}</option>`).join('')}
+            ${unitOptsHTML}
           </select>
         </div>
         <div class="field"><label class="field-label">${t('items_form_reorder')}</label><input class="input" id="f_reorder" type="number" min="0" step="any" value="${v.reorderLevel}"></div>

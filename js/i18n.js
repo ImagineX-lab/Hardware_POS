@@ -117,7 +117,7 @@ const i18n = {
     items_form_name_ph: "උදා: සිමෙන්ති, 6mm ඇණ",
     items_form_cat: "Category",
     items_form_cat_ph: "උදා: සිමෙන්ති/පයිප්ප/විදුලි",
-    items_form_unit: "Unit",
+    items_form_unit: "ඒකකය (Unit)",
     items_form_reorder: "Reorder Level (Stock අඩු සීමාව)",
     items_form_cost: "ගත්ත මිල (Cost Price)",
     items_form_sell: "ගාස්තු (Sell Price) *",
