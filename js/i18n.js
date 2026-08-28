@@ -88,6 +88,10 @@ const i18n = {
     cart_stock: "තොගය",
     cart_qty_label: "ප්‍රමාණය (Qty)",
     cart_discount_label: "වට්ටම (Disc)",
+    cart_loose_label: "ලිහිල් (Loose)",
+    cart_loose_modal_title: "⚖️ ලිහිල් විකිණීම සහ පරිවර්තනය",
+    cart_loose_apply: "✔ Cart එකට යොදන්න",
+    cart_loose_reset: "සාමාන්‍ය විකිණීමට හරවන්න",
 
     app_title: "HardwarePOS — කඩේ සිස්ටම්",
     receipt_title: "Hardware Store POS",
@@ -336,6 +340,10 @@ const i18n = {
     cart_stock: "Stock",
     cart_qty_label: "Qty",
     cart_discount_label: "Disc",
+    cart_loose_label: "Loose",
+    cart_loose_modal_title: "⚖️ Loose Unit Sale & Converter",
+    cart_loose_apply: "✔ Apply to Cart",
+    cart_loose_reset: "Reset to Normal Sale",
 
     app_title: "HardwarePOS — Store POS",
     receipt_title: "Hardware Store POS",

@@ -366,13 +366,20 @@ Views.sale = {
       return `
         <div class="cart-row" style="padding:6px 0; border-bottom:1px solid var(--border);">
           <div class="cart-row-top" style="display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:4px;">
-            <div class="cart-item-name" style="font-size:15px; font-weight:700; color:var(--charcoal);">${escapeHTML(l.name)}</div>
+            <div style="flex:1; min-width:0;">
+              <div class="cart-item-name" style="font-size:15px; font-weight:700; color:var(--charcoal);">${escapeHTML(l.name)}</div>
+              ${l.looseInfo ? `
+                <div style="margin-top:2px; display:inline-flex; align-items:center; gap:4px; font-size:11px; font-weight:700; color:#b45309; background:#fef3c7; border:1px solid #fde68a; border-radius:4px; padding:1px 6px;">
+                  <span>⚖️ ලිහිල්: ${escapeHTML(l.looseInfo.shortText || '')}</span>
+                  <span style="font-size:10px; color:#92400e; font-weight:600;">(Stock: -${l.qty} ${escapeHTML(l.unit)})</span>
+                </div>` : ''}
+            </div>
             <button class="icon-btn" data-remove-idx="${idx}" title="${t('delete')}" style="font-size:16px; padding:2px 6px; border:none; background:none; color:var(--steel); cursor:pointer;">✕</button>
           </div>
           <div style="display:flex; align-items:center; justify-content:space-between; gap:8px;">
             <div style="display:flex; align-items:center; gap:4px; flex-wrap:wrap;">
               <span style="font-size:11px; font-weight:700; color:var(--steel);">QTY</span>
-              <input type="number" min="0.01" step="any" max="${l.maxQty}" value="${l.qty}" data-qty-idx="${idx}" class="input" style="width:65px; height:32px; padding:4px 6px; font-size:14px; text-align:center;" title="Quantity">
+              <input type="number" min="0.0001" step="any" max="${l.maxQty}" value="${l.qty}" data-qty-idx="${idx}" class="input" style="width:65px; height:32px; padding:4px 6px; font-size:14px; text-align:center;" title="Quantity">
               
               <span style="font-size:11px; font-weight:700; color:var(--steel); margin-left:4px;">DISC</span>
               <div style="display:inline-flex; align-items:center;">
@@ -381,6 +388,12 @@ Views.sale = {
                   ${isPerUnit ? '/එකකට' : '/මුළු'}
                 </button>
               </div>
+
+              <!-- LOOSE CALCULATOR BUTTON RIGHT NEXT TO DISCOUNT -->
+              <button type="button" class="btn-loose-toggle" data-loose-idx="${idx}" title="ලිහිල් විකිණීම සහ මිනුම් පරිවර්තනය (kg, g, අඟල්, අඩි, L, ml, pcs...)" style="height:32px; padding:0 8px; font-size:11.5px; font-weight:700; border:1px solid ${l.looseInfo ? '#f59e0b' : 'var(--border)'}; border-radius:6px; background:${l.looseInfo ? '#fef3c7' : '#f8fafc'}; color:${l.looseInfo ? '#b45309' : '#334155'}; cursor:pointer; display:inline-flex; align-items:center; gap:3px; white-space:nowrap; transition:all 0.15s ease;">
+                <span>⚖️</span>
+                <span>${l.looseInfo ? escapeHTML(l.looseInfo.shortText || 'ලිහිල්') : 'ලිහිල්'}</span>
+              </button>
             </div>
             <div style="text-align:right;">
               <div class="cart-row-price" style="font-size:16px; font-weight:700; color:var(--primary-dark);">
@@ -460,9 +473,9 @@ Views.sale = {
     document.querySelectorAll('[data-qty-idx]').forEach(inp => {
       inp.addEventListener('change', (e) => {
         const idx = Number(e.target.dataset.qtyIdx);
-        let v = Number(e.target.value) || 0.01;
-        v = Math.max(0.01, Math.min(v, cart[idx].maxQty));
-        v = Math.round(v * 100) / 100;
+        let v = Number(e.target.value) || 0.0001;
+        v = Math.max(0.0001, Math.min(v, cart[idx].maxQty));
+        v = Math.round(v * 10000) / 10000;
         cart[idx].qty = v;
         Views.sale.refreshCart();
         Views.sale.applyCustomerHardwareDiscount();
@@ -483,6 +496,12 @@ Views.sale = {
         const currType = cart[idx].discountType || (DB.data.settings && DB.data.settings.defaultDiscType) || 'unit';
         cart[idx].discountType = currType === 'line' ? 'unit' : 'line';
         Views.sale.refreshCart();
+      });
+    });
+    document.querySelectorAll('[data-loose-idx]').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        const idx = Number(e.currentTarget.dataset.looseIdx);
+        Views.sale.openLooseModal(idx);
       });
     });
     document.querySelectorAll('[data-remove-idx]').forEach(btn => {
@@ -1188,6 +1207,418 @@ Views.sale = {
     Views.sale.refreshCart();
   },
 
+  openLooseModal(idx) {
+    const item = cart[idx];
+    if (!item) return;
+
+    // Detect packaging details from item name or unit
+    let defaultPackSize = 1;
+    let defaultPackUnit = item.unit || 'pcs';
+    let defaultLooseUnit = item.unit || 'pcs';
+
+    const nameLower = (item.name || '').toLowerCase();
+    const matchWeight = nameLower.match(/(\d+(?:\.\d+)?)\s*(kg|g|කිලෝ|ග්‍රෑම්)/i);
+    const matchVolume = nameLower.match(/(\d+(?:\.\d+)?)\s*(l|ml|ltr|ලීටර්|මිලිලීටර්)/i);
+    const matchLength = nameLower.match(/(\d+(?:\.\d+)?)\s*(ft|in|m|cm|අඩි|අඟල්|මීටර්)/i);
+
+    if (item.unit === 'bag' || item.unit === 'box' || item.unit === 'pkt' || item.unit === 'roll' || item.unit === 'bundle') {
+      if (matchWeight) {
+        defaultPackSize = parseFloat(matchWeight[1]) || 50;
+        defaultPackUnit = matchWeight[2].startsWith('g') ? 'g' : 'kg';
+        defaultLooseUnit = defaultPackUnit;
+      } else if (matchVolume) {
+        defaultPackSize = parseFloat(matchVolume[1]) || 1;
+        defaultPackUnit = matchVolume[2].startsWith('ml') ? 'ml' : 'L';
+        defaultLooseUnit = defaultPackUnit;
+      } else if (matchLength) {
+        defaultPackSize = parseFloat(matchLength[1]) || 1;
+        defaultPackUnit = matchLength[2].includes('in') || matchLength[2].includes('අඟල්') ? 'in' : (matchLength[2].includes('m') ? 'm' : 'ft');
+        defaultLooseUnit = defaultPackUnit;
+      } else if (nameLower.includes('50kg') || nameLower.includes('50 kg') || nameLower.includes('සිමෙන්ති')) {
+        defaultPackSize = 50;
+        defaultPackUnit = 'kg';
+        defaultLooseUnit = 'kg';
+      }
+    } else if (item.unit === 'kg') {
+      defaultPackSize = 1;
+      defaultPackUnit = 'kg';
+      defaultLooseUnit = 'kg';
+    } else if (item.unit === 'g') {
+      defaultPackSize = 1000;
+      defaultPackUnit = 'g';
+      defaultLooseUnit = 'g';
+    } else if (item.unit === 'L') {
+      defaultPackSize = 1;
+      defaultPackUnit = 'L';
+      defaultLooseUnit = 'L';
+    } else if (item.unit === 'ml') {
+      defaultPackSize = 1000;
+      defaultPackUnit = 'ml';
+      defaultLooseUnit = 'ml';
+    } else if (item.unit === 'ft') {
+      defaultPackSize = 1;
+      defaultPackUnit = 'ft';
+      defaultLooseUnit = 'ft';
+    } else if (item.unit === 'm') {
+      defaultPackSize = 1;
+      defaultPackUnit = 'm';
+      defaultLooseUnit = 'm';
+    }
+
+    const curLoose = item.looseInfo || {};
+    const initPackSize = curLoose.packSize || defaultPackSize;
+    const initPackUnit = curLoose.packUnit || defaultPackUnit;
+    const initLooseUnit = curLoose.looseUnit || defaultLooseUnit;
+    const initLooseQty = (curLoose.looseQty !== undefined && curLoose.looseQty !== null) ? curLoose.looseQty : 1;
+
+    const unitOptions = [
+      { val: 'kg', label: 'kg (කිලෝග්‍රෑම්)' },
+      { val: 'g', label: 'g (ග්‍රෑම්)' },
+      { val: 'in', label: 'in / agal (අඟල්)' },
+      { val: 'ft', label: 'ft / adi (අඩි)' },
+      { val: 'm', label: 'm (මීටර්)' },
+      { val: 'cm', label: 'cm (සෙන්ටිමීටර්)' },
+      { val: 'L', label: 'L (ලීටර්)' },
+      { val: 'ml', label: 'ml (මිලිලීටර්)' },
+      { val: 'pcs', label: 'pcs (කෑලි)' },
+      { val: 'bag', label: 'bag (බෑග් / මලු)' },
+      { val: 'box', label: 'box (පෙට්ටි)' },
+      { val: 'pkt', label: 'pkt (පැකට්)' },
+      { val: 'roll', label: 'roll (රෝල්)' }
+    ];
+
+    const getUnitFactor = (fromU, toU) => {
+      fromU = (fromU || '').toLowerCase().trim();
+      toU = (toU || '').toLowerCase().trim();
+      if (fromU === toU) return 1;
+      // Weight
+      if (fromU === 'g' && toU === 'kg') return 0.001;
+      if (fromU === 'kg' && toU === 'g') return 1000;
+      // Length
+      if ((fromU === 'in' || fromU === 'agal' || fromU === 'අඟල්') && (toU === 'ft' || toU === 'adi' || toU === 'අඩි')) return 1 / 12;
+      if ((fromU === 'ft' || fromU === 'adi' || fromU === 'අඩි') && (toU === 'in' || toU === 'agal' || toU === 'අඟල්')) return 12;
+      if (fromU === 'cm' && toU === 'm') return 0.01;
+      if (fromU === 'm' && toU === 'cm') return 100;
+      if ((fromU === 'in' || fromU === 'agal' || fromU === 'අඟල්') && toU === 'm') return 0.0254;
+      if ((fromU === 'in' || fromU === 'agal' || fromU === 'අඟල්') && toU === 'cm') return 2.54;
+      if (fromU === 'm' && (toU === 'in' || toU === 'agal' || toU === 'අඟල්')) return 39.3701;
+      if (fromU === 'cm' && (toU === 'in' || toU === 'agal' || toU === 'අඟල්')) return 0.393701;
+      if (fromU === 'ft' && toU === 'm') return 0.3048;
+      if (fromU === 'm' && toU === 'ft') return 3.28084;
+      if (fromU === 'ft' && toU === 'cm') return 30.48;
+      // Volume
+      if (fromU === 'ml' && toU === 'l') return 0.001;
+      if (fromU === 'l' && toU === 'ml') return 1000;
+      return 1;
+    };
+
+    const modalBody = `
+      <div style="font-family:'Noto Sans Sinhala', sans-serif;">
+        <!-- Item Overview Header -->
+        <div style="background:var(--bg-card, #f8fafc); border:1px solid var(--border); border-radius:10px; padding:12px 14px; margin-bottom:14px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+          <div>
+            <div style="font-size:16px; font-weight:800; color:var(--charcoal);">${escapeHTML(item.name)}</div>
+            <div style="font-size:12px; color:var(--steel); margin-top:2px;">
+              මුල් ඒකක මිල: <b style="color:var(--primary);">${fmt(item.unitPrice)}</b> / 1 ${escapeHTML(item.unit)} &nbsp;•&nbsp; තොගය: <b>${item.maxQty} ${escapeHTML(item.unit)}</b>
+            </div>
+          </div>
+          <div style="text-align:right;">
+            <span class="pill pill-ok" style="font-size:11px; padding:3px 8px;">⚖️ Loose Calculator</span>
+          </div>
+        </div>
+
+        <!-- Mode Toggle Tabs -->
+        <div style="display:flex; border-bottom:2px solid var(--border); margin-bottom:14px; gap:8px;">
+          <button type="button" id="lm_tab_qty" class="btn-tab active" style="flex:1; padding:8px; font-weight:700; font-size:13px; border:none; background:none; border-bottom:3px solid var(--primary); color:var(--primary); cursor:pointer;">
+            📏 ප්‍රමාණය අනුව (By Qty)
+          </button>
+          <button type="button" id="lm_tab_cash" class="btn-tab" style="flex:1; padding:8px; font-weight:700; font-size:13px; border:none; background:none; border-bottom:3px solid transparent; color:var(--steel); cursor:pointer;">
+            💵 මුදල අනුව (By Cash)
+          </button>
+        </div>
+
+        <!-- Pack / Base Config -->
+        <div style="background:#f1f5f9; border-radius:8px; padding:10px 12px; margin-bottom:14px;">
+          <label style="font-size:11.5px; font-weight:700; color:var(--charcoal); display:block; margin-bottom:4px;">
+            📦 මුළු පැකේජයේ / බෑගයේ ප්‍රමාණය (Base Pack Size):
+          </label>
+          <div style="display:flex; gap:8px; align-items:center;">
+            <input type="number" id="lm_pack_size" class="input" min="0.0001" step="any" value="${initPackSize}" style="flex:1; font-weight:700; height:34px;">
+            <select id="lm_pack_unit" class="input" style="flex:1.2; font-weight:600; height:34px;">
+              ${unitOptions.map(u => `<option value="${u.val}" ${initPackUnit === u.val ? 'selected' : ''}>${u.label}</option>`).join('')}
+            </select>
+          </div>
+          <div style="font-size:10.5px; color:var(--steel); margin-top:4px;">
+            (උදා: සිමෙන්ති බෑග් = 50 kg | කෑලි පෙට්ටි = 100 pcs | 1kg බඩු = 1 kg | 1ft බට = 1 ft)
+          </div>
+        </div>
+
+        <!-- Qty Mode Inputs -->
+        <div id="lm_qty_section">
+          <div style="display:grid; grid-template-columns:1fr 1.2fr; gap:10px; margin-bottom:10px;">
+            <div>
+              <label style="font-size:12px; font-weight:700; color:var(--charcoal); display:block; margin-bottom:4px;">
+                ලිහිල් ප්‍රමාණය (Loose Qty)
+              </label>
+              <input type="number" id="lm_loose_qty" class="input" min="0.0001" step="any" value="${initLooseQty}" placeholder="උදා: 1 හෝ 500" autofocus style="font-size:16px; font-weight:800; text-align:center; height:40px; border:2px solid var(--primary-light);">
+            </div>
+            <div>
+              <label style="font-size:12px; font-weight:700; color:var(--charcoal); display:block; margin-bottom:4px;">
+                ලිහිල් ඒකකය (Unit)
+              </label>
+              <select id="lm_loose_unit" class="input" style="font-size:13.5px; font-weight:700; height:40px;">
+                ${unitOptions.map(u => `<option value="${u.val}" ${initLooseUnit === u.val ? 'selected' : ''}>${u.label}</option>`).join('')}
+              </select>
+            </div>
+          </div>
+
+          <!-- Quick Preset Chips -->
+          <div style="margin-bottom:14px;">
+            <div style="font-size:11px; font-weight:700; color:var(--steel); margin-bottom:4px;">⚡ ඉක්මන් තේරීම් (Quick Presets):</div>
+            <div id="lm_presets" style="display:flex; flex-wrap:wrap; gap:5px;"></div>
+          </div>
+        </div>
+
+        <!-- Cash Amount Mode Inputs -->
+        <div id="lm_cash_section" style="display:none;">
+          <div style="margin-bottom:10px;">
+            <label style="font-size:12px; font-weight:700; color:var(--charcoal); display:block; margin-bottom:4px;">
+              ඉල්ලූ මුදල (Amount in Rs.)
+            </label>
+            <input type="number" id="lm_cash_amount" class="input" min="1" step="any" placeholder="උදා: 100" style="font-size:16px; font-weight:800; text-align:center; height:40px; border:2px solid var(--primary-light);">
+          </div>
+          <!-- Quick Cash Chips -->
+          <div style="margin-bottom:14px;">
+            <div style="font-size:11px; font-weight:700; color:var(--steel); margin-bottom:4px;">⚡ ඉක්මන් මුදල් ප්‍රමාණ:</div>
+            <div style="display:flex; flex-wrap:wrap; gap:5px;">
+              ${[50, 100, 150, 200, 250, 500, 1000].map(amt => `
+                <button type="button" class="btn-cash-chip" data-cash="${amt}" style="padding:4px 8px; font-size:11.5px; font-weight:700; background:#f1f5f9; border:1px solid var(--border); border-radius:6px; cursor:pointer;">
+                  රු. ${amt}
+                </button>
+              `).join('')}
+            </div>
+          </div>
+        </div>
+
+        <!-- Live Calculation Box -->
+        <div id="lm_result_box" style="background:#ecfdf5; border:1.5px solid #a7f3d0; border-radius:10px; padding:12px 14px; margin-bottom:10px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+            <span style="font-size:13px; font-weight:700; color:#065f46;">අයවන මුදල (Line Total):</span>
+            <span id="lm_res_price" style="font-size:20px; font-weight:900; color:#047857;">රු. 0.00</span>
+          </div>
+          <div style="display:flex; justify-content:space-between; align-items:center; font-size:12px; color:#065f46; border-top:1px dashed #6ee7b7; padding-top:6px; margin-top:6px;">
+            <span>තොගයෙන් අඩු වන්නේ (Stock Deduction):</span>
+            <b id="lm_res_stock" style="font-size:13px; color:#0f766e;">0.00 ${escapeHTML(item.unit)}</b>
+          </div>
+          <div id="lm_res_formula" style="font-size:11px; color:#047857; margin-top:4px; font-style:italic;"></div>
+        </div>
+
+        <div id="lm_stock_warning" style="display:none; background:#fef2f2; border:1px solid #fecaca; color:#b91c1c; font-size:11.5px; font-weight:700; padding:6px 10px; border-radius:6px; margin-bottom:10px;">
+          ⚠️ ඉල්ලූ ප්‍රමාණය පවතින Stock එකට වඩා වැඩියි!
+        </div>
+      </div>
+    `;
+
+    openModal({
+      title: `${t('cart_loose_modal_title') || '⚖️ ලිහිල් විකිණීම සහ පරිවර්තනය'}`,
+      bodyHTML: modalBody,
+      footHTML: `
+        <div style="display:flex; justify-content:space-between; width:100%; align-items:center;">
+          <div>
+            ${item.looseInfo ? `<button type="button" class="btn btn-outline" id="lm_reset_btn" style="color:var(--danger); border-color:var(--danger); font-size:12px;">${t('cart_loose_reset') || 'සාමාන්‍ය විකිණීමට'}</button>` : ''}
+          </div>
+          <div style="display:flex; gap:8px;">
+            <button type="button" class="btn btn-outline" data-close>${t('close')}</button>
+            <button type="button" class="btn btn-primary" id="lm_apply_btn" style="min-width:140px; font-weight:800;">${t('cart_loose_apply') || '✔ Cart එකට යොදන්න'}</button>
+          </div>
+        </div>
+      `,
+      wide: false,
+      onMount: (wrap) => {
+        let activeMode = 'qty'; // 'qty' | 'cash'
+        const packSizeEl = wrap.querySelector('#lm_pack_size');
+        const packUnitEl = wrap.querySelector('#lm_pack_unit');
+        const looseQtyEl = wrap.querySelector('#lm_loose_qty');
+        const looseUnitEl = wrap.querySelector('#lm_loose_unit');
+        const cashAmountEl = wrap.querySelector('#lm_cash_amount');
+        const resPriceEl = wrap.querySelector('#lm_res_price');
+        const resStockEl = wrap.querySelector('#lm_res_stock');
+        const resFormulaEl = wrap.querySelector('#lm_res_formula');
+        const stockWarnEl = wrap.querySelector('#lm_stock_warning');
+        const presetsWrap = wrap.querySelector('#lm_presets');
+
+        const tabQty = wrap.querySelector('#lm_tab_qty');
+        const tabCash = wrap.querySelector('#lm_tab_cash');
+        const qtySec = wrap.querySelector('#lm_qty_section');
+        const cashSec = wrap.querySelector('#lm_cash_section');
+
+        const updatePresets = () => {
+          const lUnit = looseUnitEl.value;
+          let chips = [];
+          if (lUnit === 'kg') chips = [0.25, 0.5, 1, 2, 2.5, 5, 10];
+          else if (lUnit === 'g') chips = [50, 100, 200, 250, 500, 750, 1000];
+          else if (lUnit === 'in') chips = [1, 2, 3, 4, 6, 8, 12, 18, 24];
+          else if (lUnit === 'ft') chips = [0.5, 1, 2, 3, 5, 10, 15, 20];
+          else if (lUnit === 'm') chips = [0.5, 1, 1.5, 2, 3, 5, 10];
+          else if (lUnit === 'cm') chips = [10, 25, 50, 75, 100, 150];
+          else if (lUnit === 'L') chips = [0.25, 0.5, 1, 2, 4, 5];
+          else if (lUnit === 'ml') chips = [50, 100, 200, 250, 500, 750];
+          else chips = [1, 2, 5, 10, 20, 25, 50];
+
+          presetsWrap.innerHTML = chips.map(c => `
+            <button type="button" class="btn-loose-preset" data-val="${c}" style="padding:3px 8px; font-size:11px; font-weight:700; background:#f1f5f9; border:1px solid var(--border); border-radius:5px; cursor:pointer;">
+              ${c} ${lUnit}
+            </button>
+          `).join('');
+
+          presetsWrap.querySelectorAll('.btn-loose-preset').forEach(btn => {
+            btn.addEventListener('click', () => {
+              looseQtyEl.value = btn.dataset.val;
+              calc();
+            });
+          });
+        };
+
+        const calc = () => {
+          const packSize = Math.max(0.0001, parseFloat(packSizeEl.value) || 1);
+          const packUnit = packUnitEl.value;
+          const looseUnit = looseUnitEl.value;
+          const unitPrice = item.unitPrice;
+
+          let calcLooseQty = 0;
+          let stockQty = 0;
+          let linePrice = 0;
+          let formulaText = '';
+
+          if (activeMode === 'qty') {
+            calcLooseQty = Math.max(0, parseFloat(looseQtyEl.value) || 0);
+            const factor = getUnitFactor(looseUnit, packUnit);
+            const effectiveInPack = calcLooseQty * factor;
+            stockQty = effectiveInPack / packSize;
+            linePrice = stockQty * unitPrice;
+            formulaText = `(රු. ${unitPrice.toLocaleString('en-LK')} ÷ ${packSize} ${packUnit}) × ${calcLooseQty} ${looseUnit} = රු. ${linePrice.toFixed(2)}`;
+          } else {
+            const cash = Math.max(0, parseFloat(cashAmountEl.value) || 0);
+            linePrice = cash;
+            stockQty = unitPrice > 0 ? (cash / unitPrice) : 0;
+            const effectiveInPack = stockQty * packSize;
+            const factor = getUnitFactor(packUnit, looseUnit);
+            calcLooseQty = effectiveInPack * factor;
+            calcLooseQty = Math.round(calcLooseQty * 1000) / 1000;
+            looseQtyEl.value = calcLooseQty;
+            formulaText = `රු. ${cash.toFixed(2)} ට ලැබෙන ප්‍රමාණය = ${calcLooseQty} ${looseUnit} (Stock: ${Math.round(stockQty * 10000)/10000} ${item.unit})`;
+          }
+
+          resPriceEl.textContent = fmt(linePrice);
+          const displayStock = Math.round(stockQty * 10000) / 10000;
+          resStockEl.textContent = `${displayStock} ${item.unit} (${calcLooseQty} ${looseUnit})`;
+          resFormulaEl.textContent = formulaText;
+
+          if (stockQty > item.maxQty) {
+            stockWarnEl.style.display = 'block';
+            stockWarnEl.textContent = `⚠️ Stock මදි! උපරිම Stock ප්‍රමාණය: ${item.maxQty} ${item.unit} (උපරිම ${Math.round(item.maxQty * packSize * (getUnitFactor(packUnit, looseUnit)) * 100)/100} ${looseUnit})`;
+          } else {
+            stockWarnEl.style.display = 'none';
+          }
+
+          return { stockQty: displayStock, calcLooseQty, linePrice, packSize, packUnit, looseUnit };
+        };
+
+        tabQty.addEventListener('click', () => {
+          activeMode = 'qty';
+          tabQty.style.borderBottom = '3px solid var(--primary)';
+          tabQty.style.color = 'var(--primary)';
+          tabCash.style.borderBottom = '3px solid transparent';
+          tabCash.style.color = 'var(--steel)';
+          qtySec.style.display = 'block';
+          cashSec.style.display = 'none';
+          calc();
+        });
+
+        tabCash.addEventListener('click', () => {
+          activeMode = 'cash';
+          tabCash.style.borderBottom = '3px solid var(--primary)';
+          tabCash.style.color = 'var(--primary)';
+          tabQty.style.borderBottom = '3px solid transparent';
+          tabQty.style.color = 'var(--steel)';
+          qtySec.style.display = 'none';
+          cashSec.style.display = 'block';
+          if (!cashAmountEl.value) cashAmountEl.value = '100';
+          calc();
+        });
+
+        packSizeEl.addEventListener('input', calc);
+        packUnitEl.addEventListener('change', calc);
+        looseQtyEl.addEventListener('input', calc);
+        looseUnitEl.addEventListener('change', () => {
+          updatePresets();
+          calc();
+        });
+        cashAmountEl.addEventListener('input', calc);
+
+        wrap.querySelectorAll('.btn-cash-chip').forEach(b => {
+          b.addEventListener('click', () => {
+            cashAmountEl.value = b.dataset.cash;
+            calc();
+          });
+        });
+
+        updatePresets();
+        calc();
+
+        // Apply action
+        const applyAction = () => {
+          const res = calc();
+          if (res.stockQty <= 0) {
+            toast('කරුණාකර වලංගු ප්‍රමාණයක් ඇතුළත් කරන්න', 'err');
+            return;
+          }
+          if (res.stockQty > item.maxQty) {
+            toast(t('sale_exceeds_stock'), 'err');
+            return;
+          }
+
+          item.qty = res.stockQty;
+          item.looseInfo = {
+            isLoose: true,
+            looseQty: res.calcLooseQty,
+            looseUnit: res.looseUnit,
+            packSize: res.packSize,
+            packUnit: res.packUnit,
+            shortText: `${res.calcLooseQty} ${res.looseUnit}`,
+            fullText: `${res.calcLooseQty} ${res.looseUnit} (${res.packSize} ${res.packUnit} පැකේජයකින්)`
+          };
+
+          closeModal();
+          Views.sale.refreshCart();
+          Views.sale.applyCustomerHardwareDiscount();
+          toast(`ලිහිල් විකිණීම Cart එකට යෙදුවා: ${item.looseInfo.shortText}`, 'ok');
+        };
+
+        wrap.querySelector('#lm_apply_btn').addEventListener('click', applyAction);
+
+        wrap.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter') {
+            e.preventDefault();
+            applyAction();
+          }
+        });
+
+        const resetBtn = wrap.querySelector('#lm_reset_btn');
+        if (resetBtn) {
+          resetBtn.addEventListener('click', () => {
+            item.qty = 1;
+            item.looseInfo = null;
+            closeModal();
+            Views.sale.refreshCart();
+            Views.sale.applyCustomerHardwareDiscount();
+            toast('සාමාන්‍ය විකිණීමට මාරු කළා', 'ok');
+          });
+        }
+      }
+    });
+  },
+
   async completeSale() {
     if (!cart.length) { toast(t('sale_empty_cart'), 'err'); return; }
     const payType = Views.sale.payType;
@@ -1218,7 +1649,8 @@ Views.sale = {
       unitPrice: l.unitPrice,
       discount: l.discount || 0,
       discountType: l.discountType || (DB.data.settings && DB.data.settings.defaultDiscType) || 'unit',
-      lineDiscountTotal: Views.sale.calcLineDiscount(l)
+      lineDiscountTotal: Views.sale.calcLineDiscount(l),
+      looseInfo: l.looseInfo || null
     }));
 
     const sale = await DB.createSale({ lines, paymentType: payType, customerId, customerName, discount, amountPaid, changeAmount });
@@ -1258,8 +1690,11 @@ Views.sale = {
           <tbody>
             ${sale.lines.map(l => `
               <tr>
-                <td>${escapeHTML(l.name)}</td>
-                <td class="num">${l.qty} ${escapeHTML(l.unit || '')}</td>
+                <td>
+                  ${escapeHTML(l.name)}
+                  ${l.looseInfo ? `<div style="font-size:10px; color:#555; font-weight:600;">[ලිහිල්: ${escapeHTML(l.looseInfo.shortText || '')}]</div>` : ''}
+                </td>
+                <td class="num">${l.looseInfo ? `${l.looseInfo.looseQty} ${escapeHTML(l.looseInfo.looseUnit)}` : `${l.qty} ${escapeHTML(l.unit || '')}`}</td>
                 <td class="num">${fmt(l.qty * l.unitPrice)}</td>
               </tr>
             `).join('')}
@@ -2139,7 +2574,7 @@ Views.customers = {
           const sale = DB.allSales().find(s => s.id === l.saleId);
           if (sale && sale.lines && sale.lines.length) {
             itemsHtml = `<div style="margin-top:4px; font-size:12px; color:var(--text-color); opacity:0.8; line-height:1.4;">` +
-              sale.lines.map(line => `• ${escapeHTML(line.name)} (x${line.qty})`).join('<br>') +
+              sale.lines.map(line => `• ${escapeHTML(line.name)} (${line.looseInfo ? `[ලිහිල්: ${line.looseInfo.shortText}]` : `x${line.qty}`})`).join('<br>') +
               `</div>`;
           }
         }
@@ -2298,7 +2733,7 @@ Views.history = {
               <tr data-sale-row="${s.id}" style="cursor:pointer;" title="${t('hist_preview')}">
                 <td>#${s.id}</td>
                 <td>${fmtDate(s.date)}</td>
-                <td class="small">${s.lines.map(l => escapeHTML(l.name) + ' x' + l.qty).join(', ')}</td>
+                <td class="small">${s.lines.map(l => escapeHTML(l.name) + ' ' + (l.looseInfo ? `[${l.looseInfo.shortText}]` : 'x' + l.qty)).join(', ')}</td>
                 <td>${s.paymentType === 'credit' ? `<span class="pill pill-warn">${t('word_credit')}</span> <span class="small text-muted">${escapeHTML(s.customerName)}</span>` : `<span class="pill pill-ok">${t('word_cash')}</span>`}</td>
                 <td class="num" style="font-weight:700">${fmt(s.total)}</td>
                 <td style="white-space:nowrap;">

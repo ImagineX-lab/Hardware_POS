@@ -230,7 +230,8 @@ module.exports = {
         for(let l of sale.lines) {
             const it = await get(`SELECT qty FROM items WHERE id = ?`, [l.itemId]);
             if(it) {
-                await run(`UPDATE items SET qty = ? WHERE id = ?`, [Math.max(0, it.qty - l.qty), l.itemId]);
+                const remaining = Math.max(0, Math.round((it.qty - l.qty) * 10000) / 10000);
+                await run(`UPDATE items SET qty = ? WHERE id = ?`, [remaining, l.itemId]);
             }
         }
 
@@ -254,7 +255,8 @@ module.exports = {
         for(let l of lines) {
             const it = await get(`SELECT qty FROM items WHERE id = ?`, [l.itemId]);
             if(it) {
-                await run(`UPDATE items SET qty = ? WHERE id = ?`, [it.qty + l.qty, l.itemId]);
+                const restored = Math.round((it.qty + l.qty) * 10000) / 10000;
+                await run(`UPDATE items SET qty = ? WHERE id = ?`, [restored, l.itemId]);
             }
         }
 
