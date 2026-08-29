@@ -208,7 +208,7 @@ module.exports = {
         return sales;
     },
     createSale: async (sale) => {
-        const subtotal = sale.lines.reduce((s,l) => s + l.qty * l.unitPrice, 0);
+        const subtotal = sale.lines.reduce((s,l) => s + l.qty * (l.originalPrice || l.unitPrice), 0);
         const discount = Number(sale.discount)||0;
         const total = Math.max(0, subtotal - discount);
         const amountPaid = Number(sale.amountPaid) || 0;
