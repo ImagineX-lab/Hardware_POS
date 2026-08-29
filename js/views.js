@@ -350,7 +350,9 @@ Views.sale = {
   },
 
   calcLineDiscount(l) {
-    const d = Number(l.discount) || 0;
+    const origPrice = (l.originalPrice !== undefined && l.originalPrice > 0) ? l.originalPrice : l.unitPrice;
+    const effectiveDisc = Math.max(0, origPrice - l.unitPrice);
+    const d = (l.discount !== undefined && l.discount > 0) ? l.discount : effectiveDisc;
     if (!d) return 0;
     const type = l.discountType || (DB.data.settings && DB.data.settings.defaultDiscType) || 'unit';
     if (type === 'line') return d;
@@ -360,9 +362,10 @@ Views.sale = {
   cartHTML() {
     if (!cart.length) return `<div class="empty-state" style="padding:20px 10px"><div class="em-ico"><i class="ph ph-shopping-cart"></i></div><h3>${t('sale_empty_cart')}</h3><div class="small">${t('sale_empty_cart_sub')}</div></div>`;
     return cart.map((l, idx) => {
-      const lineDisc = Views.sale.calcLineDiscount(l);
-      const lineTotal = Math.max(0, l.qty * l.unitPrice - lineDisc);
-      const isPerUnit = (l.discountType || (DB.data.settings && DB.data.settings.defaultDiscType) || 'unit') === 'unit';
+      const origPrice = (l.originalPrice !== undefined && l.originalPrice > 0) ? l.originalPrice : l.unitPrice;
+      const effectiveDisc = Math.max(0, origPrice - l.unitPrice);
+      const lineTotal = Math.max(0, l.qty * l.unitPrice);
+      const isDiscounted = (l.unitPrice < origPrice);
       return `
         <div class="cart-row" style="padding:6px 0; border-bottom:1px solid var(--border);">
           <div class="cart-row-top" style="display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:4px;">
@@ -381,15 +384,15 @@ Views.sale = {
               <span style="font-size:11px; font-weight:700; color:var(--steel);">QTY</span>
               <input type="number" min="0.0001" step="any" max="${l.maxQty}" value="${l.qty}" data-qty-idx="${idx}" class="input" style="width:65px; height:32px; padding:4px 6px; font-size:14px; text-align:center;" title="Quantity">
               
-              <span style="font-size:11px; font-weight:700; color:var(--steel); margin-left:4px;">DISC</span>
-              <div style="display:inline-flex; align-items:center;">
-                <input type="number" min="0" step="any" placeholder="0" value="${l.discount || ''}" data-discount-idx="${idx}" class="input" style="width:60px; height:32px; padding:4px 6px; font-size:14px; text-align:center; border-top-right-radius:0; border-bottom-right-radius:0;" title="Discount">
-                <button type="button" class="btn-disc-toggle" data-disc-type-toggle="${idx}" title="${isPerUnit ? 'එකකට Discount: Rs ' + (l.discount||0) + ' x ' + l.qty + ' QTY = ' + fmt(lineDisc) + ' (Click to switch to Total Line Discount)' : 'මුළු බිලටම Fixed Discount: ' + fmt(lineDisc) + ' (Click to switch to Per Unit Discount)'}" style="height:32px; padding:0 6px; font-size:11px; font-weight:700; border:1px solid var(--border); border-left:none; border-top-right-radius:6px; border-bottom-right-radius:6px; background:${isPerUnit ? 'var(--primary-light, #e0f2fe)' : '#f1f5f9'}; color:${isPerUnit ? 'var(--primary, #0284c7)' : '#475569'}; cursor:pointer; white-space:nowrap;">
-                  ${isPerUnit ? '/එකකට' : '/මුළු'}
-                </button>
+              <div style="display:inline-flex; align-items:center; gap:4px; margin-left:2px;">
+                <div style="display:inline-flex; flex-direction:column; align-items:flex-end; line-height:1.1;">
+                  <span style="font-size:10px; font-weight:700; color:var(--steel); white-space:nowrap;">Disc Price</span>
+                  <span style="font-size:11px; font-weight:800; color:var(--steel);">Rs.</span>
+                </div>
+                <input type="number" min="0" step="any" placeholder="${origPrice}" value="${l.unitPrice}" data-price-idx="${idx}" data-discount-idx="${idx}" class="input" style="width:75px; height:32px; padding:4px 4px; font-size:13.5px; font-weight:700; text-align:center; border-radius:6px; background:${isDiscounted ? '#ecfdf5' : '#fff'}; color:${isDiscounted ? '#047857' : 'inherit'}; border-color:${isDiscounted ? '#6ee7b7' : 'var(--border)'};" title="විකුණන මිල (Discount Price / Unit Selling Price)">
               </div>
 
-              <!-- LOOSE CALCULATOR BUTTON RIGHT NEXT TO DISCOUNT -->
+              <!-- LOOSE CALCULATOR BUTTON RIGHT NEXT TO PRICE -->
               <button type="button" class="btn-loose-toggle" data-loose-idx="${idx}" title="ලිහිල් විකිණීම සහ මිනුම් පරිවර්තනය (kg, g, අඟල්, අඩි, L, ml, pcs...)" style="height:32px; padding:0 8px; font-size:11.5px; font-weight:700; border:1px solid ${l.looseInfo ? '#f59e0b' : 'var(--border)'}; border-radius:6px; background:${l.looseInfo ? '#fef3c7' : '#f8fafc'}; color:${l.looseInfo ? '#b45309' : '#334155'}; cursor:pointer; display:inline-flex; align-items:center; gap:3px; white-space:nowrap; transition:all 0.15s ease;">
                 <span>⚖️</span>
                 <span>${l.looseInfo ? escapeHTML(l.looseInfo.shortText || 'ලිහිල්') : 'ලිහිල්'}</span>
@@ -399,7 +402,7 @@ Views.sale = {
               <div class="cart-row-price" style="font-size:16px; font-weight:700; color:var(--primary-dark);">
                 ${fmt(lineTotal)}
               </div>
-              ${(l.discount > 0 && isPerUnit && l.qty > 1) ? `<div style="font-size:10.5px; color:var(--success); font-weight:600;">(-${fmt(lineDisc)})</div>` : ''}
+              ${isDiscounted ? `<div style="font-size:10.5px; color:var(--success); font-weight:600;" title="මුල් මිල: Rs ${fmt(origPrice)} | එකකට රු. ${fmt(effectiveDisc)} අඩුවුණා">(-${fmt(effectiveDisc * l.qty)})</div>` : ''}
             </div>
           </div>
         </div>
@@ -408,11 +411,18 @@ Views.sale = {
   },
 
   calcSubtotal() {
-    return cart.reduce((s, l) => s + l.qty * l.unitPrice, 0);
+    return cart.reduce((s, l) => {
+      const orig = (l.originalPrice !== undefined && l.originalPrice > 0) ? l.originalPrice : l.unitPrice;
+      return s + l.qty * orig;
+    }, 0);
   },
 
   calcItemDiscounts() {
-    return cart.reduce((s, l) => s + Views.sale.calcLineDiscount(l), 0);
+    return cart.reduce((s, l) => {
+      const orig = (l.originalPrice !== undefined && l.originalPrice > 0) ? l.originalPrice : l.unitPrice;
+      const effectiveDisc = Math.max(0, orig - l.unitPrice);
+      return s + (l.qty * effectiveDisc);
+    }, 0);
   },
 
   calcTotal() {
@@ -481,20 +491,14 @@ Views.sale = {
         Views.sale.applyCustomerHardwareDiscount();
       });
     });
-    document.querySelectorAll('[data-discount-idx]').forEach(inp => {
+    document.querySelectorAll('[data-price-idx], [data-discount-idx]').forEach(inp => {
       inp.addEventListener('change', (e) => {
-        const idx = Number(e.target.dataset.discountIdx);
-        let v = Number(e.target.value) || 0;
-        v = Math.max(0, v);
-        cart[idx].discount = v;
-        Views.sale.refreshCart();
-      });
-    });
-    document.querySelectorAll('[data-disc-type-toggle]').forEach(btn => {
-      btn.addEventListener('click', (e) => {
-        const idx = Number(e.currentTarget.dataset.discTypeToggle);
-        const currType = cart[idx].discountType || (DB.data.settings && DB.data.settings.defaultDiscType) || 'unit';
-        cart[idx].discountType = currType === 'line' ? 'unit' : 'line';
+        const idx = Number(e.target.dataset.priceIdx !== undefined ? e.target.dataset.priceIdx : e.target.dataset.discountIdx);
+        let v = Number(e.target.value);
+        if (isNaN(v) || v < 0) v = 0;
+        cart[idx].unitPrice = v;
+        const orig = (cart[idx].originalPrice !== undefined && cart[idx].originalPrice > 0) ? cart[idx].originalPrice : v;
+        cart[idx].discount = Math.max(0, orig - v);
         Views.sale.refreshCart();
       });
     });
@@ -1196,6 +1200,7 @@ Views.sale = {
         name: item.name,
         image: item.image,
         unit: item.unit,
+        originalPrice: item.sellPrice,
         unitPrice: item.sellPrice,
         costPrice: item.costPrice || 0,
         qty: 1,
@@ -1610,7 +1615,8 @@ Views.sale = {
       unit: l.unit,
       qty: l.qty,
       unitPrice: l.unitPrice,
-      discount: l.discount || 0,
+      originalPrice: (l.originalPrice !== undefined && l.originalPrice > 0) ? l.originalPrice : l.unitPrice,
+      discount: Math.max(0, ((l.originalPrice !== undefined && l.originalPrice > 0) ? l.originalPrice : l.unitPrice) - l.unitPrice),
       discountType: l.discountType || (DB.data.settings && DB.data.settings.defaultDiscType) || 'unit',
       lineDiscountTotal: Views.sale.calcLineDiscount(l),
       looseInfo: l.looseInfo || null
@@ -2536,9 +2542,31 @@ Views.customers = {
         if (l.type === 'sale' && l.saleId) {
           const sale = DB.allSales().find(s => s.id === l.saleId);
           if (sale && sale.lines && sale.lines.length) {
-            itemsHtml = `<div style="margin-top:4px; font-size:12px; color:var(--text-color); opacity:0.8; line-height:1.4;">` +
-              sale.lines.map(line => `• ${escapeHTML(line.name)} (${line.looseInfo ? `[ලිහිල්: ${line.looseInfo.shortText}]` : `x${line.qty}`})`).join('<br>') +
-              `</div>`;
+            itemsHtml = `
+              <div style="margin-top:6px; padding:6px 10px; background:var(--bg-card, #f8fafc); border:1px solid var(--border); border-radius:6px; font-size:12px;">
+                <table style="width:100%; border-collapse:collapse; margin:0;">
+                  <tbody>
+                    ${sale.lines.map(line => {
+                      const lineTotal = line.qty * line.unitPrice;
+                      const qtyText = line.looseInfo ? `${line.looseInfo.looseQty} ${escapeHTML(line.looseInfo.looseUnit || '')}` : `${line.qty} ${escapeHTML(line.unit || '')}`;
+                      return `
+                        <tr style="border-bottom:1px dashed var(--border);">
+                          <td style="padding:3px 0; font-weight:600; color:var(--charcoal);">• ${escapeHTML(line.name)}</td>
+                          <td style="padding:3px 8px; text-align:center; color:var(--steel); font-size:11px; white-space:nowrap;">${qtyText} × ${fmt(line.unitPrice)}</td>
+                          <td style="padding:3px 0; text-align:right; font-weight:700; color:var(--charcoal); white-space:nowrap;">${fmt(lineTotal)}</td>
+                        </tr>
+                      `;
+                    }).join('')}
+                  </tbody>
+                </table>
+                ${(sale.discount > 0) ? `
+                  <div style="display:flex; justify-content:space-between; margin-top:4px; font-size:11px; color:var(--steel); border-top:1px solid var(--border); padding-top:4px;">
+                    <span>Subtotal: ${fmt(sale.subtotal)} | Disc: -${fmt(sale.discount)}</span>
+                    <span style="font-weight:700; color:var(--primary-dark);">Total: ${fmt(sale.total)}</span>
+                  </div>
+                ` : ''}
+              </div>
+            `;
           }
         }
         return `
