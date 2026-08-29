@@ -185,6 +185,14 @@ const App = {
             if (typeof lastQtyInp.select === 'function') lastQtyInp.select();
           }
         }
+        if (e.key === 'l' || e.key === 'L' || e.code === 'KeyL') {
+          e.preventDefault();
+          const looseBtns = document.querySelectorAll('[data-loose-idx]');
+          if (looseBtns.length > 0) {
+            const lastLooseBtn = looseBtns[looseBtns.length - 1];
+            lastLooseBtn.focus();
+          }
+        }
       }
 
       if (App.currentView === 'sale' && !document.getElementById('activeModal')) {
@@ -222,6 +230,14 @@ const App = {
             const lastQtyInp = qtyInps[qtyInps.length - 1];
             lastQtyInp.focus();
             if (typeof lastQtyInp.select === 'function') lastQtyInp.select();
+          }
+        }
+        if (e.altKey && (e.code === 'KeyL' || e.key === 'l' || e.key === 'L')) {
+          e.preventDefault();
+          const looseBtns = document.querySelectorAll('[data-loose-idx]');
+          if (looseBtns.length > 0) {
+            const lastLooseBtn = looseBtns[looseBtns.length - 1];
+            lastLooseBtn.focus();
           }
         }
         if (e.key === 'F8') { e.preventDefault(); document.getElementById('saleDiscount')?.focus(); }

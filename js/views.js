@@ -517,7 +517,24 @@ Views.sale = {
       });
     });
 
-    // Arrow keys navigation between Cart rows and fields below Total
+    // Helper to focus bottom payment controls from cart
+    const focusBottomControls = () => {
+      const activeBtn = Views.sale.payType === 'cash' ? document.getElementById('payCashBtn') : document.getElementById('payCreditBtn');
+      if (activeBtn) {
+        activeBtn.focus();
+      } else {
+        const custInp = document.getElementById('saleCustomerSearch');
+        const paidInp = document.getElementById('saleAmountPaid');
+        const discInp = document.getElementById('saleDiscount');
+        const target = (custInp && custInp.offsetParent !== null) ? custInp : (paidInp && paidInp.offsetParent !== null) ? paidInp : discInp;
+        if (target) {
+          target.focus();
+          if (typeof target.select === 'function') target.select();
+        }
+      }
+    };
+
+    // Arrow keys navigation between Cart rows (QTY, Disc Price, Loose Button) and fields below Total
     document.querySelectorAll('[data-qty-idx], [data-discount-idx]').forEach(inp => {
       inp.addEventListener('focus', (e) => {
         if (typeof e.target.select === 'function') e.target.select();
@@ -534,20 +551,7 @@ Views.sale = {
             nextInp.focus();
             if (typeof nextInp.select === 'function') nextInp.select();
           } else {
-            // From last item in cart -> move down to Cash/Credit selector
-            const activeBtn = Views.sale.payType === 'cash' ? document.getElementById('payCashBtn') : document.getElementById('payCreditBtn');
-            if (activeBtn) {
-              activeBtn.focus();
-            } else {
-              const custInp = document.getElementById('saleCustomerSearch');
-              const paidInp = document.getElementById('saleAmountPaid');
-              const discInp = document.getElementById('saleDiscount');
-              const target = (custInp && custInp.offsetParent !== null) ? custInp : (paidInp && paidInp.offsetParent !== null) ? paidInp : discInp;
-              if (target) {
-                target.focus();
-                if (typeof target.select === 'function') target.select();
-              }
-            }
+            focusBottomControls();
           }
         } else if (e.key === 'ArrowUp') {
           e.preventDefault();
@@ -570,28 +574,28 @@ Views.sale = {
               discInp.focus();
               if (typeof discInp.select === 'function') discInp.select();
             }
-          } else if (idx === cart.length - 1) {
-            // From last item's discount field -> move to Cash/Credit selector
-            const activeBtn = Views.sale.payType === 'cash' ? document.getElementById('payCashBtn') : document.getElementById('payCreditBtn');
-            if (activeBtn) {
-              activeBtn.focus();
-            } else {
-              const custInp = document.getElementById('saleCustomerSearch');
-              const paidInp = document.getElementById('saleAmountPaid');
-              const discInp = document.getElementById('saleDiscount');
-              const target = (custInp && custInp.offsetParent !== null) ? custInp : (paidInp && paidInp.offsetParent !== null) ? paidInp : discInp;
-              if (target) {
-                target.focus();
-                if (typeof target.select === 'function') target.select();
-              }
+          } else {
+            // From discount input -> move right to Loose (ලිහිල්) button
+            const looseBtn = document.querySelector(`[data-loose-idx="${idx}"]`);
+            if (looseBtn) {
+              looseBtn.focus();
+            } else if (idx === cart.length - 1) {
+              focusBottomControls();
             }
           }
-        } else if (e.key === 'ArrowLeft' && !isQty) {
-          e.preventDefault();
-          const qtyInp = document.querySelector(`[data-qty-idx="${idx}"]`);
-          if (qtyInp) {
-            qtyInp.focus();
-            if (typeof qtyInp.select === 'function') qtyInp.select();
+        } else if (e.key === 'ArrowLeft') {
+          if (!isQty) {
+            e.preventDefault();
+            const qtyInp = document.querySelector(`[data-qty-idx="${idx}"]`);
+            if (qtyInp) {
+              qtyInp.focus();
+              if (typeof qtyInp.select === 'function') qtyInp.select();
+            }
+          } else if (idx > 0) {
+            // From QTY of current row -> move left to previous row's loose button
+            e.preventDefault();
+            const prevLoose = document.querySelector(`[data-loose-idx="${idx - 1}"]`);
+            if (prevLoose) prevLoose.focus();
           }
         } else if (e.key === 'Backspace' || e.key === 'Delete') {
           if (e.key === 'Delete' || e.target.value === '' || e.shiftKey || e.altKey) {
@@ -614,6 +618,69 @@ Views.sale = {
         } else if (e.key === 'Enter') {
           e.preventDefault();
           e.target.blur();
+        }
+      });
+    });
+
+    // Arrow keys & keyboard shortcuts for Loose (ලිහිල්) buttons
+    document.querySelectorAll('[data-loose-idx]').forEach(btn => {
+      btn.addEventListener('keydown', (e) => {
+        const idx = Number(e.currentTarget.dataset.looseIdx);
+
+        if (e.key === 'ArrowLeft') {
+          e.preventDefault();
+          const discInp = document.querySelector(`[data-discount-idx="${idx}"]`);
+          if (discInp) {
+            discInp.focus();
+            if (typeof discInp.select === 'function') discInp.select();
+          }
+        } else if (e.key === 'ArrowRight') {
+          e.preventDefault();
+          if (idx < cart.length - 1) {
+            const nextQty = document.querySelector(`[data-qty-idx="${idx + 1}"]`);
+            if (nextQty) {
+              nextQty.focus();
+              if (typeof nextQty.select === 'function') nextQty.select();
+            }
+          } else {
+            focusBottomControls();
+          }
+        } else if (e.key === 'ArrowDown') {
+          e.preventDefault();
+          const nextLoose = document.querySelector(`[data-loose-idx="${idx + 1}"]`);
+          if (nextLoose) {
+            nextLoose.focus();
+          } else {
+            focusBottomControls();
+          }
+        } else if (e.key === 'ArrowUp') {
+          e.preventDefault();
+          const prevLoose = document.querySelector(`[data-loose-idx="${idx - 1}"]`);
+          if (prevLoose) {
+            prevLoose.focus();
+          } else {
+            const searchInp = document.getElementById('saleSearch');
+            if (searchInp) {
+              searchInp.focus();
+              if (typeof searchInp.select === 'function') searchInp.select();
+            }
+          }
+        } else if (e.key === 'Enter' || e.key === ' ' || e.code === 'Space') {
+          e.preventDefault();
+          Views.sale.openLooseModal(idx);
+        } else if (e.key === 'Backspace' || e.key === 'Delete') {
+          e.preventDefault();
+          cart.splice(idx, 1);
+          Views.sale.refreshCart();
+          Views.sale.applyCustomerHardwareDiscount();
+          const targetIdx = Math.min(idx, cart.length - 1);
+          if (targetIdx >= 0) {
+            const nextTarget = document.querySelector(`[data-loose-idx="${targetIdx}"]`) || document.querySelector(`[data-qty-idx="${targetIdx}"]`);
+            if (nextTarget) nextTarget.focus();
+          } else {
+            const searchInp = document.getElementById('saleSearch');
+            if (searchInp) searchInp.focus();
+          }
         }
       });
     });
@@ -1205,6 +1272,9 @@ Views.sale = {
         costPrice: item.costPrice || 0,
         qty: 1,
         maxQty: item.qty,
+        packSize: item.packSize || 1,
+        packUnit: item.packUnit || '',
+        loosePrice: item.loosePrice || 0,
         discount: 0,
         discountType: (DB.data.settings && DB.data.settings.defaultDiscType) || 'unit'
       });
@@ -1270,11 +1340,28 @@ Views.sale = {
       defaultLooseUnit = 'm';
     }
 
+    // Priority: Saved packaging details configured on the Item itself
+    const dbItem = DB.getItem(item.itemId);
+    const configuredPackSize = (dbItem && Number(dbItem.packSize) > 0) ? Number(dbItem.packSize) : ((Number(item.packSize) > 0) ? Number(item.packSize) : null);
+    const configuredPackUnit = (dbItem && dbItem.packUnit) ? dbItem.packUnit : (item.packUnit || null);
+    const configuredLoosePrice = (dbItem && Number(dbItem.loosePrice) > 0) ? Number(dbItem.loosePrice) : (Number(item.loosePrice) || 0);
+
+    if (configuredPackSize) {
+      defaultPackSize = configuredPackSize;
+    }
+    if (configuredPackUnit) {
+      defaultPackUnit = configuredPackUnit;
+      defaultLooseUnit = configuredPackUnit;
+    }
+
     const curLoose = item.looseInfo || {};
     const initPackSize = curLoose.packSize || defaultPackSize;
     const initPackUnit = curLoose.packUnit || defaultPackUnit;
     const initLooseUnit = curLoose.looseUnit || defaultLooseUnit;
     const initLooseQty = (curLoose.looseQty !== undefined && curLoose.looseQty !== null) ? curLoose.looseQty : 1;
+    const initCustomPrice = (curLoose.customLooseUnitPrice !== undefined && curLoose.customLooseUnitPrice !== null)
+      ? curLoose.customLooseUnitPrice
+      : (configuredLoosePrice > 0 ? configuredLoosePrice : '');
 
     const unitOptions = [
       { val: 'kg', label: 'kg (කිලෝ)' },
@@ -1338,15 +1425,17 @@ Views.sale = {
 
         <!-- Qty Mode Section -->
         <div id="lm_qty_section">
+          <!-- Quantity + Unit -->
           <div style="margin-bottom:12px;">
-            <label style="font-size:13px; font-weight:700; color:var(--charcoal); display:block; margin-bottom:6px;">දෙන ප්‍රමාණය සහ මිනුම:</label>
+            <label style="font-size:13px; font-weight:700; color:var(--charcoal); display:block; margin-bottom:6px;">📏 ප්‍රමාණය සහ මිනුම:</label>
             <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
-              <input type="number" id="lm_loose_qty" class="input" min="0.0001" step="any" value="${initLooseQty}" placeholder="ප්‍රමාණය" autofocus style="font-size:20px; font-weight:900; text-align:center; height:46px; border:2px solid var(--primary);">
-              <select id="lm_loose_unit" class="input" style="font-size:14px; font-weight:700; height:46px; border:2px solid var(--primary-light, #bae6fd);">
+              <input type="number" id="lm_loose_qty" class="input" min="0.0001" step="any" value="${initLooseQty}" placeholder="ප්‍රමාණය" autofocus style="font-size:22px; font-weight:900; text-align:center; height:50px; border:2px solid var(--primary);">
+              <select id="lm_loose_unit" class="input" style="font-size:14px; font-weight:700; height:50px; border:2px solid var(--primary-light, #bae6fd);">
                 ${unitOptions.map(u => `<option value="${u.val}" ${initLooseUnit === u.val ? 'selected' : ''}>${u.label}</option>`).join('')}
               </select>
             </div>
           </div>
+          <!-- Presets -->
           <div style="margin-bottom:14px;">
             <div id="lm_presets" style="display:flex; flex-wrap:wrap; gap:6px;"></div>
           </div>
@@ -1366,19 +1455,6 @@ Views.sale = {
             `).join('')}
           </div>
           <div id="lm_cash_qty_show" style="font-size:12px; color:var(--steel); font-weight:700; margin-bottom:10px; text-align:center;"></div>
-        </div>
-
-        <!-- Simple Pack Size -->
-        <div style="background:#f8fafc; border:1px dashed var(--border); border-radius:8px; padding:8px 12px; margin-bottom:14px;">
-          <div style="display:flex; align-items:center; justify-content:space-between; gap:8px;">
-            <span style="font-size:12px; font-weight:700; color:var(--steel);">මුළු බෑගයේ / පැකට් එකේ ප්‍රමාණය:</span>
-            <div style="display:flex; align-items:center; gap:4px;">
-              <input type="number" id="lm_pack_size" class="input" min="0.0001" step="any" value="${initPackSize}" style="width:65px; height:32px; font-size:13px; font-weight:800; text-align:center; padding:2px 4px;">
-              <select id="lm_pack_unit" class="input" style="height:32px; font-size:12px; font-weight:700; padding:2px 4px;">
-                ${unitOptions.map(u => `<option value="${u.val}" ${initPackUnit === u.val ? 'selected' : ''}>${u.val}</option>`).join('')}
-              </select>
-            </div>
-          </div>
         </div>
 
         <!-- Result Box -->
@@ -1413,8 +1489,6 @@ Views.sale = {
       wide: false,
       onMount: (wrap) => {
         let activeMode = 'qty';
-        const packSizeEl = wrap.querySelector('#lm_pack_size');
-        const packUnitEl = wrap.querySelector('#lm_pack_unit');
         const looseQtyEl = wrap.querySelector('#lm_loose_qty');
         const looseUnitEl = wrap.querySelector('#lm_loose_unit');
         const cashAmountEl = wrap.querySelector('#lm_cash_amount');
@@ -1483,24 +1557,47 @@ Views.sale = {
         };
 
         const calc = () => {
-          const packSize = Math.max(0.0001, parseFloat(packSizeEl.value) || 1);
-          const packUnit = packUnitEl.value;
+          const packSize = Math.max(0.0001, Number(initPackSize) || 1);
+          const packUnit = initPackUnit || 'pcs';
           const looseUnit = looseUnitEl.value;
           const unitPrice = item.unitPrice;
           let calcLooseQty = 0, stockQty = 0, linePrice = 0;
 
+          // If custom loose unit price configured on item
+          const hasCustomPrice = initCustomPrice !== '' && Number(initCustomPrice) > 0;
+          const autoLooseUnitPrice = (() => {
+            if (unitPrice <= 0) return 0;
+            const factor = getUnitFactor(packUnit, looseUnit);
+            const looseUnitsPerPack = packSize * factor;
+            return looseUnitsPerPack > 0 ? unitPrice / looseUnitsPerPack : 0;
+          })();
+          const effectiveLooseUnitPrice = hasCustomPrice ? Number(initCustomPrice) : autoLooseUnitPrice;
+
           if (activeMode === 'qty') {
             calcLooseQty = Math.max(0, parseFloat(looseQtyEl.value) || 0);
-            const factor = getUnitFactor(looseUnit, packUnit);
-            stockQty = (calcLooseQty * factor) / packSize;
-            linePrice = stockQty * unitPrice;
+            if (hasCustomPrice) {
+              linePrice = calcLooseQty * effectiveLooseUnitPrice;
+              const factor = getUnitFactor(looseUnit, packUnit);
+              stockQty = (calcLooseQty * factor) / packSize;
+            } else {
+              const factor = getUnitFactor(looseUnit, packUnit);
+              stockQty = (calcLooseQty * factor) / packSize;
+              linePrice = stockQty * unitPrice;
+            }
           } else {
             const cash = Math.max(0, parseFloat(cashAmountEl.value) || 0);
             linePrice = cash;
-            stockQty = unitPrice > 0 ? (cash / unitPrice) : 0;
-            const effectiveInPack = stockQty * packSize;
-            const factor = getUnitFactor(packUnit, looseUnit);
-            calcLooseQty = Math.round(effectiveInPack * factor * 1000) / 1000;
+            if (hasCustomPrice && effectiveLooseUnitPrice > 0) {
+              const looseUnitsGiven = cash / effectiveLooseUnitPrice;
+              calcLooseQty = Math.round(looseUnitsGiven * 1000) / 1000;
+              const factor = getUnitFactor(looseUnit, packUnit);
+              stockQty = (looseUnitsGiven * factor) / packSize;
+            } else {
+              stockQty = unitPrice > 0 ? (cash / unitPrice) : 0;
+              const effectiveInPack = stockQty * packSize;
+              const factor = getUnitFactor(packUnit, looseUnit);
+              calcLooseQty = Math.round(effectiveInPack * factor * 1000) / 1000;
+            }
             if (cashQtyShowEl) {
               cashQtyShowEl.textContent = cash > 0
                 ? `➜ ලැබෙන්නේ: ${calcLooseQty} ${looseUnit} (Stock: ${Math.round(stockQty * 10000)/10000} ${item.unit})`
@@ -1518,11 +1615,9 @@ Views.sale = {
             stockWarnEl.style.display = 'none';
           }
 
-          return { stockQty: displayStock, calcLooseQty, linePrice, packSize, packUnit, looseUnit };
+          return { stockQty: displayStock, calcLooseQty, linePrice, packSize, packUnit, looseUnit, customLooseUnitPrice: hasCustomPrice ? effectiveLooseUnitPrice : null };
         };
 
-        packSizeEl.addEventListener('input', calc);
-        packUnitEl.addEventListener('change', calc);
         looseQtyEl.addEventListener('input', calc);
         looseUnitEl.addEventListener('change', () => { updatePresets(); calc(); });
         cashAmountEl.addEventListener('input', calc);
@@ -1547,14 +1642,16 @@ Views.sale = {
           }
 
           item.qty = res.stockQty;
+          item.unitPrice = res.linePrice > 0 && res.stockQty > 0 ? (res.linePrice / res.stockQty) : item.unitPrice;
           item.looseInfo = {
             isLoose: true,
             looseQty: res.calcLooseQty,
             looseUnit: res.looseUnit,
             packSize: res.packSize,
             packUnit: res.packUnit,
-            shortText: `${res.calcLooseQty} ${res.looseUnit}`,
-            fullText: `${res.calcLooseQty} ${res.looseUnit} (${res.packSize} ${res.packUnit} පැකේජයකින්)`
+            customLooseUnitPrice: res.customLooseUnitPrice,
+            shortText: `${res.calcLooseQty} ${res.looseUnit}${res.customLooseUnitPrice ? ` @ රු.${res.customLooseUnitPrice}` : ''}`,
+            fullText: `${res.calcLooseQty} ${res.looseUnit} (${res.packSize} ${res.packUnit} පැකේජයකින්)${res.customLooseUnitPrice ? ` — custom රු.${res.customLooseUnitPrice}/${res.looseUnit}` : ''}`
           };
 
           closeModal();
@@ -1563,16 +1660,118 @@ Views.sale = {
           toast(`ලිහිල් විකිණීම Cart එකට යෙදුවා: ${item.looseInfo.shortText}`, 'ok');
         };
 
-        wrap.querySelector('#lm_apply_btn').addEventListener('click', applyAction);
+        const applyBtn = wrap.querySelector('#lm_apply_btn');
+        const closeBtn = wrap.querySelector('[data-close]');
+        const resetBtn = wrap.querySelector('#lm_reset_btn');
 
-        wrap.addEventListener('keydown', (e) => {
-          if (e.key === 'Enter') {
+        applyBtn?.addEventListener('click', applyAction);
+
+        const focusElement = (el) => {
+          if (!el) return;
+          el.focus();
+          if (typeof el.select === 'function') el.select();
+        };
+
+        // Select all text on focus for inputs
+        [looseQtyEl, cashAmountEl].forEach(inp => {
+          if (inp) inp.addEventListener('focus', () => inp.select());
+        });
+
+        // 1. Qty input keydown
+        looseQtyEl?.addEventListener('keydown', (e) => {
+          if (e.key === 'ArrowRight') {
+            e.preventDefault();
+            focusElement(looseUnitEl);
+          } else if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            focusElement(applyBtn);
+          } else if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            focusElement(tabQtyBtn);
+          } else if (e.key === 'Enter') {
             e.preventDefault();
             applyAction();
           }
         });
 
-        const resetBtn = wrap.querySelector('#lm_reset_btn');
+        // 2. Loose Unit select keydown
+        looseUnitEl?.addEventListener('keydown', (e) => {
+          if (e.key === 'ArrowLeft') {
+            e.preventDefault();
+            focusElement(looseQtyEl);
+          } else if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            focusElement(applyBtn);
+          } else if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            focusElement(tabCashBtn);
+          } else if (e.key === 'Enter') {
+            e.preventDefault();
+            applyAction();
+          }
+        });
+
+        // 3. Cash amount input keydown
+        cashAmountEl?.addEventListener('keydown', (e) => {
+          if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            focusElement(applyBtn);
+          } else if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            focusElement(tabCashBtn);
+          } else if (e.key === 'Enter') {
+            e.preventDefault();
+            applyAction();
+          }
+        });
+
+        // 6. Mode Tabs keydown
+        tabQtyBtn?.addEventListener('keydown', (e) => {
+          if (e.key === 'ArrowRight') {
+            e.preventDefault();
+            setTab('cash');
+            focusElement(tabCashBtn);
+          } else if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            focusElement(looseQtyEl);
+          }
+        });
+
+        tabCashBtn?.addEventListener('keydown', (e) => {
+          if (e.key === 'ArrowLeft') {
+            e.preventDefault();
+            setTab('qty');
+            focusElement(tabQtyBtn);
+          } else if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            focusElement(cashAmountEl);
+          }
+        });
+
+        // 7. Footer buttons keydown
+        applyBtn?.addEventListener('keydown', (e) => {
+          if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            focusElement(packSizeEl);
+          } else if (e.key === 'ArrowLeft') {
+            e.preventDefault();
+            focusElement(closeBtn || resetBtn);
+          }
+        });
+
+        closeBtn?.addEventListener('keydown', (e) => {
+          if (e.key === 'ArrowRight') {
+            e.preventDefault();
+            focusElement(applyBtn);
+          } else if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            focusElement(packSizeEl);
+          } else if (e.key === 'ArrowLeft' && resetBtn) {
+            e.preventDefault();
+            focusElement(resetBtn);
+          }
+        });
+
         if (resetBtn) {
           resetBtn.addEventListener('click', () => {
             item.qty = 1;
@@ -1581,6 +1780,15 @@ Views.sale = {
             Views.sale.refreshCart();
             Views.sale.applyCustomerHardwareDiscount();
             toast('සාමාන්‍ය විකිණීමට මාරු කළා', 'ok');
+          });
+          resetBtn.addEventListener('keydown', (e) => {
+            if (e.key === 'ArrowRight') {
+              e.preventDefault();
+              focusElement(closeBtn || applyBtn);
+            } else if (e.key === 'ArrowUp') {
+              e.preventDefault();
+              focusElement(packSizeEl);
+            }
           });
         }
       }
@@ -1758,7 +1966,7 @@ Views.items = {
   },
 
   formHTML(item) {
-    const v = item || { name: '', category: '', subCategory: '', unit: 'pcs', costPrice: '', sellPrice: '', qty: '', reorderLevel: 5, image: '', description: '' };
+    const v = item || { name: '', category: '', subCategory: '', unit: 'pcs', costPrice: '', sellPrice: '', qty: '', reorderLevel: 5, packSize: '', packUnit: '', loosePrice: '', image: '', description: '' };
     const existingCategories = [...new Set(DB.data.items.map(i => i.category).filter(c => c && c.trim()))].sort();
     const catOptions = existingCategories.map(c => `<div class="combo-opt" data-val="${escapeHTML(c)}">${escapeHTML(c)}</div>`).join('');
     // sub-category options for the current category
@@ -1851,10 +2059,48 @@ Views.items = {
         <div class="field"><label class="field-label">${t('items_form_cost')}</label><input class="input" id="f_cost" type="number" min="0" step="0.01" value="${v.costPrice}"></div>
         <div class="field"><label class="field-label">${t('items_form_sell')}</label><input class="input" id="f_sell" type="number" min="0" step="0.01" value="${v.sellPrice}"></div>
       </div>
-      <div class="field">
+      <div class="field" style="margin-bottom:12px;">
         <label class="field-label">${t('items_form_qty')}</label>
         <input class="input" id="f_qty" type="number" min="0" step="any" value="${v.qty}">
         <div class="small text-muted" style="margin-top:4px;">* කොටස්/ලිහිල් (loose) වශයෙන් විකිණීමට decimal values (උදා: 0.5kg, 2.5m) භාවිතා කළ හැක.</div>
+      </div>
+
+      <!-- Packaging & Loose Sale Configuration -->
+      <div style="background: linear-gradient(135deg, #eff6ff 0%, #f0fdf4 100%); border: 1.5px solid #93c5fd; border-radius: 10px; padding: 12px 14px; margin-top: 10px; margin-bottom: 6px;">
+        <div style="font-size: 13px; font-weight: 800; color: #1e40af; display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+          <div style="display:flex; align-items:center; gap:6px;">
+            <span>📦 ලිහිල් විකිණීම් සැකසුම් (Loose Sale / Packaging Details)</span>
+          </div>
+          <span style="font-size: 10.5px; font-weight: 700; color: #1e40af; background: #dbeafe; padding: 2px 7px; border-radius: 5px;">Optional</span>
+        </div>
+        <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px;">
+          <div class="field" style="margin-bottom:0;">
+            <label class="field-label" style="font-size:11.5px; font-weight:700; color:#1e3a8a;">මුළු බෑගයේ / පැකට්ටුවේ ප්‍රමාණය</label>
+            <input class="input" id="f_packSize" type="number" min="0.0001" step="any" value="${v.packSize || ''}" placeholder="උදා: 50">
+            <div class="small text-muted" style="font-size:10px; margin-top:2px;">උදා: සිමෙන්ති බෑගයකට 50, බටයකට 20</div>
+          </div>
+          <div class="field" style="margin-bottom:0;">
+            <label class="field-label" style="font-size:11.5px; font-weight:700; color:#1e3a8a;">පැකට් මිනුම් ඒකකය</label>
+            <select class="input" id="f_packUnit">
+              <option value="" ${!v.packUnit ? 'selected' : ''}>-- ඒකකය --</option>
+              <option value="kg" ${v.packUnit === 'kg' ? 'selected' : ''}>kg (කිලෝග්‍රෑම්)</option>
+              <option value="g" ${v.packUnit === 'g' ? 'selected' : ''}>g (ග්‍රෑම්)</option>
+              <option value="ft" ${v.packUnit === 'ft' ? 'selected' : ''}>ft (අඩි)</option>
+              <option value="in" ${v.packUnit === 'in' ? 'selected' : ''}>in (අඟල්)</option>
+              <option value="m" ${v.packUnit === 'm' ? 'selected' : ''}>m (මීටර්)</option>
+              <option value="cm" ${v.packUnit === 'cm' ? 'selected' : ''}>cm (සෙ.මී.)</option>
+              <option value="L" ${v.packUnit === 'L' ? 'selected' : ''}>L (ලීටර්)</option>
+              <option value="ml" ${v.packUnit === 'ml' ? 'selected' : ''}>ml (මිලිලීටර්)</option>
+              <option value="pcs" ${v.packUnit === 'pcs' ? 'selected' : ''}>pcs (කෑලි)</option>
+            </select>
+            <div class="small text-muted" style="font-size:10px; margin-top:2px;">බෑගයේ ප්‍රමාණයේ ඒකකය</div>
+          </div>
+          <div class="field" style="margin-bottom:0;">
+            <label class="field-label" style="font-size:11.5px; font-weight:700; color:#92400e;">ලිහිල් ඒකක මිල (රු.)</label>
+            <input class="input" id="f_loosePrice" type="number" min="0" step="any" value="${v.loosePrice || ''}" placeholder="Auto (හිස්ව තබන්න)">
+            <div class="small text-muted" style="font-size:10px; margin-top:2px;">උදා: 1kg = රු.80 (නැතහොත් Auto)</div>
+          </div>
+        </div>
       </div>
     `;
   },
@@ -1918,6 +2164,9 @@ Views.items = {
               unit: document.getElementById('f_unit').value,
               costPrice: document.getElementById('f_cost').value,
               sellPrice: sell, qty: Number(qty) || 0, reorderLevel: document.getElementById('f_reorder').value,
+              packSize: Number(document.getElementById('f_packSize')?.value) || 1,
+              packUnit: document.getElementById('f_packUnit')?.value || '',
+              loosePrice: Number(document.getElementById('f_loosePrice')?.value) || 0,
               description: desc, image: image
             });
             closeModal();
@@ -2097,7 +2346,10 @@ Views.items = {
               description: document.getElementById('f_desc').value.trim(),
               image: document.getElementById('f_image').value,
               qty: Number(document.getElementById('f_qty').value) || 0,
-              reorderLevel: Number(document.getElementById('f_reorder').value) || 0
+              reorderLevel: Number(document.getElementById('f_reorder').value) || 0,
+              packSize: Number(document.getElementById('f_packSize')?.value) || 1,
+              packUnit: document.getElementById('f_packUnit')?.value || '',
+              loosePrice: Number(document.getElementById('f_loosePrice')?.value) || 0
             });
             closeModal();
             toast(t('items_updated'), 'ok');

@@ -38,6 +38,9 @@ module.exports = {
             sellPrice REAL,
             qty REAL,
             reorderLevel REAL,
+            packSize REAL DEFAULT 1,
+            packUnit TEXT DEFAULT '',
+            loosePrice REAL DEFAULT 0,
             createdAt INTEGER
         )`);
         await run(`CREATE TABLE IF NOT EXISTS customers (
@@ -82,6 +85,9 @@ module.exports = {
         try { await run(`ALTER TABLE items ADD COLUMN description TEXT`); } catch(e) {}
         try { await run(`ALTER TABLE items ADD COLUMN image TEXT`); } catch(e) {}
         try { await run(`ALTER TABLE items ADD COLUMN subCategory TEXT`); } catch(e) {}
+        try { await run(`ALTER TABLE items ADD COLUMN packSize REAL DEFAULT 1`); } catch(e) {}
+        try { await run(`ALTER TABLE items ADD COLUMN packUnit TEXT DEFAULT ''`); } catch(e) {}
+        try { await run(`ALTER TABLE items ADD COLUMN loosePrice REAL DEFAULT 0`); } catch(e) {}
         try { await run(`ALTER TABLE purchases ADD COLUMN image TEXT`); } catch(e) {}
 
         await run(`CREATE TABLE IF NOT EXISTS purchases (
@@ -149,16 +155,16 @@ module.exports = {
         return await all(`SELECT * FROM items ORDER BY name ASC`);
     },
     addItem: async (item) => {
-        const res = await run(`INSERT INTO items (name, category, subCategory, unit, costPrice, sellPrice, qty, reorderLevel, description, image, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-            [item.name, item.category?.trim() || 'වෙනත්', item.subCategory?.trim() || '', item.unit || 'pcs', Number(item.costPrice)||0, Number(item.sellPrice)||0, Number(item.qty)||0, Number(item.reorderLevel)||5, item.description||'', item.image||'', Date.now()]);
+        const res = await run(`INSERT INTO items (name, category, subCategory, unit, costPrice, sellPrice, qty, reorderLevel, description, image, packSize, packUnit, loosePrice, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [item.name, item.category?.trim() || 'වෙනත්', item.subCategory?.trim() || '', item.unit || 'pcs', Number(item.costPrice)||0, Number(item.sellPrice)||0, Number(item.qty)||0, Number(item.reorderLevel)||5, item.description||'', item.image||'', Number(item.packSize)||1, item.packUnit||'', Number(item.loosePrice)||0, Date.now()]);
         return await get(`SELECT * FROM items WHERE id = ?`, [res.lastID]);
     },
     updateItem: async (id, patch) => {
         const item = await get(`SELECT * FROM items WHERE id = ?`, [id]);
         if (!item) return null;
         const merged = { ...item, ...patch };
-        await run(`UPDATE items SET name=?, category=?, subCategory=?, unit=?, costPrice=?, sellPrice=?, qty=?, reorderLevel=?, description=?, image=? WHERE id=?`,
-            [merged.name, merged.category?.trim()||'වෙනත්', merged.subCategory?.trim()||'', merged.unit, Number(merged.costPrice)||0, Number(merged.sellPrice)||0, Number(merged.qty)||0, Number(merged.reorderLevel)||5, merged.description||'', merged.image||'', id]);
+        await run(`UPDATE items SET name=?, category=?, subCategory=?, unit=?, costPrice=?, sellPrice=?, qty=?, reorderLevel=?, description=?, image=?, packSize=?, packUnit=?, loosePrice=? WHERE id=?`,
+            [merged.name, merged.category?.trim()||'වෙනත්', merged.subCategory?.trim()||'', merged.unit, Number(merged.costPrice)||0, Number(merged.sellPrice)||0, Number(merged.qty)||0, Number(merged.reorderLevel)||5, merged.description||'', merged.image||'', Number(merged.packSize)||1, merged.packUnit||'', Number(merged.loosePrice)||0, id]);
         return merged;
     },
     deleteItem: async (id) => {
