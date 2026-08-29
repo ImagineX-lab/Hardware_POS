@@ -1758,9 +1758,12 @@ Views.items = {
   },
 
   formHTML(item) {
-    const v = item || { name: '', category: '', unit: 'pcs', costPrice: '', sellPrice: '', qty: '', reorderLevel: 5, image: '', description: '' };
+    const v = item || { name: '', category: '', subCategory: '', unit: 'pcs', costPrice: '', sellPrice: '', qty: '', reorderLevel: 5, image: '', description: '' };
     const existingCategories = [...new Set(DB.data.items.map(i => i.category).filter(c => c && c.trim()))].sort();
     const catOptions = existingCategories.map(c => `<div class="combo-opt" data-val="${escapeHTML(c)}">${escapeHTML(c)}</div>`).join('');
+    // sub-category options for the current category
+    const existingSubCats = [...new Set(DB.data.items.filter(i => i.category === v.category).map(i => i.subCategory).filter(s => s && s.trim()))].sort();
+    const subCatOptions = existingSubCats.map(s => `<div class="combo-opt" data-val="${escapeHTML(s)}">${escapeHTML(s)}</div>`).join('');
     const unitsList = [
       { val: 'pcs', label: 'pcs (කෑලි)' },
       { val: 'kg', label: 'kg (කිලෝග්‍රෑම්)' },
@@ -1818,6 +1821,20 @@ Views.items = {
             </button>
             <div class="combo-dropdown" id="comboCatDrop">
               ${catOptions || '<div class="combo-opt combo-no-match">කිසිදු category එකක් නැත</div>'}
+            </div>
+          </div>
+        </div>
+        <div class="field">
+          <label class="field-label">${t('items_form_subcat')}</label>
+          <div class="combo-wrap" id="comboSubCatWrap">
+            <input class="combo-input" id="f_subCategory" value="${escapeHTML(v.subCategory || '')}" placeholder="${t('items_form_subcat_ph')}" autocomplete="off">
+            <button type="button" class="combo-arrow" id="comboSubCatArrow" tabindex="-1">
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M2 4L6 8L10 4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </button>
+            <div class="combo-dropdown" id="comboSubCatDrop">
+              ${subCatOptions || '<div class="combo-opt combo-no-match">Sub category නැත. ටයිප් කරන්න.</div>'}
             </div>
           </div>
         </div>
@@ -1882,6 +1899,7 @@ Views.items = {
       footHTML: `<button class="btn btn-outline" data-close>${t('cancel')}</button><button class="btn btn-primary" id="saveItemBtn">${t('confirm')}</button>`,
       onMount: () => {
         Views.items.bindCategoryCombo();
+        Views.items.bindSubCategoryCombo();
         Views.items.bindImageUpload();
         document.getElementById('saveItemBtn').addEventListener('click', async () => {
           const name = document.getElementById('f_name').value.trim();
@@ -1890,12 +1908,13 @@ Views.items = {
           const desc = document.getElementById('f_desc').value.trim();
           const image = document.getElementById('f_image').value;
           const category = document.getElementById('f_category').value.trim() || 'වෙනත්';
+          const subCategory = document.getElementById('f_subCategory')?.value.trim() || '';
           if (!name) { toast(t('items_err_name'), 'err'); return; }
           if (sell === '') { toast(t('items_err_sell'), 'err'); return; }
           if (qty === '') { toast(t('items_err_qty'), 'err'); return; }
           try {
             await DB.addItem({
-              name, category,
+              name, category, subCategory,
               unit: document.getElementById('f_unit').value,
               costPrice: document.getElementById('f_cost').value,
               sellPrice: sell, qty: Number(qty) || 0, reorderLevel: document.getElementById('f_reorder').value,
@@ -1919,7 +1938,29 @@ Views.items = {
     const drop = document.getElementById('comboCatDrop');
     if (!input || !arrow || !drop) return;
 
-    const allCats = [...new Set(DB.data.items.map(i => i.category).filter(c => c && c.trim()))].sort();
+    // Predefined hardware store categories
+    const HARDWARE_CATEGORIES = [
+      'ගොඩනැගිලි උපකරණ',
+      'විදුලි උපකරණ',
+      'සෙවිලි උපකරණ',
+      'ගෘහ උපකරණ',
+      'පයිප්ප හා සනිටරි',
+      'ඇණ හා බෝල්ට්',
+      'සායම් හා රසායනික',
+      'දැව හා ලෑලි',
+      'ජනෙල් හා දොර',
+      'ඉදිකිරීම් බඩු',
+      'සිමෙන්ති හා වැලි',
+      'ගල් හා ඇඹරීම',
+      'ආරක්ෂක උපකරණ',
+      'මිනුම් උපකරණ',
+      'යාන්ත්‍රික උපකරණ',
+      'වෙනත්',
+    ];
+
+    const dbCats = [...new Set(DB.data.items.map(i => i.category).filter(c => c && c.trim()))];
+    // Merge: predefined first, then any extra from DB not already in list
+    const allCats = [...new Set([...HARDWARE_CATEGORIES, ...dbCats])];
 
     function renderOpts(filter) {
       const raw = (filter || '').trim();
@@ -1969,6 +2010,69 @@ Views.items = {
     renderOpts('');
   },
 
+  bindSubCategoryCombo() {
+    const catInput = document.getElementById('f_category');
+    const input = document.getElementById('f_subCategory');
+    const arrow = document.getElementById('comboSubCatArrow');
+    const drop = document.getElementById('comboSubCatDrop');
+    if (!input || !arrow || !drop) return;
+
+    function getSubCats() {
+      const currentCat = (catInput?.value || '').trim();
+      return [...new Set(
+        DB.data.items
+          .filter(i => !currentCat || (i.category || '').trim() === currentCat)
+          .map(i => i.subCategory)
+          .filter(s => s && s.trim())
+      )].sort();
+    }
+
+    function renderOpts(filter) {
+      const raw = (filter || '').trim();
+      const q = raw.toLowerCase();
+      const allSubs = getSubCats();
+      const matched = q ? allSubs.filter(s => s.toLowerCase().includes(q)) : allSubs;
+
+      let html = matched.map(s =>
+        `<div class="combo-opt" data-val="${escapeHTML(s)}">${escapeHTML(s)}</div>`
+      ).join('');
+
+      if (raw && !allSubs.some(s => s.toLowerCase() === q)) {
+        html += `<div class="combo-opt combo-opt-new" data-val="${escapeHTML(raw)}" style="color:var(--orange-dark); font-weight:bold; border-top:1px dashed var(--border);"><i class="ph ph-plus"></i> අලුත් Sub Category: "<b>${escapeHTML(raw)}</b>"</div>`;
+      }
+
+      if (!html) {
+        html = `<div class="combo-opt combo-no-match">${getSubCats().length === 0 ? 'Sub category නැත. ටයිප් කරන්න.' : 'ලැයිස්තුවේ නැත.'}</div>`;
+      }
+
+      drop.innerHTML = html;
+      drop.querySelectorAll('.combo-opt[data-val]').forEach(opt => {
+        opt.addEventListener('mousedown', e => { e.preventDefault(); input.value = opt.dataset.val; closeCombo(); });
+      });
+    }
+
+    function openCombo() { renderOpts(input.value); drop.classList.add('open'); arrow.classList.add('open'); }
+    function closeCombo() { drop.classList.remove('open'); arrow.classList.remove('open'); }
+    function toggleCombo() { drop.classList.contains('open') ? closeCombo() : openCombo(); }
+
+    arrow.addEventListener('click', e => { e.stopPropagation(); toggleCombo(); input.focus(); });
+    input.addEventListener('focus', () => openCombo());
+    input.addEventListener('input', () => renderOpts(input.value));
+    document.addEventListener('click', function handler(e) {
+      if (!document.getElementById('comboSubCatWrap')) { document.removeEventListener('click', handler); return; }
+      if (!document.getElementById('comboSubCatWrap').contains(e.target)) closeCombo();
+    });
+    input.addEventListener('keydown', e => { if (e.key === 'Escape' || e.key === 'Tab') closeCombo(); });
+
+    // When main category changes, reset & re-render sub-category options
+    if (catInput) {
+      catInput.addEventListener('change', () => { input.value = ''; renderOpts(''); });
+      catInput.addEventListener('input', () => { input.value = ''; renderOpts(''); });
+    }
+
+    renderOpts('');
+  },
+
   openEditModal(id) {
     const item = DB.getItem(id);
     if (!item) return;
@@ -1978,6 +2082,7 @@ Views.items = {
       footHTML: `<button class="btn btn-outline" data-close>${t('cancel')}</button><button class="btn btn-primary" id="saveItemBtn">${t('update')}</button>`,
       onMount: () => {
         Views.items.bindCategoryCombo();
+        Views.items.bindSubCategoryCombo();
         Views.items.bindImageUpload();
         document.getElementById('saveItemBtn').addEventListener('click', async () => {
           const name = document.getElementById('f_name').value.trim();
@@ -1985,6 +2090,7 @@ Views.items = {
           try {
             await DB.updateItem(id, {
               name, category: document.getElementById('f_category').value.trim() || 'වෙනත්',
+              subCategory: document.getElementById('f_subCategory')?.value.trim() || '',
               unit: document.getElementById('f_unit').value,
               costPrice: Number(document.getElementById('f_cost').value) || 0,
               sellPrice: Number(document.getElementById('f_sell').value) || 0,

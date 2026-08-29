@@ -32,6 +32,7 @@ module.exports = {
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             name TEXT,
             category TEXT,
+            subCategory TEXT,
             unit TEXT,
             costPrice REAL,
             sellPrice REAL,
@@ -80,6 +81,7 @@ module.exports = {
         try { await run(`ALTER TABLE sales ADD COLUMN changeAmount REAL DEFAULT 0`); } catch(e) {}
         try { await run(`ALTER TABLE items ADD COLUMN description TEXT`); } catch(e) {}
         try { await run(`ALTER TABLE items ADD COLUMN image TEXT`); } catch(e) {}
+        try { await run(`ALTER TABLE items ADD COLUMN subCategory TEXT`); } catch(e) {}
         try { await run(`ALTER TABLE purchases ADD COLUMN image TEXT`); } catch(e) {}
 
         await run(`CREATE TABLE IF NOT EXISTS purchases (
@@ -108,15 +110,15 @@ module.exports = {
         const count = await get(`SELECT COUNT(*) as c FROM items`);
         if(count.c === 0) {
             const demoItems = [
-                { name:"සිමෙන්ති (50kg)", category:"සිමෙන්ති/වැලි", unit:"bag", costPrice:1450, sellPrice:1650, qty:40, reorderLevel:10 },
-                { name:"6mm ඇණ", category:"ඇණ/බෝල්ට්", unit:"kg", costPrice:280, sellPrice:340, qty:25, reorderLevel:5 },
-                { name:'PVC පයිප්ප 1/2"', category:"පයිප්ප", unit:"pcs", costPrice:320, sellPrice:400, qty:3, reorderLevel:8 },
-                { name:"විදුලි වයර් (2.5mm)", category:"විදුලි", unit:"m", costPrice:65, sellPrice:85, qty:150, reorderLevel:20 },
-                { name:"සායම් (Enamel 1L)", category:"සායම්", unit:"L", costPrice:850, sellPrice:1050, qty:2, reorderLevel:6 },
+                { name:"සිමෙන්ති (50kg)", category:"සිමෙන්ති හා වැලි", subCategory:"සිමෙන්ති", unit:"bag", costPrice:1450, sellPrice:1650, qty:40, reorderLevel:10 },
+                { name:"6mm ඇණ", category:"ඇණ හා බෝල්ට්", subCategory:"ඇණ", unit:"kg", costPrice:280, sellPrice:340, qty:25, reorderLevel:5 },
+                { name:'PVC පයිප්ප 1/2"', category:"පයිප්ප හා සනිටරි", subCategory:"Anton/National/Arpico බට", unit:"pcs", costPrice:320, sellPrice:400, qty:3, reorderLevel:8 },
+                { name:"විදුලි වයර් (2.5mm)", category:"විදුලි උපකරණ", subCategory:"වයර්", unit:"m", costPrice:65, sellPrice:85, qty:150, reorderLevel:20 },
+                { name:"සායම් (Enamel 1L)", category:"සායම් හා රසායනික", subCategory:"සායම්", unit:"L", costPrice:850, sellPrice:1050, qty:2, reorderLevel:6 },
             ];
             for(let it of demoItems) {
-                await run(`INSERT INTO items (name, category, unit, costPrice, sellPrice, qty, reorderLevel, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-                [it.name, it.category, it.unit, it.costPrice, it.sellPrice, it.qty, it.reorderLevel, Date.now()]);
+                await run(`INSERT INTO items (name, category, subCategory, unit, costPrice, sellPrice, qty, reorderLevel, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                [it.name, it.category, it.subCategory, it.unit, it.costPrice, it.sellPrice, it.qty, it.reorderLevel, Date.now()]);
             }
         }
     },
@@ -147,16 +149,16 @@ module.exports = {
         return await all(`SELECT * FROM items ORDER BY name ASC`);
     },
     addItem: async (item) => {
-        const res = await run(`INSERT INTO items (name, category, unit, costPrice, sellPrice, qty, reorderLevel, description, image, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-            [item.name, item.category?.trim() || 'වෙනත්', item.unit || 'pcs', Number(item.costPrice)||0, Number(item.sellPrice)||0, Number(item.qty)||0, Number(item.reorderLevel)||5, item.description||'', item.image||'', Date.now()]);
+        const res = await run(`INSERT INTO items (name, category, subCategory, unit, costPrice, sellPrice, qty, reorderLevel, description, image, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [item.name, item.category?.trim() || 'වෙනත්', item.subCategory?.trim() || '', item.unit || 'pcs', Number(item.costPrice)||0, Number(item.sellPrice)||0, Number(item.qty)||0, Number(item.reorderLevel)||5, item.description||'', item.image||'', Date.now()]);
         return await get(`SELECT * FROM items WHERE id = ?`, [res.lastID]);
     },
     updateItem: async (id, patch) => {
         const item = await get(`SELECT * FROM items WHERE id = ?`, [id]);
         if (!item) return null;
         const merged = { ...item, ...patch };
-        await run(`UPDATE items SET name=?, category=?, unit=?, costPrice=?, sellPrice=?, qty=?, reorderLevel=?, description=?, image=? WHERE id=?`,
-            [merged.name, merged.category?.trim()||'වෙනත්', merged.unit, Number(merged.costPrice)||0, Number(merged.sellPrice)||0, Number(merged.qty)||0, Number(merged.reorderLevel)||5, merged.description||'', merged.image||'', id]);
+        await run(`UPDATE items SET name=?, category=?, subCategory=?, unit=?, costPrice=?, sellPrice=?, qty=?, reorderLevel=?, description=?, image=? WHERE id=?`,
+            [merged.name, merged.category?.trim()||'වෙනත්', merged.subCategory?.trim()||'', merged.unit, Number(merged.costPrice)||0, Number(merged.sellPrice)||0, Number(merged.qty)||0, Number(merged.reorderLevel)||5, merged.description||'', merged.image||'', id]);
         return merged;
     },
     deleteItem: async (id) => {
