@@ -1986,7 +1986,6 @@ Views.sale = {
     const html = `
       <div class="receipt" id="printArea">
         ${DB.data.settings.logo ? `<img class="receipt-watermark" src="${DB.data.settings.logo}" alt="Watermark Logo">` : ''}
-        <h2>${escapeHTML(DB.data.settings.shopName || 'රත්න හාඩ්වෙයාර්')}</h2>
         ${DB.data.settings.shopDescription ? `<div class="r-center" style="font-size:12px; font-weight:700; color:#111; margin-top:2px; margin-bottom:4px; white-space:pre-line; font-family:'Noto Sans Sinhala', sans-serif; line-height:1.6;">${escapeHTML(DB.data.settings.shopDescription)}</div>` : ''}
         <div style="display:flex; justify-content:space-between; align-items:center; font-size:12px; margin:4px 0;">
           <span>${(()=>{ const d=new Date(sale.date); return d.toLocaleDateString('en-GB'); })()}</span>

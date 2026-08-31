@@ -75,6 +75,11 @@ const App = {
       }
     });
 
+    // Calculator button toggle
+    document.getElementById('topbarCalcBtn')?.addEventListener('click', () => {
+      App.openCalculator();
+    });
+
     // Bell dropdown toggle
     document.getElementById('bellBtn')?.addEventListener('click', (e) => {
       e.stopPropagation();
@@ -357,6 +362,220 @@ const App = {
         </div>
       `;
     }
+  },
+
+  openCalculator() {
+    let current = '0';
+    let prev = null;
+    let op = null;
+    let resetNext = false;
+
+    openModal({
+      title: (typeof currentLang !== 'undefined' && currentLang === 'si') ? '🧮 කැල්කියුලේටරය (Calculator)' : '🧮 Calculator',
+      bodyHTML: `
+        <div class="pos-calculator">
+          <div class="calc-display-wrap">
+            <div class="calc-history" id="calcHistory">&nbsp;</div>
+            <div class="calc-current" id="calcCurrent">0</div>
+          </div>
+          <div class="calc-grid">
+            <button type="button" class="calc-btn calc-btn-fn" data-calc-action="clear">AC</button>
+            <button type="button" class="calc-btn calc-btn-fn" data-calc-action="backspace" title="Delete"><i class="ph ph-backspace" style="font-size:18px;"></i></button>
+            <button type="button" class="calc-btn calc-btn-fn" data-calc-action="percent">%</button>
+            <button type="button" class="calc-btn calc-btn-op" data-calc-op="/">÷</button>
+            
+            <button type="button" class="calc-btn calc-btn-num" data-calc-num="7">7</button>
+            <button type="button" class="calc-btn calc-btn-num" data-calc-num="8">8</button>
+            <button type="button" class="calc-btn calc-btn-num" data-calc-num="9">9</button>
+            <button type="button" class="calc-btn calc-btn-op" data-calc-op="*">×</button>
+            
+            <button type="button" class="calc-btn calc-btn-num" data-calc-num="4">4</button>
+            <button type="button" class="calc-btn calc-btn-num" data-calc-num="5">5</button>
+            <button type="button" class="calc-btn calc-btn-num" data-calc-num="6">6</button>
+            <button type="button" class="calc-btn calc-btn-op" data-calc-op="-">−</button>
+            
+            <button type="button" class="calc-btn calc-btn-num" data-calc-num="1">1</button>
+            <button type="button" class="calc-btn calc-btn-num" data-calc-num="2">2</button>
+            <button type="button" class="calc-btn calc-btn-num" data-calc-num="3">3</button>
+            <button type="button" class="calc-btn calc-btn-op" data-calc-op="+">+</button>
+            
+            <button type="button" class="calc-btn calc-btn-num" data-calc-action="sign">±</button>
+            <button type="button" class="calc-btn calc-btn-num" data-calc-num="0">0</button>
+            <button type="button" class="calc-btn calc-btn-num" data-calc-num=".">.</button>
+            <button type="button" class="calc-btn calc-btn-equals" data-calc-action="equals">=</button>
+          </div>
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-top:14px; gap:10px;">
+            <button type="button" class="btn btn-outline" id="calcCopyBtn" style="flex:1; display:flex; align-items:center; justify-content:center; gap:6px; font-size:13px; padding:8px 12px;">
+              <i class="ph ph-copy" style="font-size:16px;"></i> ${(typeof currentLang !== 'undefined' && currentLang === 'si') ? 'අගය Copy කරන්න' : 'Copy Result'}
+            </button>
+            <button type="button" class="btn btn-primary" data-close style="flex:1; font-size:13px; padding:8px 12px;">
+              ${t('close')}
+            </button>
+          </div>
+        </div>
+      `,
+      onMount: (wrap) => {
+        const curEl = wrap.querySelector('#calcCurrent');
+        const histEl = wrap.querySelector('#calcHistory');
+
+        const updateDisplay = () => {
+          if (curEl) curEl.textContent = current;
+          if (histEl) {
+            if (prev !== null && op !== null) {
+              const opSym = op === '*' ? '×' : op === '/' ? '÷' : op === '-' ? '−' : '+';
+              histEl.textContent = `${prev} ${opSym}`;
+            } else {
+              histEl.innerHTML = '&nbsp;';
+            }
+          }
+        };
+
+        const inputDigit = (digit) => {
+          if (resetNext) {
+            current = digit === '.' ? '0.' : digit;
+            resetNext = false;
+          } else {
+            if (digit === '.') {
+              if (!current.includes('.')) current += '.';
+            } else {
+              current = current === '0' ? digit : current + digit;
+            }
+          }
+          updateDisplay();
+        };
+
+        const calculate = (first, second, operator) => {
+          if (operator === '+') return first + second;
+          if (operator === '-') return first - second;
+          if (operator === '*') return first * second;
+          if (operator === '/') return second !== 0 ? first / second : 0;
+          return second;
+        };
+
+        const handleOp = (nextOp) => {
+          const inputValue = parseFloat(current);
+          if (prev === null) {
+            prev = inputValue;
+          } else if (op) {
+            const result = calculate(prev, inputValue, op);
+            current = String(Math.round(result * 100000000) / 100000000);
+            prev = parseFloat(current);
+          }
+          resetNext = true;
+          op = nextOp;
+          updateDisplay();
+        };
+
+        const handleEquals = () => {
+          if (op === null || prev === null) return;
+          const inputValue = parseFloat(current);
+          const result = calculate(prev, inputValue, op);
+          const opSym = op === '*' ? '×' : op === '/' ? '÷' : op === '-' ? '−' : '+';
+          if (histEl) histEl.textContent = `${prev} ${opSym} ${inputValue} =`;
+          current = String(Math.round(result * 100000000) / 100000000);
+          prev = null;
+          op = null;
+          resetNext = true;
+          if (curEl) curEl.textContent = current;
+        };
+
+        const handleClear = () => {
+          current = '0';
+          prev = null;
+          op = null;
+          resetNext = false;
+          updateDisplay();
+        };
+
+        const handleBackspace = () => {
+          if (resetNext) return;
+          if (current.length > 1) {
+            current = current.slice(0, -1);
+          } else {
+            current = '0';
+          }
+          updateDisplay();
+        };
+
+        const handlePercent = () => {
+          const val = parseFloat(current);
+          current = String(Math.round((val / 100) * 100000000) / 100000000);
+          updateDisplay();
+        };
+
+        const handleSign = () => {
+          const val = parseFloat(current);
+          current = String(val * -1);
+          updateDisplay();
+        };
+
+        // Number button clicks
+        wrap.querySelectorAll('[data-calc-num]').forEach(b => {
+          b.addEventListener('click', () => inputDigit(b.dataset.calcNum));
+        });
+
+        // Op button clicks
+        wrap.querySelectorAll('[data-calc-op]').forEach(b => {
+          b.addEventListener('click', () => handleOp(b.dataset.calcOp));
+        });
+
+        // Action button clicks
+        wrap.querySelectorAll('[data-calc-action]').forEach(b => {
+          b.addEventListener('click', () => {
+            const action = b.dataset.calcAction;
+            if (action === 'clear') handleClear();
+            else if (action === 'backspace') handleBackspace();
+            else if (action === 'percent') handlePercent();
+            else if (action === 'sign') handleSign();
+            else if (action === 'equals') handleEquals();
+          });
+        });
+
+        // Copy button
+        const copyBtn = wrap.querySelector('#calcCopyBtn');
+        if (copyBtn) {
+          copyBtn.addEventListener('click', () => {
+            navigator.clipboard.writeText(current).then(() => {
+              toast((typeof currentLang !== 'undefined' && currentLang === 'si') ? `අගය පිටපත් කරගන්නා ලදී: ${current}` : `Copied: ${current}`, 'ok');
+            }).catch(() => {
+              toast(`Result: ${current}`, 'ok');
+            });
+          });
+        }
+
+        // Keyboard listener inside modal
+        const keyHandler = (e) => {
+          const activeModal = document.getElementById('activeModal');
+          if (!activeModal || !activeModal.contains(wrap)) {
+            document.removeEventListener('keydown', keyHandler);
+            return;
+          }
+          if (e.key >= '0' && e.key <= '9') {
+            e.preventDefault();
+            inputDigit(e.key);
+          } else if (e.key === '.') {
+            e.preventDefault();
+            inputDigit('.');
+          } else if (e.key === '+' || e.key === '-' || e.key === '*' || e.key === '/') {
+            e.preventDefault();
+            handleOp(e.key);
+          } else if (e.key === 'Enter' || e.key === '=') {
+            e.preventDefault();
+            handleEquals();
+          } else if (e.key === 'Backspace') {
+            e.preventDefault();
+            handleBackspace();
+          } else if (e.key === 'c' || e.key === 'C') {
+            e.preventDefault();
+            handleClear();
+          } else if (e.key === '%') {
+            e.preventDefault();
+            handlePercent();
+          }
+        };
+        document.addEventListener('keydown', keyHandler);
+      }
+    });
   }
 };
 
