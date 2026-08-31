@@ -173,6 +173,12 @@ const App = {
       }
 
       if (!isInput && !document.getElementById('activeModal')) {
+        if (e.code === 'Space' || e.key === ' ' || e.key === 'Spacebar') {
+          e.preventDefault();
+          App.openCalculator();
+          return;
+        }
+
         if (e.key === 's' || e.key === 'S' || e.code === 'KeyS') {
           e.preventDefault();
           const searchInp = document.getElementById('saleSearch') || document.getElementById('itemsSearch') || document.getElementById('stockSearch') || document.getElementById('custSearch') || document.getElementById('purchasesSearch');
