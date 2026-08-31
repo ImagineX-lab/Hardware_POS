@@ -1296,14 +1296,16 @@ Views.sale = {
     const matchVolume = nameLower.match(/(\d+(?:\.\d+)?)\s*(l|ml|ltr|ලීටර්|මිලිලීටර්)/i);
     const matchLength = nameLower.match(/(\d+(?:\.\d+)?)\s*(ft|in|m|cm|අඩි|අඟල්|මීටර්)/i);
 
-    if (item.unit === 'bag' || item.unit === 'box' || item.unit === 'pkt' || item.unit === 'roll' || item.unit === 'bundle') {
+    // Units that are containers/packs — auto-detect measurement from item name
+    const containerUnits = ['bag', 'box', 'pkt', 'roll', 'bundle', 'bottle', 'can', 'tube', 'set', 'pair', 'sheet', 'length', 'cube', 'sqft'];
+    if (containerUnits.includes(item.unit)) {
       if (matchWeight) {
         defaultPackSize = parseFloat(matchWeight[1]) || 50;
-        defaultPackUnit = matchWeight[2].startsWith('g') ? 'g' : 'kg';
+        defaultPackUnit = matchWeight[2].toLowerCase().startsWith('g') && !matchWeight[2].toLowerCase().startsWith('kg') ? 'g' : 'kg';
         defaultLooseUnit = defaultPackUnit;
       } else if (matchVolume) {
         defaultPackSize = parseFloat(matchVolume[1]) || 1;
-        defaultPackUnit = matchVolume[2].startsWith('ml') ? 'ml' : 'L';
+        defaultPackUnit = matchVolume[2].toLowerCase().startsWith('ml') ? 'ml' : 'L';
         defaultLooseUnit = defaultPackUnit;
       } else if (matchLength) {
         defaultPackSize = parseFloat(matchLength[1]) || 1;
@@ -1378,6 +1380,9 @@ Views.sale = {
     const getUnitFactor = (fromU, toU) => {
       fromU = (fromU || '').toLowerCase().trim();
       toU = (toU || '').toLowerCase().trim();
+      // Normalize aliases
+      if (fromU === 'ltr') fromU = 'l';
+      if (toU === 'ltr') toU = 'l';
       if (fromU === toU) return 1;
       // Weight
       if (fromU === 'g' && toU === 'kg') return 0.001;
@@ -1397,7 +1402,9 @@ Views.sale = {
       // Volume
       if (fromU === 'ml' && toU === 'l') return 0.001;
       if (fromU === 'l' && toU === 'ml') return 1000;
-      return 1;
+      // Unknown cross-unit combination — return 0 to indicate incompatible units
+      // This prevents silent wrong price calculation
+      return 0;
     };
 
     const modalBody = `
@@ -1534,16 +1541,61 @@ Views.sale = {
         const updatePresets = () => {
           const lUnit = looseUnitEl.value;
           let chips = [];
-          if (lUnit === 'kg') chips = [{ val: 0.25, lbl: '250g' }, { val: 0.5, lbl: '500g' }, { val: 1, lbl: '1kg' }, { val: 2, lbl: '2kg' }, { val: 2.5, lbl: '2.5kg' }, { val: 5, lbl: '5kg' }];
-          else if (lUnit === 'g') chips = [{ val: 100, lbl: '100g' }, { val: 250, lbl: '250g' }, { val: 500, lbl: '500g' }, { val: 750, lbl: '750g' }, { val: 1000, lbl: '1000g' }];
-          else if (lUnit === 'in') chips = [{ val: 3, lbl: '3 අඟල්' }, { val: 6, lbl: '6 අඟල්' }, { val: 12, lbl: '12 අඟල්' }, { val: 18, lbl: '18 අඟල්' }, { val: 24, lbl: '24 අඟල්' }];
-          else if (lUnit === 'ft') chips = [{ val: 0.5, lbl: '1/2 අඩිය' }, { val: 1, lbl: '1 අඩිය' }, { val: 2, lbl: '2 අඩි' }, { val: 3, lbl: '3 අඩි' }, { val: 5, lbl: '5 අඩි' }, { val: 10, lbl: '10 අඩි' }];
-          else if (lUnit === 'L') chips = [{ val: 0.25, lbl: '250ml' }, { val: 0.5, lbl: '500ml' }, { val: 1, lbl: '1L' }, { val: 2, lbl: '2L' }, { val: 4, lbl: '4L' }];
-          else if (lUnit === 'ml') chips = [{ val: 50, lbl: '50ml' }, { val: 100, lbl: '100ml' }, { val: 250, lbl: '250ml' }, { val: 500, lbl: '500ml' }];
+          // Each chip: { val, lbl, switchUnit? }
+          // switchUnit: if set, clicking this chip ALSO changes the unit dropdown
+          if (lUnit === 'kg') chips = [
+            { val: 100,  lbl: '100g',   switchUnit: 'g'  },
+            { val: 250,  lbl: '250g',   switchUnit: 'g'  },
+            { val: 500,  lbl: '500g',   switchUnit: 'g'  },
+            { val: 750,  lbl: '750g',   switchUnit: 'g'  },
+            { val: 1,    lbl: '1 kg',   switchUnit: 'kg' },
+            { val: 2,    lbl: '2 kg',   switchUnit: 'kg' },
+            { val: 5,    lbl: '5 kg',   switchUnit: 'kg' }
+          ];
+          else if (lUnit === 'g') chips = [
+            { val: 100,  lbl: '100g'  },
+            { val: 250,  lbl: '250g'  },
+            { val: 500,  lbl: '500g'  },
+            { val: 750,  lbl: '750g'  },
+            { val: 1000, lbl: '1000g' }
+          ];
+          else if (lUnit === 'in') chips = [
+            { val: 3,  lbl: '3 අඟල්'  },
+            { val: 6,  lbl: '6 අඟල්'  },
+            { val: 12, lbl: '12 අඟල්' },
+            { val: 18, lbl: '18 අඟල්' },
+            { val: 24, lbl: '24 අඟල්' }
+          ];
+          else if (lUnit === 'ft') chips = [
+            { val: 0.5, lbl: '1/2 අඩිය' },
+            { val: 1,   lbl: '1 අඩිය'  },
+            { val: 2,   lbl: '2 අඩි'   },
+            { val: 3,   lbl: '3 අඩි'   },
+            { val: 5,   lbl: '5 අඩි'   },
+            { val: 10,  lbl: '10 අඩි'  }
+          ];
+          else if (lUnit === 'L') chips = [
+            { val: 50,  lbl: '50 ml',  switchUnit: 'ml' },
+            { val: 100, lbl: '100 ml', switchUnit: 'ml' },
+            { val: 250, lbl: '250 ml', switchUnit: 'ml' },
+            { val: 500, lbl: '500 ml', switchUnit: 'ml' },
+            { val: 1,   lbl: '1 L',    switchUnit: 'L'  },
+            { val: 2,   lbl: '2 L',    switchUnit: 'L'  },
+            { val: 4,   lbl: '4 L',    switchUnit: 'L'  },
+            { val: 5,   lbl: '5 L',    switchUnit: 'L'  }
+          ];
+          else if (lUnit === 'ml') chips = [
+            { val: 50,  lbl: '50 ml'  },
+            { val: 100, lbl: '100 ml' },
+            { val: 250, lbl: '250 ml' },
+            { val: 500, lbl: '500 ml' },
+            { val: 750, lbl: '750 ml' },
+            { val: 1000,lbl: '1000 ml'}
+          ];
           else chips = [{ val: 1, lbl: '1' }, { val: 2, lbl: '2' }, { val: 5, lbl: '5' }, { val: 10, lbl: '10' }, { val: 20, lbl: '20' }];
 
-          presetsWrap.innerHTML = chips.map(c => `
-            <button type="button" class="btn-loose-preset" data-val="${c.val}" style="padding:4px 9px; font-size:11.5px; font-weight:700; background:#f1f5f9; border:1px solid #cbd5e1; border-radius:6px; cursor:pointer; color:var(--charcoal);">
+          presetsWrap.innerHTML = chips.map(c =>
+            `<button type="button" class="btn-loose-preset" data-val="${c.val}" ${c.switchUnit ? `data-switch-unit="${c.switchUnit}"` : ''} style="padding:4px 9px; font-size:11.5px; font-weight:700; background:#f1f5f9; border:1px solid #cbd5e1; border-radius:6px; cursor:pointer; color:var(--charcoal);">
               ${c.lbl}
             </button>
           `).join('');
@@ -1551,6 +1603,11 @@ Views.sale = {
           presetsWrap.querySelectorAll('.btn-loose-preset').forEach(btn => {
             btn.addEventListener('click', () => {
               looseQtyEl.value = btn.dataset.val;
+              // Switch unit dropdown if the chip specifies a different unit
+              if (btn.dataset.switchUnit && btn.dataset.switchUnit !== looseUnitEl.value) {
+                looseUnitEl.value = btn.dataset.switchUnit;
+                updatePresets(); // rebuild chip list for new unit
+              }
               calc();
             });
           });
@@ -1571,7 +1628,7 @@ Views.sale = {
             const looseUnitsPerPack = packSize * factor;
             return looseUnitsPerPack > 0 ? unitPrice / looseUnitsPerPack : 0;
           })();
-          const effectiveLooseUnitPrice = hasCustomPrice ? Number(initCustomPrice) : autoLooseUnitPrice;
+          const effectiveLooseUnitPrice = hasCustomPrice ? (Number(initCustomPrice) * getUnitFactor(looseUnit, packUnit)) : autoLooseUnitPrice;
 
           if (activeMode === 'qty') {
             calcLooseQty = Math.max(0, parseFloat(looseQtyEl.value) || 0);
@@ -1615,7 +1672,7 @@ Views.sale = {
             stockWarnEl.style.display = 'none';
           }
 
-          return { stockQty: displayStock, calcLooseQty, linePrice, packSize, packUnit, looseUnit, customLooseUnitPrice: hasCustomPrice ? effectiveLooseUnitPrice : null };
+          return { stockQty: displayStock, calcLooseQty, linePrice, packSize, packUnit, looseUnit, customLooseUnitPrice: hasCustomPrice ? Number(initCustomPrice) : null };
         };
 
         looseQtyEl.addEventListener('input', calc);
@@ -1650,8 +1707,8 @@ Views.sale = {
             packSize: res.packSize,
             packUnit: res.packUnit,
             customLooseUnitPrice: res.customLooseUnitPrice,
-            shortText: `${res.calcLooseQty} ${res.looseUnit}${res.customLooseUnitPrice ? ` @ රු.${res.customLooseUnitPrice}` : ''}`,
-            fullText: `${res.calcLooseQty} ${res.looseUnit} (${res.packSize} ${res.packUnit} පැකේජයකින්)${res.customLooseUnitPrice ? ` — custom රු.${res.customLooseUnitPrice}/${res.looseUnit}` : ''}`
+            shortText: `${res.calcLooseQty} ${res.looseUnit}${res.customLooseUnitPrice ? ` @ රු.${res.customLooseUnitPrice}/${res.packUnit}` : ''}`,
+            fullText: `${res.calcLooseQty} ${res.looseUnit} (${res.packSize} ${res.packUnit} පැකේජයකින්)${res.customLooseUnitPrice ? ` — custom රු.${res.customLooseUnitPrice}/${res.packUnit}` : ''}`
           };
 
           closeModal();
