@@ -75,6 +75,10 @@ const DB = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(c)
     });
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.error || 'Failed to add customer');
+    }
     const newCust = await res.json();
     this.data.customers.push(newCust);
     return newCust;
@@ -145,6 +149,20 @@ const DB = {
     this.data.sales = this.data.sales.filter(x => x.id !== id);
     // Reload to fix stock and customer balances
     await this.reload();
+  },
+  async clearAllSales(restoreStock = true){
+    const res = await fetch('/api/sales/clear-all', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ restoreStock })
+    });
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.error || 'Failed to clear sales');
+    }
+    this.data.sales = [];
+    await this.reload();
+    return true;
   },
 
   /* ---------------- STATS ---------------- */

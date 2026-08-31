@@ -52,13 +52,21 @@ app.get('/api/customers', async (req, res) => {
     res.json(await db.getAllCustomers());
 });
 app.post('/api/customers', async (req, res) => {
-    const newCustomer = await db.addCustomer(req.body);
-    res.json(newCustomer);
+    try {
+        const newCustomer = await db.addCustomer(req.body);
+        res.json(newCustomer);
+    } catch (err) {
+        res.status(400).json({ error: err.message || "Failed to add customer" });
+    }
 });
 app.put('/api/customers/:id', async (req, res) => {
-    const updated = await db.updateCustomer(req.params.id, req.body);
-    if(updated) res.json(updated);
-    else res.status(404).json({error: "Customer not found"});
+    try {
+        const updated = await db.updateCustomer(req.params.id, req.body);
+        if(updated) res.json(updated);
+        else res.status(404).json({error: "Customer not found"});
+    } catch (err) {
+        res.status(400).json({ error: err.message || "Failed to update customer" });
+    }
 });
 app.delete('/api/customers/:id', async (req, res) => {
     await db.deleteCustomer(req.params.id);
@@ -82,6 +90,15 @@ app.post('/api/sales', async (req, res) => {
 app.delete('/api/sales/:id', async (req, res) => {
     await db.deleteSale(req.params.id);
     res.json({ success: true });
+});
+app.post('/api/sales/clear-all', async (req, res) => {
+    try {
+        const restoreStock = req.body?.restoreStock !== false;
+        await db.clearAllSales(restoreStock);
+        res.json({ success: true, message: "All sales cleared and bill counter reset to 1" });
+    } catch (err) {
+        res.status(500).json({ error: err.message || "Failed to clear sales" });
+    }
 });
 
 // Purchases (කඩේට ගත් බිල්පත්)

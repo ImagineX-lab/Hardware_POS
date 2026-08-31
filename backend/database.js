@@ -25,6 +25,34 @@ const all = (query, params = []) => new Promise((resolve, reject) => {
     });
 });
 
+const validatePhoneBackend = (phone) => {
+    if (!phone || !String(phone).trim()) return { valid: true, value: '' };
+    const clean = String(phone).trim().replace(/[\s\-\(\)\.]/g, '');
+    const is10Digit = /^0[1-9][0-9]{8}$/.test(clean);
+    const isPlus94 = /^\+94[1-9][0-9]{8}$/.test(clean);
+    const is94 = /^94[1-9][0-9]{8}$/.test(clean);
+    const is9Digit = /^[1-9][0-9]{8}$/.test(clean);
+    if (is10Digit || isPlus94 || is94 || is9Digit) {
+        let normalized = clean;
+        if (isPlus94) normalized = '0' + clean.slice(3);
+        else if (is94) normalized = '0' + clean.slice(2);
+        else if (is9Digit) normalized = '0' + clean;
+        return { valid: true, value: normalized };
+    }
+    return { valid: false, error: 'Invalid phone number' };
+};
+
+const validateNICBackend = (nic) => {
+    if (!nic || !String(nic).trim()) return { valid: true, value: '' };
+    const clean = String(nic).trim().replace(/[\s\-\.]/g, '').toUpperCase();
+    const isOldNIC = /^[0-9]{9}[VX]$/.test(clean);
+    const isNewNIC = /^[0-9]{12}$/.test(clean);
+    if (isOldNIC || isNewNIC) {
+        return { valid: true, value: clean };
+    }
+    return { valid: false, error: 'Invalid NIC number' };
+};
+
 module.exports = {
     init: async () => {
         await run(`CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT)`);
@@ -179,15 +207,35 @@ module.exports = {
         return customers;
     },
     addCustomer: async (c) => {
+        if (!c.name || !c.name.trim()) throw new Error("Customer name is required");
+        const phoneVal = validatePhoneBackend(c.phone);
+        if (!phoneVal.valid) throw new Error("Invalid phone number format");
+        const nicVal = validateNICBackend(c.nic);
+        if (!nicVal.valid) throw new Error("Invalid NIC number format");
+
         const type = c.customerType || 'customer';
         const discount = Number(c.discountPercent) || 0;
         const res = await run(`INSERT INTO customers (name, phone, address, nic, creditLimit, balance, createdAt, customerType, discountPercent) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-            [c.name.trim(), c.phone?.trim()||"", c.address?.trim()||"", c.nic?.trim()||"", Number(c.creditLimit)||0, 0, Date.now(), type, discount]);
-        return { id: res.lastID, ...c, customerType: type, discountPercent: discount, balance: 0, ledger: [] };
+            [c.name.trim(), phoneVal.value, c.address?.trim()||"", nicVal.value, Number(c.creditLimit)||0, 0, Date.now(), type, discount]);
+        return { id: res.lastID, ...c, phone: phoneVal.value, nic: nicVal.value, customerType: type, discountPercent: discount, balance: 0, ledger: [] };
     },
     updateCustomer: async (id, patch) => {
         const c = await get(`SELECT * FROM customers WHERE id = ?`, [id]);
         if (!c) return null;
+        if (patch.name !== undefined && (!patch.name || !patch.name.trim())) {
+            throw new Error("Customer name is required");
+        }
+        if (patch.phone !== undefined) {
+            const phoneVal = validatePhoneBackend(patch.phone);
+            if (!phoneVal.valid) throw new Error("Invalid phone number format");
+            patch.phone = phoneVal.value;
+        }
+        if (patch.nic !== undefined) {
+            const nicVal = validateNICBackend(patch.nic);
+            if (!nicVal.valid) throw new Error("Invalid NIC number format");
+            patch.nic = nicVal.value;
+        }
+
         const merged = { ...c, ...patch };
         await run(`UPDATE customers SET name=?, phone=?, address=?, nic=?, creditLimit=?, balance=?, customerType=?, discountPercent=? WHERE id=?`,
             [merged.name, merged.phone, merged.address, merged.nic, merged.creditLimit, merged.balance, merged.customerType || 'customer', Number(merged.discountPercent)||0, id]);
@@ -278,6 +326,42 @@ module.exports = {
         }
 
         await run(`DELETE FROM sales WHERE id = ?`, [id]);
+        const remaining = await get(`SELECT COUNT(*) as cnt FROM sales`);
+        if (remaining && remaining.cnt === 0) {
+            try {
+                await run(`DELETE FROM sqlite_sequence WHERE name = 'sales'`);
+            } catch(e) {}
+        }
+    },
+
+    clearAllSales: async (restoreStock = true) => {
+        if (restoreStock) {
+            const sales = await all(`SELECT * FROM sales`);
+            for (let s of sales) {
+                try {
+                    const lines = typeof s.lines === 'string' ? JSON.parse(s.lines) : (s.lines || []);
+                    for (let l of lines) {
+                        const it = await get(`SELECT qty FROM items WHERE id = ?`, [l.itemId]);
+                        if (it) {
+                            const restored = Math.round((it.qty + l.qty) * 10000) / 10000;
+                            await run(`UPDATE items SET qty = ? WHERE id = ?`, [restored, l.itemId]);
+                        }
+                    }
+                    if (s.paymentType === 'credit' && s.customerId) {
+                        const c = await get(`SELECT balance FROM customers WHERE id = ?`, [s.customerId]);
+                        if (c) {
+                            await run(`UPDATE customers SET balance = ? WHERE id = ?`, [Math.max(0, c.balance - s.total), s.customerId]);
+                            await run(`INSERT INTO customer_ledger (customerId, date, type, amount, note) VALUES (?, ?, 'payment', ?, ?)`,
+                                [s.customerId, Date.now(), s.total, `බිල්පත් සියල්ල මකා දැමීම (#${s.id})`]);
+                        }
+                    }
+                } catch(e) {}
+            }
+        }
+        await run(`DELETE FROM sales`);
+        try {
+            await run(`DELETE FROM sqlite_sequence WHERE name = 'sales'`);
+        } catch(e) {}
     },
 
     getAllPurchases: async () => {
@@ -438,6 +522,10 @@ module.exports = {
         await run(`DELETE FROM customers`);
         await run(`DELETE FROM customer_ledger`);
         await run(`DELETE FROM sales`);
+        await run(`DELETE FROM purchases`);
         await run(`DELETE FROM settings`);
+        try {
+            await run(`DELETE FROM sqlite_sequence`);
+        } catch(e) {}
     }
 };

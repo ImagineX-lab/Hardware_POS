@@ -1157,41 +1157,116 @@ Views.sale = {
     openModal({
       title: t('cust_quick_add_title'),
       bodyHTML: `
-        <div class="field"><label class="field-label">${t('cust_form_name')}</label><input class="input" id="qc_name" value="${escapeHTML(initialName)}" placeholder="${t('cust_form_name_ph')}"></div>
+        <div class="field">
+          <label class="field-label">${t('cust_form_name')}</label>
+          <input class="input" id="qc_name" value="${escapeHTML(initialName)}" placeholder="${t('cust_form_name_ph')}">
+          <div class="field-error-msg" id="qc_name_err"></div>
+        </div>
         <div class="grid grid-2">
-          <div class="field"><label class="field-label">${t('cust_form_phone')}</label><input class="input" id="qc_phone" value="${escapeHTML(initialPhone)}" placeholder="${t('cust_form_phone_ph')}"></div>
-          <div class="field"><label class="field-label">${t('cust_form_type')}</label>
+          <div class="field">
+            <label class="field-label">${t('cust_form_phone')}</label>
+            <input class="input" id="qc_phone" value="${escapeHTML(initialPhone)}" placeholder="${t('cust_form_phone_ph')}">
+            <div class="field-error-msg" id="qc_phone_err"></div>
+          </div>
+          <div class="field">
+            <label class="field-label">${t('cust_form_type')}</label>
             <select class="input" id="qc_type">
               <option value="customer">${t('cust_type_retail')}</option>
               <option value="hardware">${t('cust_type_hardware')}</option>
             </select>
           </div>
         </div>
-        <div class="field" id="qc_discount_wrap" style="display:none;"><label class="field-label">${t('cust_form_discount')}</label><input class="input" id="qc_discount" type="number" min="0" max="100" value="0"></div>
+        <div class="field" id="qc_discount_wrap" style="display:none;">
+          <label class="field-label">${t('cust_form_discount')}</label>
+          <input class="input" id="qc_discount" type="number" min="0" max="100" value="0">
+          <div class="field-error-msg" id="qc_discount_err"></div>
+        </div>
         <div class="grid grid-2">
           <div class="field"><label class="field-label">${t('cust_form_address')}</label><input class="input" id="qc_address"></div>
-          <div class="field"><label class="field-label">${t('cust_form_nic')}</label><input class="input" id="qc_nic" placeholder="e.g. 199012345678 / 901234567V"></div>
+          <div class="field">
+            <label class="field-label">${t('cust_form_nic')}</label>
+            <input class="input" id="qc_nic" placeholder="e.g. 199012345678 / 901234567V">
+            <div class="field-error-msg" id="qc_nic_err"></div>
+          </div>
         </div>
       `,
       footHTML: `<button class="btn btn-outline" data-close>${t('cancel')}</button><button class="btn btn-primary" id="saveQCustBtn">${t('confirm')}</button>`,
       onMount: (wrap) => {
+        const nameInp = wrap.querySelector('#qc_name');
+        const nameErr = wrap.querySelector('#qc_name_err');
+        const phoneInp = wrap.querySelector('#qc_phone');
+        const phoneErr = wrap.querySelector('#qc_phone_err');
+        const nicInp = wrap.querySelector('#qc_nic');
+        const nicErr = wrap.querySelector('#qc_nic_err');
         const typeSelect = wrap.querySelector('#qc_type');
         const discWrap = wrap.querySelector('#qc_discount_wrap');
+        const discInp = wrap.querySelector('#qc_discount');
+        const discErr = wrap.querySelector('#qc_discount_err');
+
         typeSelect.addEventListener('change', () => {
           discWrap.style.display = typeSelect.value === 'hardware' ? 'block' : 'none';
         });
 
+        // Realtime input listeners to clear errors and format
+        nameInp.addEventListener('input', () => clearInputError(nameInp, nameErr));
+        phoneInp.addEventListener('input', () => clearInputError(phoneInp, phoneErr));
+        nicInp.addEventListener('input', () => {
+          clearInputError(nicInp, nicErr);
+          const pos = nicInp.selectionStart;
+          nicInp.value = nicInp.value.toUpperCase();
+          if (pos !== null) nicInp.setSelectionRange(pos, pos);
+        });
+        if (discInp) discInp.addEventListener('input', () => clearInputError(discInp, discErr));
+
         wrap.querySelector('#saveQCustBtn').addEventListener('click', async () => {
-          const name = wrap.querySelector('#qc_name').value.trim();
-          if (!name) { toast(t('cust_err_name'), 'err'); return; }
+          // 1. Validate Name
+          const nameVal = Validators.validateName(nameInp.value);
+          if (!nameVal.valid) {
+            setInputError(nameInp, nameErr, nameVal.error);
+            toast(nameVal.error, 'err');
+            nameInp.focus();
+            return;
+          }
+
+          // 2. Validate Phone
+          const phoneVal = Validators.validatePhone(phoneInp.value);
+          if (!phoneVal.valid) {
+            setInputError(phoneInp, phoneErr, phoneVal.error);
+            toast(phoneVal.error, 'err');
+            phoneInp.focus();
+            return;
+          }
+
+          // 3. Validate NIC
+          const nicVal = Validators.validateNIC(nicInp.value);
+          if (!nicVal.valid) {
+            setInputError(nicInp, nicErr, nicVal.error);
+            toast(nicVal.error, 'err');
+            nicInp.focus();
+            return;
+          }
+
+          // 4. Validate Discount
+          let discount = 0;
+          if (typeSelect.value === 'hardware') {
+            discount = Number(discInp?.value) || 0;
+            if (discount < 0 || discount > 100) {
+              setInputError(discInp, discErr, t('cust_err_discount'));
+              toast(t('cust_err_discount'), 'err');
+              discInp.focus();
+              return;
+            }
+          }
+
           const newC = await DB.addCustomer({
-            name,
-            phone: wrap.querySelector('#qc_phone').value,
-            nic: wrap.querySelector('#qc_nic')?.value || '',
-            address: wrap.querySelector('#qc_address').value,
+            name: nameVal.value,
+            phone: phoneVal.value,
+            nic: nicVal.value,
+            address: wrap.querySelector('#qc_address').value.trim(),
             customerType: typeSelect.value,
-            discountPercent: Number(wrap.querySelector('#qc_discount')?.value) || 0
+            discountPercent: discount
           });
+
           closeModal();
           toast(t('cust_added'), 'ok');
           Views.sale.selectedCustomer = newC;
@@ -2817,10 +2892,19 @@ Views.customers = {
     openModal({
       title: t('cust_add_btn'),
       bodyHTML: `
-        <div class="field"><label class="field-label">${t('cust_form_name')}</label><input class="input" id="c_name" placeholder="${t('cust_form_name_ph')}"></div>
+        <div class="field">
+          <label class="field-label">${t('cust_form_name')}</label>
+          <input class="input" id="c_name" placeholder="${t('cust_form_name_ph')}">
+          <div class="field-error-msg" id="c_name_err"></div>
+        </div>
         <div class="grid grid-2">
-          <div class="field"><label class="field-label">${t('cust_form_phone')}</label><input class="input" id="c_phone" placeholder="${t('cust_form_phone_ph')}"></div>
-          <div class="field"><label class="field-label">${t('cust_form_type')}</label>
+          <div class="field">
+            <label class="field-label">${t('cust_form_phone')}</label>
+            <input class="input" id="c_phone" placeholder="${t('cust_form_phone_ph')}">
+            <div class="field-error-msg" id="c_phone_err"></div>
+          </div>
+          <div class="field">
+            <label class="field-label">${t('cust_form_type')}</label>
             <select class="input" id="c_type">
               <option value="hardware" ${Views.customers.activeTab === 'hardwares' ? 'selected' : ''}>${t('cust_type_hardware')}</option>
               <option value="customer" ${Views.customers.activeTab === 'retail' ? 'selected' : ''}>${t('cust_type_retail')}</option>
@@ -2828,32 +2912,114 @@ Views.customers = {
           </div>
         </div>
         <div class="grid grid-2">
-          <div class="field" id="c_discount_wrap"><label class="field-label">${t('cust_form_discount')}</label><input class="input" id="c_discount" type="number" min="0" max="100" value="0"></div>
-          <div class="field"><label class="field-label">${t('cust_form_limit')}</label><input class="input" id="c_limit" type="number" min="0" value="0"></div>
+          <div class="field" id="c_discount_wrap">
+            <label class="field-label">${t('cust_form_discount')}</label>
+            <input class="input" id="c_discount" type="number" min="0" max="100" value="0">
+            <div class="field-error-msg" id="c_discount_err"></div>
+          </div>
+          <div class="field">
+            <label class="field-label">${t('cust_form_limit')}</label>
+            <input class="input" id="c_limit" type="number" min="0" value="0">
+            <div class="field-error-msg" id="c_limit_err"></div>
+          </div>
         </div>
         <div class="field"><label class="field-label">${t('cust_form_address')}</label><input class="input" id="c_address"></div>
-        <div class="field"><label class="field-label">${t('cust_form_nic')}</label><input class="input" id="c_nic"></div>
+        <div class="field">
+          <label class="field-label">${t('cust_form_nic')}</label>
+          <input class="input" id="c_nic" placeholder="e.g. 199012345678 / 901234567V">
+          <div class="field-error-msg" id="c_nic_err"></div>
+        </div>
       `,
       footHTML: `<button class="btn btn-outline" data-close>${t('cancel')}</button><button class="btn btn-primary" id="saveCustBtn">${t('confirm')}</button>`,
       onMount: (wrap) => {
+        const nameInp = wrap.querySelector('#c_name');
+        const nameErr = wrap.querySelector('#c_name_err');
+        const phoneInp = wrap.querySelector('#c_phone');
+        const phoneErr = wrap.querySelector('#c_phone_err');
+        const nicInp = wrap.querySelector('#c_nic');
+        const nicErr = wrap.querySelector('#c_nic_err');
         const typeSelect = wrap.querySelector('#c_type');
         const discWrap = wrap.querySelector('#c_discount_wrap');
+        const discInp = wrap.querySelector('#c_discount');
+        const discErr = wrap.querySelector('#c_discount_err');
+        const limitInp = wrap.querySelector('#c_limit');
+        const limitErr = wrap.querySelector('#c_limit_err');
+
         const toggleDisc = () => { discWrap.style.display = typeSelect.value === 'hardware' ? 'block' : 'none'; };
         toggleDisc();
         typeSelect.addEventListener('change', toggleDisc);
 
+        // Realtime clear errors & uppercase NIC
+        nameInp.addEventListener('input', () => clearInputError(nameInp, nameErr));
+        phoneInp.addEventListener('input', () => clearInputError(phoneInp, phoneErr));
+        nicInp.addEventListener('input', () => {
+          clearInputError(nicInp, nicErr);
+          const pos = nicInp.selectionStart;
+          nicInp.value = nicInp.value.toUpperCase();
+          if (pos !== null) nicInp.setSelectionRange(pos, pos);
+        });
+        if (discInp) discInp.addEventListener('input', () => clearInputError(discInp, discErr));
+        if (limitInp) limitInp.addEventListener('input', () => clearInputError(limitInp, limitErr));
+
         wrap.querySelector('#saveCustBtn').addEventListener('click', async () => {
-          const name = wrap.querySelector('#c_name').value.trim();
-          if (!name) { toast(t('cust_err_name'), 'err'); return; }
+          // 1. Validate Name
+          const nameVal = Validators.validateName(nameInp.value);
+          if (!nameVal.valid) {
+            setInputError(nameInp, nameErr, nameVal.error);
+            toast(nameVal.error, 'err');
+            nameInp.focus();
+            return;
+          }
+
+          // 2. Validate Phone
+          const phoneVal = Validators.validatePhone(phoneInp.value);
+          if (!phoneVal.valid) {
+            setInputError(phoneInp, phoneErr, phoneVal.error);
+            toast(phoneVal.error, 'err');
+            phoneInp.focus();
+            return;
+          }
+
+          // 3. Validate NIC
+          const nicVal = Validators.validateNIC(nicInp.value);
+          if (!nicVal.valid) {
+            setInputError(nicInp, nicErr, nicVal.error);
+            toast(nicVal.error, 'err');
+            nicInp.focus();
+            return;
+          }
+
+          // 4. Validate Credit Limit
+          const creditLimit = Number(limitInp.value);
+          if (isNaN(creditLimit) || creditLimit < 0) {
+            setInputError(limitInp, limitErr, t('cust_err_limit'));
+            toast(t('cust_err_limit'), 'err');
+            limitInp.focus();
+            return;
+          }
+
+          // 5. Validate Discount
+          let discount = 0;
+          if (typeSelect.value === 'hardware') {
+            discount = Number(discInp?.value) || 0;
+            if (discount < 0 || discount > 100) {
+              setInputError(discInp, discErr, t('cust_err_discount'));
+              toast(t('cust_err_discount'), 'err');
+              discInp.focus();
+              return;
+            }
+          }
+
           await DB.addCustomer({
-            name,
-            phone: wrap.querySelector('#c_phone').value,
-            nic: wrap.querySelector('#c_nic').value,
-            address: wrap.querySelector('#c_address').value,
-            creditLimit: wrap.querySelector('#c_limit').value,
+            name: nameVal.value,
+            phone: phoneVal.value,
+            nic: nicVal.value,
+            address: wrap.querySelector('#c_address').value.trim(),
+            creditLimit,
             customerType: typeSelect.value,
-            discountPercent: Number(wrap.querySelector('#c_discount').value) || 0
+            discountPercent: discount
           });
+
           closeModal();
           toast(t('cust_added'), 'ok');
           App.render();
@@ -2868,10 +3034,19 @@ Views.customers = {
     openModal({
       title: t('items_edit') + ' - ' + escapeHTML(c.name),
       bodyHTML: `
-        <div class="field"><label class="field-label">${t('cust_form_name')}</label><input class="input" id="ce_name" value="${escapeHTML(c.name)}" placeholder="${t('cust_form_name_ph')}"></div>
+        <div class="field">
+          <label class="field-label">${t('cust_form_name')}</label>
+          <input class="input" id="ce_name" value="${escapeHTML(c.name)}" placeholder="${t('cust_form_name_ph')}">
+          <div class="field-error-msg" id="ce_name_err"></div>
+        </div>
         <div class="grid grid-2">
-          <div class="field"><label class="field-label">${t('cust_form_phone')}</label><input class="input" id="ce_phone" value="${escapeHTML(c.phone || '')}" placeholder="${t('cust_form_phone_ph')}"></div>
-          <div class="field"><label class="field-label">${t('cust_form_type')}</label>
+          <div class="field">
+            <label class="field-label">${t('cust_form_phone')}</label>
+            <input class="input" id="ce_phone" value="${escapeHTML(c.phone || '')}" placeholder="${t('cust_form_phone_ph')}">
+            <div class="field-error-msg" id="ce_phone_err"></div>
+          </div>
+          <div class="field">
+            <label class="field-label">${t('cust_form_type')}</label>
             <select class="input" id="ce_type">
               <option value="hardware" ${c.customerType === 'hardware' ? 'selected' : ''}>${t('cust_type_hardware')}</option>
               <option value="customer" ${c.customerType === 'customer' ? 'selected' : ''}>${t('cust_type_retail')}</option>
@@ -2879,33 +3054,116 @@ Views.customers = {
           </div>
         </div>
         <div class="grid grid-2">
-          <div class="field" id="ce_discount_wrap"><label class="field-label">${t('cust_form_discount')}</label><input class="input" id="ce_discount" type="number" min="0" max="100" value="${c.discountPercent || 0}"></div>
-          <div class="field"><label class="field-label">${t('cust_form_limit')}</label><input class="input" id="ce_limit" type="number" min="0" value="${c.creditLimit || 0}"></div>
+          <div class="field" id="ce_discount_wrap">
+            <label class="field-label">${t('cust_form_discount')}</label>
+            <input class="input" id="ce_discount" type="number" min="0" max="100" value="${c.discountPercent || 0}">
+            <div class="field-error-msg" id="ce_discount_err"></div>
+          </div>
+          <div class="field">
+            <label class="field-label">${t('cust_form_limit')}</label>
+            <input class="input" id="ce_limit" type="number" min="0" value="${c.creditLimit || 0}">
+            <div class="field-error-msg" id="ce_limit_err"></div>
+          </div>
         </div>
         <div class="field"><label class="field-label">${t('cust_form_address')}</label><input class="input" id="ce_address" value="${escapeHTML(c.address || '')}"></div>
-        <div class="field"><label class="field-label">${t('cust_form_nic')}</label><input class="input" id="ce_nic" value="${escapeHTML(c.nic || '')}"></div>
+        <div class="field">
+          <label class="field-label">${t('cust_form_nic')}</label>
+          <input class="input" id="ce_nic" value="${escapeHTML(c.nic || '')}" placeholder="e.g. 199012345678 / 901234567V">
+          <div class="field-error-msg" id="ce_nic_err"></div>
+        </div>
       `,
       footHTML: `<button class="btn btn-outline" data-close>${t('cancel')}</button><button class="btn btn-primary" id="updateCustBtn">${t('confirm')}</button>`,
       onMount: (wrap) => {
+        const nameInp = wrap.querySelector('#ce_name');
+        const nameErr = wrap.querySelector('#ce_name_err');
+        const phoneInp = wrap.querySelector('#ce_phone');
+        const phoneErr = wrap.querySelector('#ce_phone_err');
+        const nicInp = wrap.querySelector('#ce_nic');
+        const nicErr = wrap.querySelector('#ce_nic_err');
         const typeSelect = wrap.querySelector('#ce_type');
         const discWrap = wrap.querySelector('#ce_discount_wrap');
+        const discInp = wrap.querySelector('#ce_discount');
+        const discErr = wrap.querySelector('#ce_discount_err');
+        const limitInp = wrap.querySelector('#ce_limit');
+        const limitErr = wrap.querySelector('#ce_limit_err');
+
         const toggleDisc = () => { discWrap.style.display = typeSelect.value === 'hardware' ? 'block' : 'none'; };
         toggleDisc();
         typeSelect.addEventListener('change', toggleDisc);
 
+        // Realtime clear errors & uppercase NIC
+        nameInp.addEventListener('input', () => clearInputError(nameInp, nameErr));
+        phoneInp.addEventListener('input', () => clearInputError(phoneInp, phoneErr));
+        nicInp.addEventListener('input', () => {
+          clearInputError(nicInp, nicErr);
+          const pos = nicInp.selectionStart;
+          nicInp.value = nicInp.value.toUpperCase();
+          if (pos !== null) nicInp.setSelectionRange(pos, pos);
+        });
+        if (discInp) discInp.addEventListener('input', () => clearInputError(discInp, discErr));
+        if (limitInp) limitInp.addEventListener('input', () => clearInputError(limitInp, limitErr));
+
         wrap.querySelector('#updateCustBtn').addEventListener('click', async () => {
-          const name = wrap.querySelector('#ce_name').value.trim();
-          if (!name) { toast(t('cust_err_name'), 'err'); return; }
+          // 1. Validate Name
+          const nameVal = Validators.validateName(nameInp.value);
+          if (!nameVal.valid) {
+            setInputError(nameInp, nameErr, nameVal.error);
+            toast(nameVal.error, 'err');
+            nameInp.focus();
+            return;
+          }
+
+          // 2. Validate Phone
+          const phoneVal = Validators.validatePhone(phoneInp.value);
+          if (!phoneVal.valid) {
+            setInputError(phoneInp, phoneErr, phoneVal.error);
+            toast(phoneVal.error, 'err');
+            phoneInp.focus();
+            return;
+          }
+
+          // 3. Validate NIC
+          const nicVal = Validators.validateNIC(nicInp.value);
+          if (!nicVal.valid) {
+            setInputError(nicInp, nicErr, nicVal.error);
+            toast(nicVal.error, 'err');
+            nicInp.focus();
+            return;
+          }
+
+          // 4. Validate Credit Limit
+          const creditLimit = Number(limitInp.value);
+          if (isNaN(creditLimit) || creditLimit < 0) {
+            setInputError(limitInp, limitErr, t('cust_err_limit'));
+            toast(t('cust_err_limit'), 'err');
+            limitInp.focus();
+            return;
+          }
+
+          // 5. Validate Discount
+          let discount = 0;
+          if (typeSelect.value === 'hardware') {
+            discount = Number(discInp?.value) || 0;
+            if (discount < 0 || discount > 100) {
+              setInputError(discInp, discErr, t('cust_err_discount'));
+              toast(t('cust_err_discount'), 'err');
+              discInp.focus();
+              return;
+            }
+          }
+
           await DB.updateCustomer(id, {
-            name,
-            phone: wrap.querySelector('#ce_phone').value,
-            nic: wrap.querySelector('#ce_nic').value,
-            address: wrap.querySelector('#ce_address').value,
-            creditLimit: wrap.querySelector('#ce_limit').value,
+            name: nameVal.value,
+            phone: phoneVal.value,
+            nic: nicVal.value,
+            address: wrap.querySelector('#ce_address').value.trim(),
+            creditLimit,
             customerType: typeSelect.value,
-            discountPercent: Number(wrap.querySelector('#ce_discount').value) || 0
+            discountPercent: discount
           });
+
           closeModal();
+          toast(currentLang === 'si' ? 'ගනුදෙනුකරු යාවත්කාලීන විය!' : 'Customer updated successfully', 'ok');
           App.render();
         });
       }
@@ -3074,14 +3332,17 @@ Views.history = {
           <i class="ph ph-clock-counter-clockwise page-header-icon"></i>
           <h2 class="page-header-title">${t('hist_title')}</h2>
         </div>
-        <div class="page-header-right">
+        <div class="page-header-right" style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
           <input class="input" id="historySearch" placeholder="🔍 බිල් No / පාරිභෝගිකයා / බඩු..." style="width:230px" value="${escapeHTML(Views.history.searchQ || '')}">
           <input class="input" id="historyDateFilter" type="date" style="width:150px" value="${escapeHTML(Views.history.filterDate || '')}" title="දිනයෙන් පෙරන්න">
-          <select class="input" id="histFilter" style="width:160px">
+          <select class="input" id="histFilter" style="width:140px">
             <option value="all" ${Views.history.filterType === 'all' ? 'selected' : ''}>${t('hist_filter_all')}</option>
             <option value="cash" ${Views.history.filterType === 'cash' ? 'selected' : ''}>${t('hist_filter_cash')}</option>
             <option value="credit" ${Views.history.filterType === 'credit' ? 'selected' : ''}>${t('hist_filter_credit')}</option>
           </select>
+          <button class="btn btn-danger btn-sm" id="clearAllSalesBtn" title="${t('hist_clear_all_btn')}" style="padding:7px 12px; font-size:13px; display:inline-flex; align-items:center; gap:6px; white-space:nowrap;">
+            <i class="ph ph-trash" style="font-size:16px;"></i> ${t('hist_clear_all_btn')}
+          </button>
         </div>
       </div>
       <div id="histTableWrap">${Views.history.tableHTML()}</div>
@@ -3177,6 +3438,26 @@ Views.history = {
       document.getElementById('histTableWrap').innerHTML = Views.history.tableHTML();
       Views.history.bindRowActions();
     });
+
+    const clearBtn = document.getElementById('clearAllSalesBtn');
+    if (clearBtn) {
+      clearBtn.addEventListener('click', () => {
+        const count = DB.allSales().length;
+        if (count === 0) {
+          toast(currentLang === 'si' ? 'මකා දැමීමට බිල්පත් නැත!' : 'No bills to clear!', 'err');
+          return;
+        }
+        confirmAction(t('hist_clear_all_confirm'), async () => {
+          await DB.clearAllSales(true);
+          toast(t('hist_clear_all_success'), 'ok');
+          document.getElementById('histTableWrap').innerHTML = Views.history.tableHTML();
+          Views.history.bindRowActions();
+          App.updateSidebarCounts();
+          if (typeof App.render === 'function') App.render();
+        });
+      });
+    }
+
     Views.history.bindRowActions();
   },
   bindRowActions() {

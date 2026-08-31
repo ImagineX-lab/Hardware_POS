@@ -185,7 +185,11 @@ const i18n = {
     cust_quick_add_title: "අලුත් ගනු දාන්න",
     cust_hardware_discount_badge: "හාර්ඩ්වෙයාර් දිස්කවුන්ට්",
     cust_payment_amount: "මුදල (රු.)",
-    cust_err_name: "නම දාන්න",
+    cust_err_name: "නම ඇතුළත් කරන්න",
+    cust_err_phone: "දුරකථන අංකය වැරදියි! කරුණාකර නිවැරදි ඉලක්කම් 10 ක අංකයක් ඇතුළත් කරන්න (උදා: 07XXXXXXXX හෝ 011XXXXXXX)",
+    cust_err_nic: "ජාතික හැඳුනුම්පත් (NIC) අංකය වැරදියි! (උදා: 901234567V හෝ 199012345678)",
+    cust_err_limit: "ණය සීමාව (Credit Limit) සඳහා නිවැරදි මුදලක් ඇතුළත් කරන්න",
+    cust_err_discount: "දිස්කවුන්ට් ප්‍රතිශතය 0 ත් 100 ත් අතර විය යුතුය",
     cust_added: "ගනු දාන ලදී",
 
     cust_curr_due: "දැන් හිඟ",
@@ -210,6 +214,9 @@ const i18n = {
     hist_preview: "බිල්පත බලන්න (Preview)",
     hist_del_confirm: "මේ බිල අවලංගු කරන්නද? ස්ටොක් සහ ණය ශේෂය නැවත ගැලපෙයි.",
     hist_deleted: "බිල අවලංගු කෙරුණා",
+    hist_clear_all_btn: "බිල්පත් සියල්ල මකන්න (Reset #1)",
+    hist_clear_all_confirm: "ඔබට සියලුම විකුණුම් බිල්පත් මකා, බිල්පත් අංකය නැවත 1 සිට ආරම්භ කිරීමට අවශ්‍යද? (භාණ්ඩ තොග නැවත එකතු වේ)",
+    hist_clear_all_success: "බිල්පත් සියල්ල මකා, බිල්පත් අංකය නැවත 1 සිට ආරම්භ වන සේ සකසන ලදී!",
 
     // Settings
     settings_title: "සෙටිංස්",
@@ -440,6 +447,10 @@ const i18n = {
     cust_hardware_discount_badge: "Hardware Discount",
     cust_payment_amount: "Amount (Rs.)",
     cust_err_name: "Name is required",
+    cust_err_phone: "Invalid phone number! Please enter a valid 10-digit number (e.g. 07XXXXXXXX or 011XXXXXXX)",
+    cust_err_nic: "Invalid NIC number! (e.g. 901234567V or 199012345678)",
+    cust_err_limit: "Please enter a valid credit limit amount",
+    cust_err_discount: "Discount percentage must be between 0 and 100",
     cust_added: "Customer added successfully",
 
     cust_curr_due: "Current Due",
@@ -464,6 +475,9 @@ const i18n = {
     hist_preview: "View Receipt",
     hist_del_confirm: "Cancel this sale? Stock and credit balances will be restored.",
     hist_deleted: "Sale cancelled successfully",
+    hist_clear_all_btn: "Clear All Bills (Reset #1)",
+    hist_clear_all_confirm: "Are you sure you want to clear all sales bills and reset bill numbering to start from 1? (Item stock will be restored)",
+    hist_clear_all_success: "All bills cleared and bill numbering reset to start from 1!",
 
     // Settings
     settings_title: "Settings",
