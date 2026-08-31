@@ -196,6 +196,7 @@ const App = {
           if (looseBtns.length > 0) {
             const lastLooseBtn = looseBtns[looseBtns.length - 1];
             lastLooseBtn.focus();
+            lastLooseBtn.scrollIntoView({ block: 'nearest' });
           }
         }
       }
@@ -243,6 +244,7 @@ const App = {
           if (looseBtns.length > 0) {
             const lastLooseBtn = looseBtns[looseBtns.length - 1];
             lastLooseBtn.focus();
+            lastLooseBtn.scrollIntoView({ block: 'nearest' });
           }
         }
         if (e.key === 'F8') { e.preventDefault(); document.getElementById('saleDiscount')?.focus(); }

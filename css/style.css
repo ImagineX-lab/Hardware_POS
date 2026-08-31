@@ -1116,11 +1116,26 @@ th.num {
 }
 
 .cart-list-wrap {
-  flex: 1;
-  min-height: 80px;
+  max-height: 245px;
+  overflow-y: auto;
+  overflow-x: hidden;
   padding-right: 6px;
   border-bottom: 1px solid var(--border);
-  margin-bottom: 12px;
+  margin-bottom: 10px;
+  scrollbar-width: thin;
+}
+
+.cart-list-wrap::-webkit-scrollbar {
+  width: 6px;
+}
+
+.cart-list-wrap::-webkit-scrollbar-thumb {
+  background: var(--border, #e2e8f0);
+  border-radius: 4px;
+}
+
+.cart-list-wrap::-webkit-scrollbar-thumb:hover {
+  background: var(--steel, #64748b);
 }
 
 

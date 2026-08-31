@@ -237,7 +237,7 @@ Views.sale = {
 
         <div class="card" style="padding:14px; display:flex; flex-direction:column; gap:6px;">
           <div class="cart-tabs-bar">${Views.sale.tabsHTML()}</div>
-          <div class="cart-list-wrap" id="cartBox" style="padding:0; flex:1; min-height:0;">${Views.sale.cartHTML()}</div>
+          <div class="cart-list-wrap" id="cartBox" style="padding:0;">${Views.sale.cartHTML()}</div>
 
           <div class="totals-box" id="totalsBox" style="margin-top:auto; padding:6px 0 4px 0; border-top:1px dashed var(--border);">${Views.sale.totalsHTML()}</div>
 
@@ -393,7 +393,7 @@ Views.sale = {
               </div>
 
               <!-- LOOSE CALCULATOR BUTTON RIGHT NEXT TO PRICE -->
-              <button type="button" class="btn-loose-toggle" data-loose-idx="${idx}" title="ලිහිල් විකිණීම සහ මිනුම් පරිවර්තනය (kg, g, අඟල්, අඩි, L, ml, pcs...)" style="height:32px; padding:0 8px; font-size:11.5px; font-weight:700; border:1px solid ${l.looseInfo ? '#f59e0b' : 'var(--border)'}; border-radius:6px; background:${l.looseInfo ? '#fef3c7' : '#f8fafc'}; color:${l.looseInfo ? '#b45309' : '#334155'}; cursor:pointer; display:inline-flex; align-items:center; gap:3px; white-space:nowrap; transition:all 0.15s ease;">
+              <button type="button" class="btn-loose-toggle" data-loose-idx="${idx}" title="ලිහිල් විකිණීම සහ මිනුම් පරිවර්තනය [Shortcut: L] (kg, g, අඟල්, අඩි, L, ml, pcs...)" style="height:32px; padding:0 8px; font-size:11.5px; font-weight:700; border:1px solid ${l.looseInfo ? '#f59e0b' : 'var(--border)'}; border-radius:6px; background:${l.looseInfo ? '#fef3c7' : '#f8fafc'}; color:${l.looseInfo ? '#b45309' : '#334155'}; cursor:pointer; display:inline-flex; align-items:center; gap:3px; white-space:nowrap; transition:all 0.15s ease;">
                 <span>⚖️</span>
                 <span>${l.looseInfo ? escapeHTML(l.looseInfo.shortText || 'ලිහිල්') : 'ලිහිල්'}</span>
               </button>
@@ -538,6 +538,7 @@ Views.sale = {
     document.querySelectorAll('[data-qty-idx], [data-discount-idx]').forEach(inp => {
       inp.addEventListener('focus', (e) => {
         if (typeof e.target.select === 'function') e.target.select();
+        e.target.closest('.cart-row')?.scrollIntoView({ block: 'nearest' });
       });
 
       inp.addEventListener('keydown', (e) => {
@@ -596,6 +597,13 @@ Views.sale = {
             e.preventDefault();
             const prevLoose = document.querySelector(`[data-loose-idx="${idx - 1}"]`);
             if (prevLoose) prevLoose.focus();
+          }
+        } else if (e.key === 'l' || e.key === 'L' || e.code === 'KeyL') {
+          e.preventDefault();
+          const looseBtn = document.querySelector(`[data-loose-idx="${idx}"]`);
+          if (looseBtn) {
+            looseBtn.focus();
+            looseBtn.scrollIntoView({ block: 'nearest' });
           }
         } else if (e.key === 'Backspace' || e.key === 'Delete') {
           if (e.key === 'Delete' || e.target.value === '' || e.shiftKey || e.altKey) {
@@ -665,7 +673,7 @@ Views.sale = {
               if (typeof searchInp.select === 'function') searchInp.select();
             }
           }
-        } else if (e.key === 'Enter' || e.key === ' ' || e.code === 'Space') {
+        } else if (e.key === 'l' || e.key === 'L' || e.code === 'KeyL' || e.key === 'Enter' || e.key === ' ' || e.code === 'Space') {
           e.preventDefault();
           Views.sale.openLooseModal(idx);
         } else if (e.key === 'Backspace' || e.key === 'Delete') {
@@ -1355,6 +1363,10 @@ Views.sale = {
       });
     }
     Views.sale.refreshCart();
+    const cartBox = document.getElementById('cartBox');
+    if (cartBox) {
+      cartBox.scrollTop = cartBox.scrollHeight;
+    }
   },
 
   openLooseModal(idx) {
