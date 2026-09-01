@@ -100,6 +100,9 @@ const App = {
     });
 
     this.bindGlobalShortcuts();
+    if (typeof BarcodeSystem !== 'undefined' && BarcodeSystem.initGlobalScanner) {
+      BarcodeSystem.initGlobalScanner();
+    }
     this.render();
   },
 

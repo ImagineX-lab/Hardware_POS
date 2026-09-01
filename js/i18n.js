@@ -137,6 +137,25 @@ const i18n = {
     items_deleted: "ඉවත් කරන ලදී",
     items_del_confirm: "ඉවත් කරන්නද?",
 
+    // Barcode translations
+    barcode_label: "බාර්කෝඩ් (Barcode)",
+    barcode_placeholder: "Barcode එක scan හෝ type කරන්න...",
+    barcode_generate: "🎲 Generate",
+    barcode_camera_scan: "📷 Camera Scan",
+    barcode_print_label: "🖨 Sticker Print",
+    barcode_not_found: "මෙම Barcode එක සහිත භාණ්ඩයක් හමු නොවුණි.",
+    barcode_scanned: "Barcode එක සාර්ථකව scan විය",
+    barcode_duplicate: "මෙම Barcode එක දැනටමත් වෙනත් භාණ්ඩයකට පවතී!",
+    barcode_print_title: "🖨 Barcode ලේබල් මුද්‍රණය",
+    barcode_copies: "පිටපත් ගණන (Copies):",
+    barcode_paper_size: "ප්‍රමාණය (Size):",
+    barcode_thermal_single: "Thermal Sticker (Single)",
+    barcode_sheet_2col: "A4 / Sticker Sheet (2 Column)",
+    barcode_sheet_3col: "A4 / Sticker Sheet (3 Column)",
+    barcode_cam_title: "📷 Barcode Camera Scanner",
+    barcode_cam_instruction: "භාණ්ඩයේ Barcode එක කැමරාව ඉදිරියෙන් තබන්න...",
+    barcode_cam_switch: "කැමරාව මාරු කරන්න",
+
     // Stock
     stock_report: "Stock List",
     stock_total_val: "Stock Total (cost මිලට):",
@@ -397,6 +416,25 @@ const i18n = {
     items_updated: "Item updated successfully",
     items_deleted: "Item deleted",
     items_del_confirm: "delete this item?",
+
+    // Barcode translations
+    barcode_label: "Barcode",
+    barcode_placeholder: "Scan or enter barcode...",
+    barcode_generate: "🎲 Generate",
+    barcode_camera_scan: "📷 Camera Scan",
+    barcode_print_label: "🖨 Print Label",
+    barcode_not_found: "No item found with this barcode.",
+    barcode_scanned: "Barcode scanned successfully",
+    barcode_duplicate: "This barcode is already assigned to another item!",
+    barcode_print_title: "🖨 Print Barcode Labels",
+    barcode_copies: "Number of Copies:",
+    barcode_paper_size: "Label Layout:",
+    barcode_thermal_single: "Thermal Sticker (Single Label)",
+    barcode_sheet_2col: "A4 / Sheet (2 Columns)",
+    barcode_sheet_3col: "A4 / Sheet (3 Columns)",
+    barcode_cam_title: "📷 Barcode Camera Scanner",
+    barcode_cam_instruction: "Position the barcode in front of the camera...",
+    barcode_cam_switch: "Switch Camera",
 
     // Stock
     stock_report: "Stock Report",

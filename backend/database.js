@@ -59,6 +59,7 @@ module.exports = {
         await run(`CREATE TABLE IF NOT EXISTS items (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             name TEXT,
+            barcode TEXT DEFAULT '',
             category TEXT,
             subCategory TEXT,
             unit TEXT,
@@ -69,6 +70,8 @@ module.exports = {
             packSize REAL DEFAULT 1,
             packUnit TEXT DEFAULT '',
             loosePrice REAL DEFAULT 0,
+            description TEXT,
+            image TEXT,
             createdAt INTEGER
         )`);
         await run(`CREATE TABLE IF NOT EXISTS customers (
@@ -110,6 +113,7 @@ module.exports = {
         try { await run(`ALTER TABLE customers ADD COLUMN discountPercent REAL DEFAULT 0`); } catch(e) {}
         try { await run(`ALTER TABLE sales ADD COLUMN amountPaid REAL DEFAULT 0`); } catch(e) {}
         try { await run(`ALTER TABLE sales ADD COLUMN changeAmount REAL DEFAULT 0`); } catch(e) {}
+        try { await run(`ALTER TABLE items ADD COLUMN barcode TEXT DEFAULT ''`); } catch(e) {}
         try { await run(`ALTER TABLE items ADD COLUMN description TEXT`); } catch(e) {}
         try { await run(`ALTER TABLE items ADD COLUMN image TEXT`); } catch(e) {}
         try { await run(`ALTER TABLE items ADD COLUMN subCategory TEXT`); } catch(e) {}
@@ -183,16 +187,16 @@ module.exports = {
         return await all(`SELECT * FROM items ORDER BY name ASC`);
     },
     addItem: async (item) => {
-        const res = await run(`INSERT INTO items (name, category, subCategory, unit, costPrice, sellPrice, qty, reorderLevel, description, image, packSize, packUnit, loosePrice, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-            [item.name, item.category?.trim() || 'වෙනත්', item.subCategory?.trim() || '', item.unit || 'pcs', Number(item.costPrice)||0, Number(item.sellPrice)||0, Number(item.qty)||0, Number(item.reorderLevel)||5, item.description||'', item.image||'', Number(item.packSize)||1, item.packUnit||'', Number(item.loosePrice)||0, Date.now()]);
+        const res = await run(`INSERT INTO items (name, barcode, category, subCategory, unit, costPrice, sellPrice, qty, reorderLevel, description, image, packSize, packUnit, loosePrice, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [item.name, item.barcode?.trim() || '', item.category?.trim() || 'වෙනත්', item.subCategory?.trim() || '', item.unit || 'pcs', Number(item.costPrice)||0, Number(item.sellPrice)||0, Number(item.qty)||0, Number(item.reorderLevel)||5, item.description||'', item.image||'', Number(item.packSize)||1, item.packUnit||'', Number(item.loosePrice)||0, Date.now()]);
         return await get(`SELECT * FROM items WHERE id = ?`, [res.lastID]);
     },
     updateItem: async (id, patch) => {
         const item = await get(`SELECT * FROM items WHERE id = ?`, [id]);
         if (!item) return null;
         const merged = { ...item, ...patch };
-        await run(`UPDATE items SET name=?, category=?, subCategory=?, unit=?, costPrice=?, sellPrice=?, qty=?, reorderLevel=?, description=?, image=?, packSize=?, packUnit=?, loosePrice=? WHERE id=?`,
-            [merged.name, merged.category?.trim()||'වෙනත්', merged.subCategory?.trim()||'', merged.unit, Number(merged.costPrice)||0, Number(merged.sellPrice)||0, Number(merged.qty)||0, Number(merged.reorderLevel)||5, merged.description||'', merged.image||'', Number(merged.packSize)||1, merged.packUnit||'', Number(merged.loosePrice)||0, id]);
+        await run(`UPDATE items SET name=?, barcode=?, category=?, subCategory=?, unit=?, costPrice=?, sellPrice=?, qty=?, reorderLevel=?, description=?, image=?, packSize=?, packUnit=?, loosePrice=? WHERE id=?`,
+            [merged.name, (merged.barcode || '').trim(), merged.category?.trim()||'වෙනත්', merged.subCategory?.trim()||'', merged.unit, Number(merged.costPrice)||0, Number(merged.sellPrice)||0, Number(merged.qty)||0, Number(merged.reorderLevel)||5, merged.description||'', merged.image||'', Number(merged.packSize)||1, merged.packUnit||'', Number(merged.loosePrice)||0, id]);
         return merged;
     },
     deleteItem: async (id) => {
@@ -494,8 +498,8 @@ module.exports = {
         if(data.settings) await module.exports.updateSettings(data.settings.shopName);
         if(data.items) {
             for(let it of data.items) {
-                await run(`INSERT INTO items (id, name, category, unit, costPrice, sellPrice, qty, reorderLevel, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-                [it.id, it.name, it.category, it.unit, it.costPrice, it.sellPrice, it.qty, it.reorderLevel, it.createdAt]);
+                await run(`INSERT INTO items (id, name, barcode, category, subCategory, unit, costPrice, sellPrice, qty, reorderLevel, description, image, packSize, packUnit, loosePrice, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                [it.id, it.name, it.barcode || '', it.category, it.subCategory || '', it.unit, it.costPrice, it.sellPrice, it.qty, it.reorderLevel, it.description || '', it.image || '', it.packSize || 1, it.packUnit || '', it.loosePrice || 0, it.createdAt]);
             }
         }
         if(data.customers) {

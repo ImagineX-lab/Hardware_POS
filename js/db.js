@@ -65,6 +65,12 @@ const DB = {
     this.data.items = this.data.items.filter(i => i.id !== id);
   },
   getItem(id){ return this.data.items.find(i=>i.id===id); },
+  getItemByBarcode(barcode){
+    if(!barcode) return null;
+    const clean = String(barcode).trim().toLowerCase();
+    if(!clean) return null;
+    return this.data.items.find(i => (i.barcode || '').trim().toLowerCase() === clean);
+  },
   allItems(){ return this.data.items.slice().sort((a,b)=>a.name.localeCompare(b.name)); },
   lowStockItems(){ return this.data.items.filter(i=>i.qty <= i.reorderLevel); },
 
