@@ -2010,52 +2010,97 @@ Views.sale = {
   },
 
   showReceipt(sale) {
+    const shopName = (DB.data.settings && DB.data.settings.shopName) || 'HardwarePOS';
+    const shopDesc = (DB.data.settings && DB.data.settings.shopDescription) || '';
+    const logo = (DB.data.settings && DB.data.settings.logo) || '';
+
     const html = `
       <div class="receipt" id="printArea">
-        ${DB.data.settings.logo ? `<img class="receipt-watermark" src="${DB.data.settings.logo}" alt="Watermark Logo">` : ''}
-        ${DB.data.settings.shopDescription ? `<div class="r-center" style="font-size:12px; font-weight:700; color:#111; margin-top:2px; margin-bottom:4px; white-space:pre-line; font-family:'Noto Sans Sinhala', sans-serif; line-height:1.6;">${escapeHTML(DB.data.settings.shopDescription)}</div>` : ''}
-        <div style="display:flex; justify-content:space-between; align-items:center; font-size:12px; margin:4px 0;">
-          <span>${(()=>{ const d=new Date(sale.date); return d.toLocaleDateString('en-GB'); })()}</span>
-          <span>${(()=>{ const d=new Date(sale.date); return d.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}); })()}</span>
-          <span>#${sale.id}</span>
+        ${logo ? `<img class="receipt-logo" src="${logo}" alt="Shop Logo">` : ''}
+        <h2>${escapeHTML(shopName)}</h2>
+        ${shopDesc ? `<div class="r-center" style="font-size:11px; color:#222; margin-bottom:4px; white-space:pre-line;">${escapeHTML(shopDesc)}</div>` : ''}
+        
+        <div style="border-top:1px dashed #000; border-bottom:1px dashed #000; padding:4px 0; margin:4px 0; font-size:11px;">
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <span><b>INVOICE #${sale.id}</b></span>
+            <span>${(()=>{ const d=new Date(sale.date); return d.toLocaleDateString('en-GB') + ' ' + d.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}); })()}</span>
+          </div>
+          ${sale.customerName ? `<div style="margin-top:2px; font-size:11px;">ගනුදෙනුකරු: <b>${escapeHTML(sale.customerName)}</b></div>` : ''}
         </div>
-        <hr>
-        <table>
-          <thead><tr><th style="text-align:left">${t('receipt_qty')}</th><th class="num">${t('word_qty')}</th><th class="num">${t('receipt_amount') || t('sale_total')}</th></tr></thead>
+
+        <table style="width:100%; border-collapse:collapse; margin:4px 0; font-size:11px;">
+          <thead>
+            <tr style="border-bottom:1px dashed #000;">
+              <th style="text-align:left; padding-bottom:3px;">විස්තරය (Item)</th>
+              <th style="text-align:center; width:45px; padding-bottom:3px;">ගණන</th>
+              <th style="text-align:right; width:65px; padding-bottom:3px;">මිල</th>
+              <th style="text-align:right; width:75px; padding-bottom:3px;">එකතුව</th>
+            </tr>
+          </thead>
           <tbody>
-            ${sale.lines.map(l => `
-              <tr>
-                <td>
-                  ${escapeHTML(l.name)}
-                  ${l.looseInfo ? `<div style="font-size:10px; color:#555; font-weight:600;">[ලිහිල්: ${escapeHTML(l.looseInfo.shortText || '')}]</div>` : ''}
-                </td>
-                <td class="num">${l.looseInfo ? `${l.looseInfo.looseQty} ${escapeHTML(l.looseInfo.looseUnit)}` : `${l.qty} ${escapeHTML(l.unit || '')}`}</td>
-                <td class="num">${fmt(l.qty * l.unitPrice)}</td>
-              </tr>
-            `).join('')}
+            ${sale.lines.map(l => {
+              const origPrice = (l.originalPrice !== undefined && l.originalPrice > 0) ? l.originalPrice : l.unitPrice;
+              const hasDisc = (l.unitPrice < origPrice);
+              const lineTot = l.qty * l.unitPrice;
+              return `
+                <tr>
+                  <td colspan="4" style="padding-top:4px; font-weight:700; color:#000;">${escapeHTML(l.name)}</td>
+                </tr>
+                <tr style="border-bottom:1px dotted #ccc;">
+                  <td style="padding-bottom:4px; font-size:10px; color:#555;">
+                    ${l.looseInfo ? `[ලිහිල්: ${escapeHTML(l.looseInfo.shortText || '')}]` : ''}
+                    ${hasDisc ? `[Disc: -${fmt(origPrice - l.unitPrice)}]` : ''}
+                  </td>
+                  <td style="text-align:center; padding-bottom:4px; font-size:11px; white-space:nowrap;">
+                    ${l.looseInfo ? `${l.looseInfo.looseQty} ${escapeHTML(l.looseInfo.looseUnit)}` : `${l.qty} ${escapeHTML(l.unit || '')}`}
+                  </td>
+                  <td style="text-align:right; padding-bottom:4px; font-size:11px; white-space:nowrap;">
+                    ${(l.unitPrice).toLocaleString('en-LK', {minimumFractionDigits:2, maximumFractionDigits:2})}
+                  </td>
+                  <td style="text-align:right; padding-bottom:4px; font-weight:700; font-size:11.5px; white-space:nowrap;">
+                    ${fmt(lineTot)}
+                  </td>
+                </tr>
+              `;
+            }).join('')}
           </tbody>
         </table>
-        <hr>
-        <div style="display:flex; justify-content:space-between;"><span>${t('sale_subtotal')}</span><span>${fmt(sale.subtotal)}</span></div>
-        <div style="display:flex; justify-content:space-between;"><span>${t('sale_discount')}</span><span>${fmt(sale.discount)}</span></div>
-        <div style="display:flex; justify-content:space-between; font-weight:700; font-size:14px;"><span>${t('sale_total')}</span><span>${fmt(sale.total)}</span></div>
-        <div style="display:flex; justify-content:space-between; margin-top:4px;"><span>${t('sale_payment')}</span><span>${sale.paymentType === 'credit' ? `${t('word_credit')} - ${escapeHTML(sale.customerName)}` : t('word_cash')}</span></div>
-        ${sale.paymentType === 'cash' && sale.amountPaid > 0 ? `
-          <div style="display:flex; justify-content:space-between; margin-top:4px;"><span>${t('sale_amount_paid')}</span><span>${fmt(sale.amountPaid)}</span></div>
-          <div style="display:flex; justify-content:space-between; font-weight:700;"><span>${t('sale_change_due')}</span><span>${fmt(sale.changeAmount)}</span></div>
-        ` : ''}
-        <hr>
-        <div class="r-center">${t('receipt_thanks')}</div>
-        <div class="r-center" style="font-size: 10px; font-weight: 700; color: #111; margin-top: 6px; border-top: 1px dashed #999; padding-top: 6px; line-height: 1.5; font-family: 'Noto Sans Sinhala', sans-serif;">භාණ්ඩය ආපසු භාරදීමේදී මෙම බිල්පත/ඉන්වොයිසිය ඉදිරිපත් කිරීම අනිවාර්ය වේ</div>
-        <div class="r-center" style="font-size: 9px; color: #111; margin-top: 8px; border-top: 1px dotted #ccc; padding-top: 4px;">imagineX software solution - 0761945587</div>
+
+        <div style="border-top:1px dashed #000; padding-top:4px; margin-top:4px;">
+          <div class="receipt-totals-row"><span>${t('sale_subtotal')} (Subtotal):</span><span>${fmt(sale.subtotal)}</span></div>
+          ${sale.discount > 0 ? `<div class="receipt-totals-row"><span>${t('sale_discount')} (Discount):</span><span>- ${fmt(sale.discount)}</span></div>` : ''}
+          <div class="receipt-totals-row grand">
+            <span style="font-size:12.5px; font-weight:800;">ශුද්ධ එකතුව (TOTAL):</span>
+            <span style="font-size:15px; font-weight:800;">${fmt(sale.total)}</span>
+          </div>
+          <div class="receipt-totals-row" style="margin-top:2px;">
+            <span>ගෙවීම් ක්‍රමය (Payment):</span>
+            <b>${sale.paymentType === 'credit' ? `ණයට (Credit) - ${escapeHTML(sale.customerName || '')}` : 'මුදල් (Cash)'}</b>
+          </div>
+          ${sale.paymentType === 'cash' && sale.amountPaid > 0 ? `
+            <div class="receipt-totals-row"><span>ගෙවූ මුදල (Paid):</span><span>${fmt(sale.amountPaid)}</span></div>
+            <div class="receipt-totals-row" style="font-weight:700;"><span>ඉතිරි මුදල (Change):</span><span>${fmt(sale.changeAmount)}</span></div>
+          ` : ''}
+        </div>
+
+        <div style="text-align:center; margin-top:8px; border-top:1px dashed #000; padding-top:6px;">
+          <div style="font-weight:700; font-size:11.5px; margin-bottom:3px;">${t('receipt_thanks')}</div>
+          <div style="font-size:9.5px; color:#222; margin-bottom:5px; line-height:1.4;">භාණ්ඩ ආපසු භාරදීමේදී මෙම බිල්පත ඉදිරිපත් කිරීම අනිවාර්ය වේ.</div>
+          
+          <div style="margin:6px 0; display:flex; justify-content:center;">
+            ${typeof BarcodeSystem !== 'undefined' ? BarcodeSystem.generateCode128SVG('BILL-' + sale.id, { width: 170, height: 38, fontSize: 9 }) : ''}
+          </div>
+
+          <div style="font-size:9px; color:#555; margin-top:4px;">imagineX software solution - 0761945587</div>
+        </div>
       </div>
     `;
     openModal({
-      title: `${t('hist_preview') || 'බිල්පත'} #${sale.id}`,
+      title: `${t('hist_preview') || 'බිල්පත'} #${sale.id} (80mm Thermal)`,
       bodyHTML: html,
       footHTML: `
         <button class="btn btn-outline" data-close>${t('close')}</button>
-        <button class="btn btn-primary" id="printReceiptBtn">${t('receipt_print')}</button>
+        <button class="btn btn-primary" id="printReceiptBtn"><i class="ph ph-printer"></i> ${t('receipt_print') || 'Print කරන්න'}</button>
       `,
       wide: false,
       onMount: (wrap) => {
