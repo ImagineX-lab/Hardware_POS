@@ -221,9 +221,16 @@ Views.sale = {
     return `
       <div class="sale-layout">
       <div class="card">
-          <div style="position:relative;">
-            <input class="input" id="saleSearch" placeholder="${t('sale_search_placeholder')}" autocomplete="off">
-            <div id="saleSuggest" style="position:absolute; z-index:10; width:100%; top:100%;"></div>
+          <div style="display:flex; gap:8px; align-items:center; margin-bottom:8px;">
+            <div style="position:relative; flex:1;">
+              <input class="input" id="saleSearch" placeholder="${t('sale_search_placeholder')} (නම හෝ Barcode Scan කරන්න...)" autocomplete="off" style="padding-left:36px; font-weight:600;">
+              <i class="ph ph-barcode" style="position:absolute; left:10px; top:50%; transform:translateY(-50%); font-size:20px; color:var(--text-muted);"></i>
+              <div id="saleSuggest" style="position:absolute; z-index:10; width:100%; top:100%;"></div>
+            </div>
+            <button type="button" class="btn btn-outline" id="posCamScanBtn" title="${t('barcode_camera_scan') || 'Camera Scanner'}" style="height:42px; padding:0 12px; display:inline-flex; align-items:center; gap:5px; font-weight:700; white-space:nowrap;">
+              <i class="ph ph-camera" style="font-size:18px;"></i>
+              <span>Scan</span>
+            </button>
           </div>
           
           <div class="pos-categories" id="posCategories">
@@ -325,7 +332,7 @@ Views.sale = {
     }
     const q = (document.getElementById('saleSearch')?.value || '').trim();
     if (q) {
-      items = items.filter(i => Singlish.match(i.name, q) || Singlish.match(i.category || '', q) || Singlish.match(i.description || '', q));
+      items = items.filter(i => Singlish.match(i.name, q) || Singlish.match(i.category || '', q) || Singlish.match(i.description || '', q) || (i.barcode && i.barcode.toLowerCase().includes(q.toLowerCase())));
     }
     if (!items.length) {
       return `<div class="empty-state" style="grid-column:1/-1; padding:40px 20px;"><div class="em-ico"><i class="ph ph-package"></i></div><h3>${t('sale_no_matches') || 'No items'}</h3></div>`;
@@ -339,6 +346,7 @@ Views.sale = {
       }
         </div>
         <div class="item-name"><b>${escapeHTML(i.name)}</b></div>
+        ${i.barcode ? `<div style="font-size:10.5px; font-family:monospace; color:var(--primary); font-weight:700;"><i class="ph ph-barcode"></i> ${escapeHTML(i.barcode)}</div>` : ''}
         <div class="item-desc text-muted">${escapeHTML(i.description || '')}</div>
         <div>
           <div class="item-price">${fmt(i.sellPrice)}</div>
@@ -697,7 +705,16 @@ Views.sale = {
   bind() {
     const searchInp = document.getElementById('saleSearch');
     const suggestBox = document.getElementById('saleSuggest');
+    const camBtn = document.getElementById('posCamScanBtn');
     let selectedIndex = -1;
+
+    if (camBtn) {
+      camBtn.addEventListener('click', () => {
+        BarcodeSystem.openCameraScanner((scanned) => {
+          BarcodeSystem.handleScannedBarcode(scanned);
+        });
+      });
+    }
 
     if (searchInp) {
       searchInp.addEventListener('input', () => {
@@ -709,7 +726,7 @@ Views.sale = {
           Views.sale.bindGrid();
         }
         if (!q) { suggestBox.innerHTML = ''; return; }
-        const matches = DB.allItems().filter(i => Singlish.match(i.name, q) || Singlish.match(i.category || '', q) || Singlish.match(i.description || '', q)).slice(0, 8);
+        const matches = DB.allItems().filter(i => Singlish.match(i.name, q) || Singlish.match(i.category || '', q) || Singlish.match(i.description || '', q) || (i.barcode && i.barcode.toLowerCase().includes(q.toLowerCase()))).slice(0, 8);
         if (!matches.length) {
           suggestBox.innerHTML = `<div class="search-suggest"><div class="suggest-row text-muted">${t('sale_no_matches')}</div></div>`;
           return;
@@ -722,7 +739,7 @@ Views.sale = {
               </div>
               <div>
                 <div class="s-name">${escapeHTML(i.name)}</div>
-                <div class="s-meta">${escapeHTML(i.category)} • ${t('word_qty')}: ${i.qty} ${escapeHTML(i.unit)} • ${t('items_cost_price')}: ${fmt(i.costPrice || 0)}</div>
+                <div class="s-meta">${i.barcode ? `<b style="font-family:monospace; color:var(--primary);"><i class="ph ph-barcode"></i> ${escapeHTML(i.barcode)}</b> • ` : ''}${escapeHTML(i.category)} • ${t('word_qty')}: ${i.qty} ${escapeHTML(i.unit)} • ${t('items_cost_price')}: ${fmt(i.costPrice || 0)}</div>
               </div>
             </div>
             <div style="font-weight:700">${fmt(i.sellPrice)}</div>
@@ -744,28 +761,25 @@ Views.sale = {
 
       searchInp.addEventListener('keydown', (e) => {
         const rows = suggestBox.querySelectorAll('[data-add-item]');
+        const rawQ = searchInp.value.trim();
 
-        if (e.key === 'ArrowDown') {
-          if (rows.length > 0) {
-            e.preventDefault();
-            selectedIndex = (selectedIndex + 1) % rows.length;
-            updateSelection();
-          } else {
-            const firstQty = document.querySelector('[data-qty-idx="0"]');
-            if (firstQty) {
-              e.preventDefault();
-              firstQty.focus();
-              if (typeof firstQty.select === 'function') firstQty.select();
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          // 1. Check if exact barcode matches an item
+          const exactBarcodeItem = DB.getItemByBarcode(rawQ);
+          if (exactBarcodeItem) {
+            BarcodeSystem.handleScannedBarcode(rawQ);
+            searchInp.value = '';
+            suggestBox.innerHTML = '';
+            const grid = document.getElementById('posItemGrid');
+            if (grid) {
+              grid.innerHTML = Views.sale.posGridHTML();
+              Views.sale.bindGrid();
             }
+            return;
           }
-        } else if (e.key === 'ArrowUp') {
-          if (!rows.length) return;
-          e.preventDefault();
-          selectedIndex = selectedIndex - 1;
-          if (selectedIndex < 0) selectedIndex = rows.length - 1;
-          updateSelection();
-        } else if (e.key === 'Enter') {
-          e.preventDefault();
+
+          // 2. Select from dropdown suggestions
           if (rows.length > 0) {
             if (selectedIndex >= 0 && selectedIndex < rows.length) {
               rows[selectedIndex].click();
@@ -774,6 +788,7 @@ Views.sale = {
             }
           }
           searchInp.blur();
+          return;
         }
 
         function updateSelection() {
@@ -2069,7 +2084,7 @@ Views.items = {
   tableHTML() {
     let list = DB.allItems();
     const q = (Views.items.searchQ || '').trim();
-    if (q) list = list.filter(i => Singlish.match(i.name, q) || Singlish.match(i.category || '', q) || Singlish.match(i.description || '', q));
+    if (q) list = list.filter(i => Singlish.match(i.name, q) || Singlish.match(i.category || '', q) || Singlish.match(i.description || '', q) || (i.barcode && i.barcode.toLowerCase().includes(q.toLowerCase())));
     if (!list.length) return `<div class="card"><div class="empty-state"><div class="em-ico"><i class="ph ph-package"></i></div><h3>${t('items_no_items')}</h3><div class="small">${t('items_no_items_sub')}</div></div></div>`;
     return `
       <div class="table-wrap">
@@ -2090,13 +2105,17 @@ Views.items = {
                     ${i.image ? `<img src="${i.image}" style="width:100%; height:100%; object-fit:cover;">` : `<i class="ph ph-package" style="font-size:18px;"></i>`}
                   </div>
                 </td>
-                <td><b>${escapeHTML(i.name)}</b></td>
+                <td>
+                  <b>${escapeHTML(i.name)}</b>
+                  ${i.barcode ? `<div style="font-size:11px; font-family:monospace; color:var(--primary); font-weight:700;"><i class="ph ph-barcode"></i> ${escapeHTML(i.barcode)}</div>` : ''}
+                </td>
                 <td class="text-muted">${escapeHTML(i.category)}</td>
                 <td class="num">${fmt(i.costPrice)}</td>
                 <td class="num">${fmt(i.sellPrice)}</td>
                 <td class="num">${i.qty} ${escapeHTML(i.unit)}</td>
                 <td>${status}</td>
                 <td>
+                  <button class="icon-btn" data-print-barcode="${i.id}" title="${t('barcode_print_label') || 'Print Barcode'}"><i class="ph ph-barcode"></i></button>
                   <button class="icon-btn" data-edit-item="${i.id}" title="${t('items_edit')}">✎</button>
                   <button class="icon-btn" data-del-item="${i.id}" title="${t('delete')}"><i class="ph ph-trash"></i></button>
                 </td>
@@ -2109,7 +2128,7 @@ Views.items = {
   },
 
   formHTML(item) {
-    const v = item || { name: '', category: '', subCategory: '', unit: 'pcs', costPrice: '', sellPrice: '', qty: '', reorderLevel: 5, packSize: '', packUnit: '', loosePrice: '', image: '', description: '' };
+    const v = item || { name: '', barcode: '', category: '', subCategory: '', unit: 'pcs', costPrice: '', sellPrice: '', qty: '', reorderLevel: 5, packSize: '', packUnit: '', loosePrice: '', image: '', description: '' };
     const existingCategories = [...new Set(DB.data.items.map(i => i.category).filter(c => c && c.trim()))].sort();
     const catOptions = existingCategories.map(c => `<div class="combo-opt" data-val="${escapeHTML(c)}">${escapeHTML(c)}</div>`).join('');
     // sub-category options for the current category
@@ -2158,6 +2177,34 @@ Views.items = {
           </div>
         </div>
       </div>
+
+      <!-- Barcode Section -->
+      <div class="field" style="margin-bottom:14px; background:#f8fafc; border:1.5px solid #cbd5e1; border-radius:10px; padding:10px 12px;">
+        <label class="field-label" style="display:flex; align-items:center; justify-content:space-between; margin-bottom:6px; color:#1e293b; font-weight:700;">
+          <span style="display:inline-flex; align-items:center; gap:6px;"><i class="ph ph-barcode" style="font-size:18px; color:var(--primary);"></i> ${t('barcode_label') || 'බාර්කෝඩ් (Barcode)'}</span>
+          <span class="small text-muted" style="font-size:11px;">(USB Scanner / Camera / Auto-Generate)</span>
+        </label>
+        <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+          <div style="position:relative; flex:1; min-width:180px;">
+            <input class="input" id="f_barcode" value="${escapeHTML(v.barcode || '')}" placeholder="${t('barcode_placeholder') || 'Scan or enter barcode...'}" style="padding-left:36px; font-family:monospace; font-weight:700; font-size:14px; letter-spacing:1px;" autocomplete="off">
+            <i class="ph ph-barcode" style="position:absolute; left:10px; top:50%; transform:translateY(-50%); font-size:18px; color:var(--text-muted);"></i>
+          </div>
+          <button type="button" class="btn btn-outline" id="btnGenBarcode" title="Generate Barcode" style="padding:0 10px; height:38px; display:inline-flex; align-items:center; gap:4px; font-weight:600;">
+            <i class="ph ph-dice-three"></i> <span>${t('barcode_generate') || 'Generate'}</span>
+          </button>
+          <button type="button" class="btn btn-outline" id="btnCamScanBarcode" title="Camera Scan" style="padding:0 10px; height:38px; display:inline-flex; align-items:center; gap:4px; font-weight:600;">
+            <i class="ph ph-camera"></i> <span>Scan</span>
+          </button>
+          ${v.id ? `
+          <button type="button" class="btn btn-outline" id="btnPrintBarcodeModalBtn" title="Print Sticker" style="padding:0 10px; height:38px; display:inline-flex; align-items:center; gap:4px; font-weight:600;">
+            <i class="ph ph-printer"></i> <span>Sticker</span>
+          </button>` : ''}
+        </div>
+        <div id="barcodePreviewWrap" style="margin-top:8px; ${v.barcode ? 'display:block;' : 'display:none;'}">
+          <!-- Live SVG Barcode Preview -->
+        </div>
+      </div>
+
       <div class="grid grid-2">
         <div class="field"><label class="field-label">Description</label><textarea class="input" id="f_desc" placeholder="Enter item description..." style="min-height:50px;">${escapeHTML(v.description || '')}</textarea></div>
         <div class="field"><label class="field-label">${t('items_form_name')}</label><input class="input" id="f_name" value="${escapeHTML(v.name)}" placeholder="${t('items_form_name_ph')}"></div>
@@ -2281,17 +2328,74 @@ Views.items = {
     });
   },
 
-  openAddModal() {
+  bindBarcodeControls(item) {
+    const barcodeInp = document.getElementById('f_barcode');
+    const genBtn = document.getElementById('btnGenBarcode');
+    const camBtn = document.getElementById('btnCamScanBarcode');
+    const printBtn = document.getElementById('btnPrintBarcodeModalBtn');
+    const previewWrap = document.getElementById('barcodePreviewWrap');
+
+    const updatePreview = () => {
+      if (!previewWrap || !barcodeInp) return;
+      const code = barcodeInp.value.trim();
+      if (code) {
+        previewWrap.style.display = 'block';
+        previewWrap.innerHTML = `
+          <div style="background:#fff; border:1px solid #cbd5e1; border-radius:6px; padding:6px 10px; display:inline-flex; align-items:center; gap:10px;">
+            ${BarcodeSystem.generateCode128SVG(code, { width: 140, height: 36, fontSize: 10 })}
+            <span class="small text-muted" style="font-size:11px;">Scannable Code 128</span>
+          </div>
+        `;
+      } else {
+        previewWrap.style.display = 'none';
+        previewWrap.innerHTML = '';
+      }
+    };
+
+    if (barcodeInp) {
+      barcodeInp.addEventListener('input', updatePreview);
+      updatePreview();
+    }
+
+    if (genBtn && barcodeInp) {
+      genBtn.addEventListener('click', () => {
+        barcodeInp.value = BarcodeSystem.generateBarcode();
+        updatePreview();
+        BarcodeSystem.playBeep(true);
+        toast("නව Barcode එකක් සාදන ලදී!", "ok");
+      });
+    }
+
+    if (camBtn && barcodeInp) {
+      camBtn.addEventListener('click', () => {
+        BarcodeSystem.openCameraScanner((scanned) => {
+          barcodeInp.value = scanned;
+          updatePreview();
+          toast(`Barcode එක සටහන් විය: ${scanned}`, 'ok');
+        });
+      });
+    }
+
+    if (printBtn && item && item.id) {
+      printBtn.addEventListener('click', () => {
+        BarcodeSystem.openLabelPrintModal(item.id);
+      });
+    }
+  },
+
+  openAddModal(initialData = null) {
     openModal({
       title: t('items_add_btn'),
-      bodyHTML: Views.items.formHTML(null),
+      bodyHTML: Views.items.formHTML(initialData),
       footHTML: `<button class="btn btn-outline" data-close>${t('cancel')}</button><button class="btn btn-primary" id="saveItemBtn">${t('confirm')}</button>`,
       onMount: () => {
         Views.items.bindCategoryCombo();
         Views.items.bindSubCategoryCombo();
         Views.items.bindImageUpload();
+        Views.items.bindBarcodeControls(initialData);
         document.getElementById('saveItemBtn').addEventListener('click', async () => {
           const name = document.getElementById('f_name').value.trim();
+          const barcode = document.getElementById('f_barcode')?.value.trim() || '';
           const sell = document.getElementById('f_sell').value;
           const qty = document.getElementById('f_qty').value;
           const desc = document.getElementById('f_desc').value.trim();
@@ -2301,9 +2405,15 @@ Views.items = {
           if (!name) { toast(t('items_err_name'), 'err'); return; }
           if (sell === '') { toast(t('items_err_sell'), 'err'); return; }
           if (qty === '') { toast(t('items_err_qty'), 'err'); return; }
+
+          if (barcode && DB.data.items.some(i => (i.barcode || '').trim().toLowerCase() === barcode.toLowerCase())) {
+            toast(t('barcode_duplicate') || "මෙම Barcode එක දැනටමත් වෙනත් භාණ්ඩයකට පවතී!", 'err');
+            return;
+          }
+
           try {
             await DB.addItem({
-              name, category, subCategory,
+              name, barcode, category, subCategory,
               unit: document.getElementById('f_unit').value,
               costPrice: document.getElementById('f_cost').value,
               sellPrice: sell, qty: Number(qty) || 0, reorderLevel: document.getElementById('f_reorder').value,
@@ -2476,12 +2586,20 @@ Views.items = {
         Views.items.bindCategoryCombo();
         Views.items.bindSubCategoryCombo();
         Views.items.bindImageUpload();
+        Views.items.bindBarcodeControls(item);
         document.getElementById('saveItemBtn').addEventListener('click', async () => {
           const name = document.getElementById('f_name').value.trim();
+          const barcode = document.getElementById('f_barcode')?.value.trim() || '';
           if (!name) { toast(t('items_err_name'), 'err'); return; }
+
+          if (barcode && DB.data.items.some(i => i.id !== id && (i.barcode || '').trim().toLowerCase() === barcode.toLowerCase())) {
+            toast(t('barcode_duplicate') || "මෙම Barcode එක දැනටමත් වෙනත් භාණ්ඩයකට පවතී!", 'err');
+            return;
+          }
+
           try {
             await DB.updateItem(id, {
-              name, category: document.getElementById('f_category').value.trim() || 'වෙනත්',
+              name, barcode, category: document.getElementById('f_category').value.trim() || 'වෙනත්',
               subCategory: document.getElementById('f_subCategory')?.value.trim() || '',
               unit: document.getElementById('f_unit').value,
               costPrice: Number(document.getElementById('f_cost').value) || 0,
@@ -2518,6 +2636,9 @@ Views.items = {
     setTimeout(() => search.focus(), 100);
   },
   bindRowActions() {
+    document.querySelectorAll('[data-print-barcode]').forEach(b => {
+      b.addEventListener('click', () => BarcodeSystem.openLabelPrintModal(Number(b.dataset.printBarcode)));
+    });
     document.querySelectorAll('[data-edit-item]').forEach(b => {
       b.addEventListener('click', () => Views.items.openEditModal(Number(b.dataset.editItem)));
     });
@@ -2615,7 +2736,7 @@ Views.stock = {
   itemsTableHTML() {
     let list = DB.allItems();
     const q = (Views.stock.itemsSearchQ || '').trim();
-    if (q) list = list.filter(i => Singlish.match(i.name, q) || Singlish.match(i.category || '', q) || Singlish.match(i.description || '', q));
+    if (q) list = list.filter(i => Singlish.match(i.name, q) || Singlish.match(i.category || '', q) || Singlish.match(i.description || '', q) || (i.barcode && i.barcode.toLowerCase().includes(q.toLowerCase())));
     if (!list.length) return `<div class="card"><div class="empty-state"><div class="em-ico"><i class="ph ph-package"></i></div><h3>${t('items_no_items')}</h3><div class="small">${t('items_no_items_sub')}</div></div></div>`;
     return `
       <div class="table-wrap">
@@ -2636,13 +2757,17 @@ Views.stock = {
                     ${i.image ? `<img src="${i.image}" style="width:100%; height:100%; object-fit:cover;">` : `<i class="ph ph-package" style="font-size:18px;"></i>`}
                   </div>
                 </td>
-                <td><b>${escapeHTML(i.name)}</b></td>
+                <td>
+                  <b>${escapeHTML(i.name)}</b>
+                  ${i.barcode ? `<div style="font-size:11px; font-family:monospace; color:var(--primary); font-weight:700;"><i class="ph ph-barcode"></i> ${escapeHTML(i.barcode)}</div>` : ''}
+                </td>
                 <td>${escapeHTML(i.category || 'වෙනත්')}</td>
                 <td class="num">${fmt(i.costPrice)}</td>
                 <td class="num"><b>${fmt(i.sellPrice)}</b></td>
                 <td class="num">${i.qty} ${escapeHTML(i.unit || '')}</td>
                 <td>${status}</td>
                 <td>
+                  <button class="icon-btn" data-print-barcode="${i.id}" title="${t('barcode_print_label') || 'Print Barcode'}"><i class="ph ph-barcode"></i></button>
                   <button class="icon-btn" data-edit-item="${i.id}" title="${t('items_edit')}"><i class="ph ph-pencil-simple"></i></button>
                   <button class="icon-btn" data-del-item="${i.id}" title="${t('delete')}"><i class="ph ph-trash"></i></button>
                 </td>
@@ -2659,7 +2784,7 @@ Views.stock = {
     let list = DB.allItems();
     const q = (Views.stock.reportSearchQ || '').trim();
     if (q) {
-      list = list.filter(i => Singlish.match(i.name || '', q) || Singlish.match(i.category || '', q));
+      list = list.filter(i => Singlish.match(i.name || '', q) || Singlish.match(i.category || '', q) || (i.barcode && i.barcode.toLowerCase().includes(q.toLowerCase())));
     }
 
     if (Views.stock.filterType === 'low') {
@@ -2705,7 +2830,10 @@ Views.stock = {
                       ${i.image ? `<img src="${i.image}" style="width:100%; height:100%; object-fit:cover;">` : `<i class="ph ph-package" style="font-size:18px;"></i>`}
                     </div>
                   </td>
-                  <td><b>${escapeHTML(i.name)}</b>${statusTag}</td>
+                  <td>
+                    <b>${escapeHTML(i.name)}</b>${statusTag}
+                    ${i.barcode ? `<div style="font-size:11px; font-family:monospace; color:var(--primary); font-weight:700;"><i class="ph ph-barcode"></i> ${escapeHTML(i.barcode)}</div>` : ''}
+                  </td>
                   <td class="text-muted">${escapeHTML(i.category)}</td>
                   <td class="num" style="font-weight:700; color:${color}">${i.qty} ${escapeHTML(i.unit)}</td>
                   <td style="min-width:110px"><div class="stock-meter"><div style="width:${ratio * 100}%; background:${color}"></div></div></td>
@@ -2777,6 +2905,9 @@ Views.stock = {
 
   bindRowActions() {
     if (Views.stock.activeTab === 'items') {
+      document.querySelectorAll('[data-print-barcode]').forEach(b => {
+        b.addEventListener('click', () => BarcodeSystem.openLabelPrintModal(Number(b.dataset.printBarcode)));
+      });
       document.querySelectorAll('[data-edit-item]').forEach(b => {
         b.addEventListener('click', () => Views.items.openEditModal(Number(b.dataset.editItem)));
       });
