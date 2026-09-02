@@ -156,14 +156,33 @@ const BarcodeSystem = {
   },
 
   /* ---------------- BARCODE LABEL STICKER PRINT MODAL ---------------- */
-  openLabelPrintModal(itemId) {
+  async openLabelPrintModal(itemId, preferredBarcode = null) {
     const item = DB.getItem(itemId);
     if (!item) {
       toast("භාණ්ඩය සොයාගත නොහැකි විය", "err");
       return;
     }
 
-    const barcodeVal = (item.barcode || '').trim() || BarcodeSystem.generateBarcode();
+    let barcodeVal = (preferredBarcode || item.barcode || '').trim();
+    let isNewlyGenerated = false;
+    if (!barcodeVal) {
+      barcodeVal = BarcodeSystem.generateBarcode();
+      isNewlyGenerated = true;
+    }
+
+    // Persist barcode to DB immediately so the first generated barcode is saved and never changes!
+    if ((item.barcode || '').trim() !== barcodeVal) {
+      item.barcode = barcodeVal;
+      try {
+        await DB.updateItem(item.id, { barcode: barcodeVal });
+        if (typeof App !== 'undefined' && App.render) {
+          App.render();
+        }
+      } catch (err) {
+        console.error("Failed to save barcode:", err);
+      }
+    }
+
     const shopName = (DB.data.settings && DB.data.settings.shopName) || 'HardwarePOS';
 
     openModal({
@@ -186,7 +205,8 @@ const BarcodeSystem = {
             <div style="background:var(--paper); border:1px solid var(--border); border-radius:8px; padding:10px; font-size:12.5px; color:var(--charcoal);">
               <div>📦 <b>${escapeHTML(item.name)}</b></div>
               <div style="margin-top:2px;">💰 මිල: <b>${fmt(item.sellPrice)}</b></div>
-              <div style="margin-top:2px;">🏷 Barcode: <code style="font-weight:bold; color:var(--primary);">${escapeHTML(barcodeVal)}</code></div>
+              <div style="margin-top:2px;">🏷 Barcode: <code style="font-weight:bold; color:var(--primary); font-size:13px;">${escapeHTML(barcodeVal)}</code></div>
+              ${isNewlyGenerated ? `<div style="margin-top:6px; font-size:11.5px; color:#16a34a; font-weight:700;"><i class="ph ph-check-circle"></i> Barcode එක සාදා මෙම භාණ්ඩයට ස්ථිරව සුරකින ලදී</div>` : ''}
             </div>
           </div>
           <div>

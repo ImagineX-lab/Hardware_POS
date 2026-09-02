@@ -2404,6 +2404,16 @@ Views.items = {
 
     if (genBtn && barcodeInp) {
       genBtn.addEventListener('click', () => {
+        const current = barcodeInp.value.trim();
+        if (current) {
+          confirmAction("දැනටමත් Barcode එකක් ඇත. එය අලුත් Barcode එකකින් වෙනස් කිරීමට අවශ්‍යද?", () => {
+            barcodeInp.value = BarcodeSystem.generateBarcode();
+            updatePreview();
+            BarcodeSystem.playBeep(true);
+            toast("නව Barcode එකක් සාදන ලදී!", "ok");
+          });
+          return;
+        }
         barcodeInp.value = BarcodeSystem.generateBarcode();
         updatePreview();
         BarcodeSystem.playBeep(true);
@@ -2422,8 +2432,13 @@ Views.items = {
     }
 
     if (printBtn && item && item.id) {
-      printBtn.addEventListener('click', () => {
-        BarcodeSystem.openLabelPrintModal(item.id);
+      printBtn.addEventListener('click', async () => {
+        const currentBarcode = barcodeInp ? barcodeInp.value.trim() : '';
+        await BarcodeSystem.openLabelPrintModal(item.id, currentBarcode);
+        if (barcodeInp && item.barcode) {
+          barcodeInp.value = item.barcode;
+          updatePreview();
+        }
       });
     }
   },
