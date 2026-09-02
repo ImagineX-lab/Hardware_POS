@@ -113,6 +113,7 @@ module.exports = {
         try { await run(`ALTER TABLE customers ADD COLUMN discountPercent REAL DEFAULT 0`); } catch(e) {}
         try { await run(`ALTER TABLE sales ADD COLUMN amountPaid REAL DEFAULT 0`); } catch(e) {}
         try { await run(`ALTER TABLE sales ADD COLUMN changeAmount REAL DEFAULT 0`); } catch(e) {}
+        try { await run(`ALTER TABLE sales ADD COLUMN barcode TEXT DEFAULT ''`); } catch(e) {}
         try { await run(`ALTER TABLE items ADD COLUMN barcode TEXT DEFAULT ''`); } catch(e) {}
         try { await run(`ALTER TABLE items ADD COLUMN description TEXT`); } catch(e) {}
         try { await run(`ALTER TABLE items ADD COLUMN image TEXT`); } catch(e) {}
@@ -264,7 +265,10 @@ module.exports = {
 
     getAllSales: async () => {
         const sales = await all(`SELECT * FROM sales ORDER BY id DESC`);
-        sales.forEach(s => s.lines = JSON.parse(s.lines));
+        sales.forEach(s => {
+            try { s.lines = typeof s.lines === 'string' ? JSON.parse(s.lines) : s.lines; } catch(e) { s.lines = []; }
+            s.barcode = s.barcode || ('BILL-' + s.id);
+        });
         return sales;
     },
     createSale: async (sale) => {
@@ -285,6 +289,10 @@ module.exports = {
             [date, JSON.stringify(sale.lines), subtotal, discount, total, sale.paymentType, sale.customerId || null, custName, amountPaid, changeAmount]);
         
         const saleId = res.lastID;
+        const saleBarcode = 'BILL-' + saleId;
+        try {
+            await run(`UPDATE sales SET barcode = ? WHERE id = ?`, [saleBarcode, saleId]);
+        } catch(e) {}
 
         // Reduce stock
         for(let l of sale.lines) {
@@ -305,7 +313,7 @@ module.exports = {
             }
         }
 
-        return { id: saleId, date, lines: sale.lines, subtotal, discount, total, paymentType: sale.paymentType, customerId: sale.customerId, customerName: custName, amountPaid, changeAmount };
+        return { id: saleId, barcode: saleBarcode, date, lines: sale.lines, subtotal, discount, total, paymentType: sale.paymentType, customerId: sale.customerId, customerName: custName, amountPaid, changeAmount };
     },
     deleteSale: async (id) => {
         const s = await get(`SELECT * FROM sales WHERE id = ?`, [id]);

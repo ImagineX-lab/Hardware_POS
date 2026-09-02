@@ -726,6 +726,33 @@ Views.sale = {
           Views.sale.bindGrid();
         }
         if (!q) { suggestBox.innerHTML = ''; return; }
+
+        // Check if query matches a Bill Barcode
+        const billSale = DB.findSaleByBarcode ? DB.findSaleByBarcode(q) : null;
+        if (billSale) {
+          suggestBox.innerHTML = `
+            <div class="search-suggest">
+              <div class="suggest-row" data-open-bill="${billSale.id}" style="background:#f0fdf4; border-bottom:2px solid #bbf7d0; cursor:pointer;">
+                <div style="display:flex; align-items:center; gap:10px;">
+                  <div style="width:36px; height:36px; border-radius:6px; background:#dcfce7; color:#15803d; display:flex; align-items:center; justify-content:center; font-size:20px; flex-shrink:0;">
+                    <i class="ph ph-receipt"></i>
+                  </div>
+                  <div>
+                    <div class="s-name" style="color:#15803d; font-weight:800;">🧾 බිල්පත (Bill) #${billSale.id} — <code style="font-size:11.5px; color:#166534;">${escapeHTML(billSale.barcode || ('BILL-' + billSale.id))}</code></div>
+                    <div class="s-meta" style="color:#166534;">${billSale.lines.length} items • ${fmtDate(billSale.date)} • ${billSale.paymentType === 'credit' ? `ණයට (${escapeHTML(billSale.customerName || '')})` : 'මුදල්'} • <b>${fmt(billSale.total)}</b></div>
+                  </div>
+                </div>
+                <div style="font-weight:800; color:#15803d;">${fmt(billSale.total)}</div>
+              </div>
+            </div>`;
+          suggestBox.querySelector('[data-open-bill]').addEventListener('click', () => {
+            searchInp.value = '';
+            suggestBox.innerHTML = '';
+            Views.sale.showReceipt(billSale);
+          });
+          return;
+        }
+
         const matches = DB.allItems().filter(i => Singlish.match(i.name, q) || Singlish.match(i.category || '', q) || Singlish.match(i.description || '', q) || (i.barcode && i.barcode.toLowerCase().includes(q.toLowerCase()))).slice(0, 8);
         if (!matches.length) {
           suggestBox.innerHTML = `<div class="search-suggest"><div class="suggest-row text-muted">${t('sale_no_matches')}</div></div>`;
@@ -765,6 +792,15 @@ Views.sale = {
 
         if (e.key === 'Enter') {
           e.preventDefault();
+          // Check if exact barcode matches a bill first
+          const exactSale = DB.findSaleByBarcode ? DB.findSaleByBarcode(rawQ) : null;
+          if (exactSale) {
+            searchInp.value = '';
+            suggestBox.innerHTML = '';
+            BarcodeSystem.handleScannedBarcode(rawQ);
+            return;
+          }
+
           // 1. Check if exact barcode matches an item
           const exactBarcodeItem = DB.getItemByBarcode(rawQ);
           if (exactBarcodeItem) {
@@ -1979,6 +2015,7 @@ Views.sale = {
     const lines = cart.map(l => ({
       itemId: l.itemId,
       name: l.name,
+      barcode: l.barcode || (DB.getItem(l.itemId)?.barcode || ''),
       unit: l.unit,
       qty: l.qty,
       unitPrice: l.unitPrice,
@@ -2087,8 +2124,8 @@ Views.sale = {
           <div style="font-weight:700; font-size:11.5px; margin-bottom:3px;">${t('receipt_thanks')}</div>
           <div style="font-size:9.5px; color:#222; margin-bottom:5px; line-height:1.4;">භාණ්ඩ ආපසු භාරදීමේදී මෙම බිල්පත ඉදිරිපත් කිරීම අනිවාර්ය වේ.</div>
           
-          <div style="margin:6px 0; display:flex; justify-content:center;">
-            ${typeof BarcodeSystem !== 'undefined' ? BarcodeSystem.generateCode128SVG('BILL-' + sale.id, { width: 170, height: 38, fontSize: 9 }) : ''}
+          <div style="margin:6px 0; display:flex; flex-direction:column; align-items:center; justify-content:center;">
+            ${typeof BarcodeSystem !== 'undefined' ? BarcodeSystem.generateCode128SVG(sale.barcode || ('BILL-' + sale.id), { width: 190, height: 44, fontSize: 10 }) : ''}
           </div>
 
           <div style="font-size:9px; color:#555; margin-top:4px;">imagineX software solution - 0761945587</div>
@@ -3573,6 +3610,7 @@ Views.history = {
     if (q) {
       sales = sales.filter(s => {
         const idStr = String(s.id);
+        const billCode = (s.barcode || ('bill-' + s.id)).toLowerCase();
         const custName = (s.customerName || '').toLowerCase();
         const itemsStr = s.lines.map(l => l.name).join(' ').toLowerCase();
         
@@ -3583,6 +3621,7 @@ Views.history = {
         const formattedDate = fmtDate(s.date);
         
         return idStr.includes(q) ||
+          billCode.includes(q.toLowerCase()) ||
           custName.includes(q.toLowerCase()) ||
           itemsStr.includes(q.toLowerCase()) ||
           Singlish.match(s.customerName || '', q) ||
@@ -3623,6 +3662,19 @@ Views.history = {
         Views.history.searchQ = search.value;
         document.getElementById('histTableWrap').innerHTML = Views.history.tableHTML();
         Views.history.bindRowActions();
+      });
+      search.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          const q = search.value.trim();
+          const sale = DB.findSaleByBarcode ? DB.findSaleByBarcode(q) : null;
+          if (sale) {
+            Views.sale.showReceipt(sale);
+            return;
+          }
+          const firstViewBtn = document.querySelector('#histTableWrap [data-view-sale]');
+          if (firstViewBtn) firstViewBtn.click();
+        }
       });
     }
 

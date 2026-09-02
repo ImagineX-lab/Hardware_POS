@@ -533,7 +533,8 @@ const BarcodeSystem = {
         if (inSaleSearch && activeEl.value.trim()) {
           const query = activeEl.value.trim();
           const item = DB.getItemByBarcode(query);
-          if (item) {
+          const sale = DB.findSaleByBarcode ? DB.findSaleByBarcode(query) : null;
+          if (item || sale) {
             e.preventDefault();
             activeEl.value = '';
             BarcodeSystem.handleScannedBarcode(query);
@@ -563,6 +564,38 @@ const BarcodeSystem = {
   handleScannedBarcode(code) {
     code = String(code || '').trim();
     if (!code) return;
+
+    // 0. CHECK IF THIS IS A BILL / INVOICE BARCODE!
+    const billSale = DB.findSaleByBarcode ? DB.findSaleByBarcode(code) : null;
+    if (billSale) {
+      BarcodeSystem.playBeep(true);
+      Views.sale.showReceipt(billSale);
+      toast(`🧾 බිල්පත #${billSale.id} විවෘත විය! (${billSale.lines.length} items - ${fmt(billSale.total)})`, 'ok');
+
+      // Clear search inputs if they contain the code
+      const searchInp = document.getElementById('saleSearch');
+      if (searchInp) {
+        searchInp.value = '';
+        const suggest = document.getElementById('saleSuggest');
+        if (suggest) {
+          suggest.style.display = 'none';
+          suggest.innerHTML = '';
+        }
+      }
+      const histSearch = document.getElementById('historySearch');
+      if (histSearch) {
+        histSearch.value = String(billSale.id);
+        if (typeof Views.history !== 'undefined' && Views.history.tableHTML) {
+          Views.history.searchQ = String(billSale.id);
+          const histWrap = document.getElementById('histTableWrap');
+          if (histWrap) {
+            histWrap.innerHTML = Views.history.tableHTML();
+            Views.history.bindRowActions();
+          }
+        }
+      }
+      return;
+    }
 
     // A. If an Item Modal with #f_barcode is currently open, populate the field
     const barcodeInput = document.getElementById('f_barcode');

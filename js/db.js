@@ -150,6 +150,33 @@ const DB = {
     return newSale;
   },
   allSales(){ return this.data.sales; },
+  getSale(id){
+    const numId = Number(id);
+    return this.data.sales.find(s => s.id === numId) || null;
+  },
+  findSaleByBarcode(code){
+    if (!code) return null;
+    const clean = String(code).trim().toLowerCase();
+    if (!clean) return null;
+
+    // 1. Check if matches BILL-XXX, INV-XXX, or #XXX format
+    const match = clean.match(/^(?:bill|inv)[-_]?(\d+)$/i) || clean.match(/^#(\d+)$/);
+    if (match) {
+      const saleId = Number(match[1]);
+      const found = this.data.sales.find(s => s.id === saleId);
+      if (found) return found;
+    }
+
+    // 2. Check explicit sale.barcode match
+    const explicit = this.data.sales.find(s => (s.barcode || '').trim().toLowerCase() === clean);
+    if (explicit) return explicit;
+
+    // 3. Check "bill-<id>" generated pattern
+    const byGen = this.data.sales.find(s => ('bill-' + s.id) === clean);
+    if (byGen) return byGen;
+
+    return null;
+  },
   async deleteSale(id){
     await fetch(`/api/sales/${id}`, { method: 'DELETE' });
     this.data.sales = this.data.sales.filter(x => x.id !== id);
