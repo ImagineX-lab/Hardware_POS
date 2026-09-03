@@ -30,7 +30,7 @@ const BarcodeSystem = {
     try {
       const ctx = this.getAudioContext();
       if (!ctx) return;
-      
+
       const now = ctx.currentTime;
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
@@ -124,7 +124,6 @@ const BarcodeSystem = {
 
     return { text, fullCode, totalModules };
   },
-
   // Generates SVG string for Code 128 barcode
   generateCode128SVG(text, options = {}) {
     const { text: cleanText, fullCode, totalModules } = this.encodeCode128(text);
@@ -133,7 +132,8 @@ const BarcodeSystem = {
     const showText = options.showText !== false;
     const fontSize = options.fontSize || 13;
 
-    const margin = options.margin !== undefined ? options.margin : 8;
+    // Minimum 10-module Quiet Zone on left and right for scanner pattern recognition
+    const margin = options.margin !== undefined ? options.margin : 16;
     const barAreaWidth = width - (margin * 2);
     const moduleWidth = barAreaWidth / totalModules;
     const barHeight = showText ? height - fontSize - 5 : height;
@@ -145,7 +145,7 @@ const BarcodeSystem = {
     for (let digit of fullCode) {
       const w = parseInt(digit, 10) * moduleWidth;
       if (isBar) {
-        svgBars += `<rect x="${currentX.toFixed(2)}" y="2" width="${w.toFixed(2)}" height="${barHeight}" fill="#000000" />`;
+        svgBars += `<rect x="${currentX.toFixed(2)}" y="2" width="${w.toFixed(2)}" height="${barHeight}" fill="#000000" shape-rendering="crispEdges" />`;
       }
       currentX += w;
       isBar = !isBar;
@@ -155,7 +155,7 @@ const BarcodeSystem = {
       ? `<text x="${(width / 2).toFixed(2)}" y="${height - 2}" text-anchor="middle" font-family="monospace, 'Courier New', sans-serif" font-size="${fontSize}" font-weight="700" fill="#000000">${escapeHTML(cleanText)}</text>`
       : '';
 
-    return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}" width="100%" height="${height}" style="display:block; margin:0 auto; background:#ffffff;">
+    return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}" width="100%" height="${height}" style="display:block; margin:0 auto; background:#ffffff; shape-rendering:crispEdges;">
       ${svgBars}
       ${textSvg}
     </svg>`;
@@ -166,6 +166,8 @@ const BarcodeSystem = {
     const showText = options.showText !== false;
     const fontSize = options.fontSize || 14;
     const { text: cleanText, fullCode, totalModules } = this.encodeCode128(text);
+
+    ctx.imageSmoothingEnabled = false;
 
     const moduleWidth = width / totalModules;
     const barHeight = showText ? height - fontSize - 4 : height;
@@ -197,13 +199,13 @@ const BarcodeSystem = {
     const canvas = document.createElement('canvas');
     
     if (layout === '30x15') {
-      // 30mm x 15mm at high resolution (300+ DPI equivalent ratio: 708px x 354px)
       const scale = 3;
       const width = 354 * scale;  // 1062px
       const height = 177 * scale; // 531px
       canvas.width = width;
       canvas.height = height;
       const ctx = canvas.getContext('2d');
+      ctx.imageSmoothingEnabled = false;
 
       // White Background
       ctx.fillStyle = '#ffffff';
@@ -216,25 +218,25 @@ const BarcodeSystem = {
       ctx.textAlign = 'right';
       ctx.textBaseline = 'top';
       const priceWidth = ctx.measureText(priceStr).width;
-      ctx.fillText(priceStr, width - (16 * scale), 14 * scale);
+      ctx.fillText(priceStr, width - (18 * scale), 14 * scale);
 
       // Item Name on top left
       ctx.font = `700 ${24 * scale}px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Iskoola Pota", sans-serif`;
       ctx.textAlign = 'left';
       let itemName = (item.name || '').trim();
-      const maxItemWidth = width - priceWidth - (40 * scale);
+      const maxItemWidth = width - priceWidth - (44 * scale);
       if (ctx.measureText(itemName).width > maxItemWidth) {
         while (itemName.length > 0 && ctx.measureText(itemName + '...').width > maxItemWidth) {
           itemName = itemName.slice(0, -1);
         }
         itemName += '...';
       }
-      ctx.fillText(itemName, 16 * scale, 16 * scale);
+      ctx.fillText(itemName, 18 * scale, 16 * scale);
 
-      // Barcode filling main body
-      const bcWidth = width - (24 * scale);
+      // Barcode with Quiet Zone margin
+      const bcWidth = width - (48 * scale);
       const bcHeight = height - (64 * scale);
-      const bcX = 12 * scale;
+      const bcX = 24 * scale;
       const bcY = 52 * scale;
 
       this.drawBarcodeOnCanvas(ctx, barcodeVal, bcX, bcY, bcWidth, bcHeight, {
@@ -253,6 +255,7 @@ const BarcodeSystem = {
     canvas.width = width;
     canvas.height = height;
     const ctx = canvas.getContext('2d');
+    ctx.imageSmoothingEnabled = false;
 
     // Background
     ctx.fillStyle = '#ffffff';
@@ -309,8 +312,6 @@ const BarcodeSystem = {
     ctx.textAlign = 'center';
     ctx.textBaseline = 'bottom';
     const priceText = typeof fmt === 'function' ? fmt(item.sellPrice) : `රු. ${item.sellPrice}`;
-    ctx.fillText(priceText, width / 2, height - (14 * scale));
-
     return canvas;
   },
 
@@ -507,7 +508,7 @@ const BarcodeSystem = {
         const updatePreview = () => {
           if (!previewEl) return;
           const layout = layoutSel.value;
-          
+
           if (layout === '30x15') {
             const svg = BarcodeSystem.generateCode128SVG(barcodeVal, { width: 220, height: 50, margin: 2, fontSize: 11 });
             previewEl.innerHTML = `
@@ -861,7 +862,7 @@ const BarcodeSystem = {
         console.warn("BarcodeDetector error, using manual entry", e);
       }
     }
-    
+
     const statusEl = document.getElementById('camStatusMsg');
     if (statusEl) {
       statusEl.innerHTML = `<span>ℹ️ මෙම බ්‍රවුසරයේ BarcodeDetector නැත. කරුණාකර USB Scanner එකෙන් හෝ කෙලින්ම Type කරන්න.</span>`;
@@ -984,7 +985,7 @@ const BarcodeSystem = {
         Views.sale.addToCart(item.id);
         Views.sale.applyCustomerHardwareDiscount();
         toast(`✅ ${item.name} (Cart +1)`, 'ok');
-        
+
         // Clear sale search if it contained the barcode
         const searchInp = document.getElementById('saleSearch');
         if (searchInp) {
