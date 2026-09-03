@@ -428,7 +428,7 @@ textarea {
   grid-template-columns: 1fr 1fr;
 }
 
-@media(max-width:1100px) {
+@media screen and (max-width:1100px) {
   .grid-4 {
     grid-template-columns: repeat(2, 1fr);
   }
@@ -838,7 +838,7 @@ th.num {
   flex-direction: column;
 }
 
-@media(max-width:1100px) {
+@media screen and (max-width:1100px) {
   .sale-layout {
     grid-template-columns: 1fr;
     height: auto;
@@ -1516,6 +1516,46 @@ th.num {
     color: #000 !important;
   }
 
+  /* Completely hide app shell, sidebar, and background so nothing bleeds into the receipt */
+  .app,
+  .sidebar,
+  .main,
+  .topbar,
+  .nav,
+  .nav-btn,
+  .nav-text,
+  .brand-text,
+  .view-wrap,
+  #toast,
+  .toast,
+  .modal-head,
+  .modal-foot,
+  .modal-close,
+  .modal-overlay,
+  .modal-footer,
+  #printReceiptBtn,
+  [data-close] {
+    display: none !important;
+    visibility: hidden !important;
+  }
+
+  /* Modal container reset for printing */
+  #modalRoot,
+  .modal-backdrop,
+  .modal,
+  .modal-body {
+    position: static !important;
+    display: block !important;
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    width: auto !important;
+    max-width: none !important;
+    overflow: visible !important;
+  }
+
   body * {
     visibility: hidden !important;
   }
@@ -1526,9 +1566,8 @@ th.num {
   }
 
   #printArea {
-    position: absolute !important;
-    left: 0 !important;
-    top: 0 !important;
+    position: static !important;
+    display: block !important;
     width: 74mm !important;         /* 72-74mm printable area */
     max-width: 74mm !important;
     margin: 0 auto !important;
@@ -1568,14 +1607,6 @@ th.num {
   #printArea .r-center {
     font-size: 10px !important;
     color: #000 !important;
-  }
-
-  /* Hide modal chrome and buttons when printing */
-  .modal-overlay,
-  .modal-footer,
-  #printReceiptBtn,
-  [data-close] {
-    display: none !important;
   }
 }
 
@@ -1876,7 +1907,7 @@ th.num {
 /* ===== RESPONSIVE MEDIA QUERIES ===== */
 
 /* Tablets & Small Laptops (max-width: 1024px) */
-@media (max-width: 1024px) {
+@media screen and (max-width: 1024px) {
   .app {
     flex-direction: column;
   }
@@ -1961,7 +1992,7 @@ th.num {
 }
 
 /* Mobile Devices (max-width: 640px) */
-@media (max-width: 640px) {
+@media screen and (max-width: 640px) {
   .grid-4, .grid-3, .grid-2 {
     grid-template-columns: 1fr;
   }
