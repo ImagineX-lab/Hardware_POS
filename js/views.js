@@ -373,6 +373,9 @@ Views.sale = {
       const effectiveDisc = Math.max(0, origPrice - l.unitPrice);
       const lineTotal = Math.max(0, l.qty * l.unitPrice);
       const isDiscounted = (l.unitPrice < origPrice);
+      // Stock warning: show badge if cart qty is at or near max
+      const stockWarn = l.qty >= l.maxQty;
+      const stockNear = !stockWarn && l.qty >= l.maxQty * 0.8 && l.maxQty > 1;
       return `
         <div class="cart-row" style="padding:6px 0; border-bottom:1px solid var(--border);">
           <div class="cart-row-top" style="display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:4px;">
@@ -383,13 +386,15 @@ Views.sale = {
                   <span>⚖️ ලිහිල්: ${escapeHTML(l.looseInfo.shortText || '')}</span>
                   <span style="font-size:10px; color:#92400e; font-weight:600;">(Stock: -${l.qty} ${escapeHTML(l.unit)})</span>
                 </div>` : ''}
+              ${stockWarn ? `<div style="margin-top:3px; display:inline-flex; align-items:center; gap:4px; font-size:11px; font-weight:700; color:#b91c1c; background:#fef2f2; border:1px solid #fecaca; border-radius:4px; padding:2px 7px;"><i class="ph ph-warning-circle"></i> Stock සීමාව ඇත්තේ ${l.maxQty} ${escapeHTML(l.unit)} ක් පමණයි!</div>` : ''}
+              ${stockNear ? `<div style="margin-top:3px; display:inline-flex; align-items:center; gap:4px; font-size:11px; font-weight:600; color:#92400e; background:#fffbeb; border:1px solid #fde68a; border-radius:4px; padding:2px 7px;"><i class="ph ph-warning"></i> Stock ඇත්තේ ${l.maxQty} ${escapeHTML(l.unit)} ක් පමණයි</div>` : ''}
             </div>
             <button class="icon-btn" data-remove-idx="${idx}" title="${t('delete')}" style="font-size:16px; padding:2px 6px; border:none; background:none; color:var(--steel); cursor:pointer;">✕</button>
           </div>
           <div style="display:flex; align-items:center; justify-content:space-between; gap:8px;">
             <div style="display:flex; align-items:center; gap:4px; flex-wrap:wrap;">
               <span style="font-size:11px; font-weight:700; color:var(--steel);">QTY</span>
-              <input type="number" min="0.0001" step="any" max="${l.maxQty}" value="${l.qty}" data-qty-idx="${idx}" class="input" style="width:65px; height:32px; padding:4px 6px; font-size:14px; text-align:center;" title="Quantity">
+              <input type="number" min="0.0001" step="any" max="${l.maxQty}" value="${l.qty}" data-qty-idx="${idx}" class="input" style="width:65px; height:32px; padding:4px 6px; font-size:14px; text-align:center; border-color:${stockWarn ? '#ef4444' : 'var(--border)'}; background:${stockWarn ? '#fef2f2' : '#fff'};" title="Quantity (max: ${l.maxQty} ${escapeHTML(l.unit)})">
               
               <div style="display:inline-flex; align-items:center; gap:4px; margin-left:2px;">
                 <div style="display:inline-flex; flex-direction:column; align-items:flex-end; line-height:1.1;">
@@ -400,7 +405,7 @@ Views.sale = {
               </div>
 
               <!-- LOOSE CALCULATOR BUTTON RIGHT NEXT TO PRICE -->
-              <button type="button" class="btn-loose-toggle" data-loose-idx="${idx}" title="ලිහිල් විකිණීම සහ මිනුම් පරිවර්තනය [Shortcut: L] (kg, g, අඟල්, අඩි, L, ml, pcs...)" style="height:32px; padding:0 8px; font-size:11.5px; font-weight:700; border:1px solid ${l.looseInfo ? '#f59e0b' : 'var(--border)'}; border-radius:6px; background:${l.looseInfo ? '#fef3c7' : '#f8fafc'}; color:${l.looseInfo ? '#b45309' : '#334155'}; cursor:pointer; display:inline-flex; align-items:center; gap:3px; white-space:nowrap; transition:all 0.15s ease;">
+              <button type="button" class="btn-loose-toggle" data-loose-idx="${idx}" title="ලිහිල් විකිනීම සහ මිනුම් පරිවර්තනය [Shortcut: L] (kg, g, අගුල්, අඩි, L, ml, pcs...)" style="height:32px; padding:0 8px; font-size:11.5px; font-weight:700; border:1px solid ${l.looseInfo ? '#f59e0b' : 'var(--border)'}; border-radius:6px; background:${l.looseInfo ? '#fef3c7' : '#f8fafc'}; color:${l.looseInfo ? '#b45309' : '#334155'}; cursor:pointer; display:inline-flex; align-items:center; gap:3px; white-space:nowrap; transition:all 0.15s ease;">
                 <span>⚖️</span>
                 <span>${l.looseInfo ? escapeHTML(l.looseInfo.shortText || 'ලිහිල්') : 'ලිහිල්'}</span>
               </button>
@@ -491,7 +496,17 @@ Views.sale = {
       inp.addEventListener('change', (e) => {
         const idx = Number(e.target.dataset.qtyIdx);
         let v = Number(e.target.value) || 0.0001;
-        v = Math.max(0.0001, Math.min(v, cart[idx].maxQty));
+        const maxQ = cart[idx].maxQty;
+        if (v > maxQ) {
+          // Show specific stock limit warning
+          const msg = (t('sale_stock_limit') || 'Stock ප්‍රමාණවත් නැහැ! Stock ඇත්තේ {avail} {unit} ක් පමණයි.')
+            .replace('{avail}', maxQ)
+            .replace('{unit}', cart[idx].unit || '');
+          toast(msg, 'err');
+          v = maxQ;
+          e.target.value = maxQ;
+        }
+        v = Math.max(0.0001, Math.min(v, maxQ));
         v = Math.round(v * 10000) / 10000;
         cart[idx].qty = v;
         Views.sale.refreshCart();
@@ -1392,8 +1407,16 @@ Views.sale = {
     if (item.qty <= 0) { toast(t('sale_out_of_stock'), 'err'); return; }
     const existing = cart.find(l => l.itemId === itemId);
     if (existing) {
-      if (existing.qty < existing.maxQty) { existing.qty += 1; }
-      else { toast(t('sale_exceeds_stock'), 'err'); }
+      if (existing.qty < existing.maxQty) {
+        existing.qty += 1;
+      } else {
+        // Show specific message with exact available stock count
+        const msg = (t('sale_stock_limit') || 'Stock ප්‍රමාණවත් නැහැ! Stock ඇත්තේ {avail} {unit} ක් පමණයි.')
+          .replace('{avail}', existing.maxQty)
+          .replace('{unit}', existing.unit || item.unit || '');
+        toast(msg, 'err');
+        return;
+      }
     } else {
       cart.push({
         itemId,
@@ -2138,245 +2161,9 @@ Views.sale = {
       `,
       wide: false,
       onMount: (wrap) => {
-        wrap.querySelector('#printReceiptBtn').addEventListener('click', () => {
-          Views.sale._openReceiptPrintPopup(sale);
-        });
+        wrap.querySelector('#printReceiptBtn').addEventListener('click', () => window.print());
       }
     });
-  },
-
-  _openReceiptPrintPopup(sale) {
-    const shopName = (DB.data.settings && DB.data.settings.shopName) || 'HardwarePOS';
-    const shopDesc = (DB.data.settings && DB.data.settings.shopDescription) || '';
-    const logo     = (DB.data.settings && DB.data.settings.logo) || '';
-
-    /* Build barcode SVG string (inline) */
-    const barcodeSVG = (typeof BarcodeSystem !== 'undefined')
-      ? BarcodeSystem.generateCode128SVG(sale.barcode || ('BILL-' + sale.id), { width: 190, height: 44, fontSize: 10 })
-      : '';
-
-    /* Build line rows */
-    const lineRows = sale.lines.map(l => {
-      const origPrice = (l.originalPrice !== undefined && l.originalPrice > 0) ? l.originalPrice : l.unitPrice;
-      const hasDisc   = l.unitPrice < origPrice;
-      const lineTot   = l.qty * l.unitPrice;
-      const qtyStr    = l.looseInfo
-        ? `${l.looseInfo.looseQty} ${escapeHTML(l.looseInfo.looseUnit)}`
-        : `${l.qty} ${escapeHTML(l.unit || '')}`;
-      const discStr   = hasDisc ? ` [Disc: -${fmt(origPrice - l.unitPrice)}]` : '';
-      const looseStr  = l.looseInfo ? ` [ලිහිල්: ${escapeHTML(l.looseInfo.shortText || '')}]` : '';
-      return `
-        <tr>
-          <td colspan="4" class="item-name">${escapeHTML(l.name)}</td>
-        </tr>
-        <tr class="item-detail">
-          <td class="item-sub">${looseStr}${discStr}</td>
-          <td class="ctr">${qtyStr}</td>
-          <td class="num">${l.unitPrice.toLocaleString('en-LK',{minimumFractionDigits:2,maximumFractionDigits:2})}</td>
-          <td class="num bold">${fmt(lineTot)}</td>
-        </tr>`;
-    }).join('');
-
-    const dateStr = (() => {
-      const d = new Date(sale.date);
-      return d.toLocaleDateString('en-GB') + ' ' + d.toLocaleTimeString('en-GB', { hour:'2-digit', minute:'2-digit' });
-    })();
-
-    const logoHTML  = logo ? `<img class="logo" src="${logo}" alt="logo">` : '';
-    const descHTML  = shopDesc ? `<div class="shop-desc">${escapeHTML(shopDesc)}</div>` : '';
-    const custHTML  = sale.customerName ? `<div class="meta-row">ගනුදෙනුකරු: <b>${escapeHTML(sale.customerName)}</b></div>` : '';
-    const discHTML  = sale.discount > 0 ? `<div class="tot-row"><span>Discount:</span><span>- ${fmt(sale.discount)}</span></div>` : '';
-    const cashHTML  = (sale.paymentType === 'cash' && sale.amountPaid > 0)
-      ? `<div class="tot-row"><span>ගෙවූ මුදල (Paid):</span><span>${fmt(sale.amountPaid)}</span></div>
-         <div class="tot-row bold"><span>ඉතිරි මුදල (Change):</span><span>${fmt(sale.changeAmount)}</span></div>`
-      : '';
-    const payLabel  = sale.paymentType === 'credit'
-      ? `ණයට (Credit) - ${escapeHTML(sale.customerName || '')}`
-      : 'මුදල් (Cash)';
-
-    const html80mm = `<!DOCTYPE html>
-<html lang="si">
-<head>
-<meta charset="UTF-8">
-<title>Invoice #${sale.id}</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Sinhala:wght@400;700;900&display=swap" rel="stylesheet">
-<style>
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  @page {
-    size: 80mm auto;
-    margin: 0;
-  }
-  html, body {
-    width: 80mm;
-    margin: 0 !important;
-    padding: 0 !important;
-    background: #fff;
-    color: #000;
-    font-family: 'Noto Sans Sinhala', 'Segoe UI', Arial, sans-serif;
-    font-size: 11px;
-    line-height: 1.4;
-    -webkit-print-color-adjust: exact;
-    print-color-adjust: exact;
-  }
-  .receipt {
-    width: 74mm;
-    margin: 0 auto;
-    padding: 3mm 2mm 12mm 2mm;
-  }
-  .logo {
-    display: block;
-    max-height: 14mm;
-    max-width: 60mm;
-    object-fit: contain;
-    margin: 0 auto 2mm;
-  }
-  h1 {
-    text-align: center;
-    font-size: 15px;
-    font-weight: 900;
-    margin-bottom: 1mm;
-    letter-spacing: 0.3px;
-  }
-  .shop-desc {
-    text-align: center;
-    font-size: 10px;
-    color: #222;
-    margin-bottom: 2mm;
-    white-space: pre-line;
-    line-height: 1.35;
-  }
-  .divider { border: none; border-top: 1px dashed #000; margin: 2mm 0; }
-  .divider-solid { border: none; border-top: 2px solid #000; margin: 2mm 0; }
-  .inv-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    font-size: 11px;
-    font-weight: 700;
-  }
-  .inv-date { font-size: 10px; font-weight: 400; }
-  .meta-row { font-size: 10px; margin-top: 1mm; }
-  table {
-    width: 100%;
-    border-collapse: collapse;
-    margin: 2mm 0;
-    font-size: 10.5px;
-  }
-  thead tr { border-bottom: 1px dashed #000; }
-  th {
-    font-weight: 800;
-    padding-bottom: 1.5mm;
-    color: #000;
-  }
-  th:first-child, td:first-child { text-align: left; }
-  th.num, td.num { text-align: right; }
-  th.ctr { text-align: center; }
-  td.num { text-align: right; white-space: nowrap; }
-  td.ctr { text-align: center; white-space: nowrap; }
-  td.item-name {
-    font-weight: 700;
-    padding-top: 2mm;
-    font-size: 11px;
-  }
-  td.item-sub { font-size: 9.5px; color: #444; padding-bottom: 1.5mm; }
-  tr.item-detail td { border-bottom: 1px dotted #bbb; padding-bottom: 1.5mm; }
-  td.bold { font-weight: 800; font-size: 11.5px; }
-  .totals { padding-top: 2mm; }
-  .tot-row {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    font-size: 11px;
-    padding: 1px 0;
-  }
-  .tot-row.bold { font-weight: 700; }
-  .tot-grand {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    font-size: 14px;
-    font-weight: 900;
-    border-top: 1px dashed #000;
-    border-bottom: 2px solid #000;
-    padding: 2mm 0;
-    margin: 2mm 0;
-  }
-  .tot-grand span:last-child { font-size: 16px; }
-  .pay-row { font-size: 11px; margin-top: 1mm; }
-  .footer {
-    text-align: center;
-    margin-top: 3mm;
-    padding-top: 3mm;
-    border-top: 1px dashed #000;
-  }
-  .thanks { font-weight: 800; font-size: 12px; margin-bottom: 1.5mm; }
-  .return-note { font-size: 9px; color: #222; line-height: 1.4; margin-bottom: 3mm; }
-  .barcode-wrap {
-    display: flex;
-    justify-content: center;
-    margin: 2mm 0 1mm;
-  }
-</style>
-</head>
-<body>
-<div class="receipt">
-  ${logoHTML}
-  <h1>${escapeHTML(shopName)}</h1>
-  ${descHTML}
-  <hr class="divider">
-  <div class="inv-header">
-    <span>INVOICE #${sale.id}</span>
-    <span class="inv-date">${dateStr}</span>
-  </div>
-  ${custHTML}
-  <hr class="divider">
-  <table>
-    <thead>
-      <tr>
-        <th>විස්තරය (Item)</th>
-        <th class="ctr" style="width:40px">ගණන</th>
-        <th class="num" style="width:58px">මිල</th>
-        <th class="num" style="width:68px">එකතුව</th>
-      </tr>
-    </thead>
-    <tbody>
-      ${lineRows}
-    </tbody>
-  </table>
-  <div class="totals">
-    <div class="tot-row"><span>එකතුව (Subtotal):</span><span>${fmt(sale.subtotal)}</span></div>
-    ${discHTML}
-    <div class="tot-grand">
-      <span>ශුද්ධ එකතුව (TOTAL):</span>
-      <span>${fmt(sale.total)}</span>
-    </div>
-    <div class="pay-row">ගෙවීම: <b>${payLabel}</b></div>
-    ${cashHTML}
-  </div>
-  <div class="footer">
-    <div class="thanks">ස්තූතියි! නැවත එන්න.</div>
-    <div class="return-note">භාණ්ඩ ආපසු භාරදීමේදී මෙම බිල්පත ඉදිරිපත් කිරීම අනිවාර්ය වේ.</div>
-    <div class="barcode-wrap">${barcodeSVG}</div>
-  </div>
-</div>
-<script>
-  if (document.readyState === 'complete') {
-    setTimeout(function(){ window.focus(); window.print(); }, 400);
-  } else {
-    window.addEventListener('load', function(){ setTimeout(function(){ window.focus(); window.print(); }, 400); });
-  }
-<\/script>
-</body>
-</html>`;
-
-    const printWin = window.open('', '_blank', 'width=320,height=600,scrollbars=yes');
-    if (!printWin) {
-      toast('Pop-up window blocked. Please allow popups and try again.', 'err');
-      return;
-    }
-    printWin.document.write(html80mm);
-    printWin.document.close();
   }
 };
 
