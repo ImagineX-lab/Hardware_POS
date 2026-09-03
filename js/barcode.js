@@ -587,231 +587,97 @@ const BarcodeSystem = {
     let pageCss = '';
     let labelHTML = '';
 
-    if (layout === '30x15') {
-      const svgCode = BarcodeSystem.generateCode128SVG(barcodeVal, { width: 220, height: 50, margin: 2, fontSize: 11 });
+    if (layout === '30x15' || layout === '40x25' || layout === '50x25' || layout === '50x30' || layout === 'single') {
+      // Create crisp 300DPI canvas sticker image
+      const canvas = BarcodeSystem.createLabelStickerCanvas(item, barcodeVal, shopName, layout);
+      const imgData = canvas.toDataURL('image/png');
+
+      let wMm = '30mm';
+      let hMm = '15mm';
+      if (layout === '40x25') { wMm = '40mm'; hMm = '25mm'; }
+      else if (layout === '50x25') { wMm = '50mm'; hMm = '25mm'; }
+      else if (layout === '50x30') { wMm = '50mm'; hMm = '30mm'; }
+      else if (layout === 'single') { wMm = '50mm'; hMm = '30mm'; }
+
       pageCss = `
         @page {
-          size: 30mm 15mm;
+          size: ${wMm} ${hMm};
           margin: 0;
         }
         html, body {
-          width: 30mm;
-          height: 15mm;
+          width: ${wMm};
+          height: ${hMm};
           margin: 0;
           padding: 0;
           background: #ffffff;
-          font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+          overflow: hidden;
           -webkit-print-color-adjust: exact;
+          print-color-adjust: exact;
         }
         .barcode-container {
-          display: block;
+          width: ${wMm};
           margin: 0;
           padding: 0;
         }
-        .barcode-sticker {
-          width: 30mm;
-          height: 15mm;
-          box-sizing: border-box;
-          padding: 0.5mm 1mm;
+        .print-label-img {
+          width: ${wMm} !important;
+          height: ${hMm} !important;
+          display: block !important;
+          margin: 0 !important;
+          padding: 0 !important;
           page-break-after: always;
           break-after: page;
           page-break-inside: avoid;
-          overflow: hidden;
-          display: flex;
-          flex-direction: column;
-          justify-content: space-between;
-          background: #ffffff;
-        }
-        .stk-header {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          width: 100%;
-          font-size: 7.5pt;
-          line-height: 1.1;
-          color: #000000;
-          font-weight: 700;
-        }
-        .stk-name {
-          white-space: nowrap;
-          overflow: hidden;
-          text-overflow: ellipsis;
-          max-width: 60%;
-          font-size: 7.5pt;
-          font-weight: 700;
-          color: #000000;
-        }
-        .stk-price {
-          font-size: 8.5pt;
-          font-weight: 900;
-          white-space: nowrap;
-          color: #000000;
-        }
-        .stk-barcode {
-          width: 100%;
-          flex: 1;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-        }
-        .stk-barcode svg {
-          width: 100% !important;
-          height: 10.5mm !important;
-          max-height: 100%;
-          display: block;
+          object-fit: fill;
         }
       `;
 
+      let imgs = '';
       for (let i = 0; i < copies; i++) {
-        labelHTML += `
-          <div class="barcode-sticker">
-            <div class="stk-header">
-              <span class="stk-name">${escapeHTML(item.name)}</span>
-              <span class="stk-price">${fmt(item.sellPrice)}</span>
-            </div>
-            <div class="stk-barcode">${svgCode}</div>
-          </div>
-        `;
+        imgs += `<img src="${imgData}" class="print-label-img" alt="Sticker">`;
       }
-    } else if (layout === '40x25') {
-      const svgCode = BarcodeSystem.generateCode128SVG(barcodeVal, { width: 220, height: 55, margin: 4, fontSize: 11 });
-      pageCss = `
-        @page {
-          size: 40mm 25mm;
-          margin: 0;
-        }
-        html, body {
-          width: 40mm;
-          height: 25mm;
-          margin: 0;
-          padding: 0;
-          background: #ffffff;
-        }
-        .barcode-container { display: block; margin: 0; padding: 0; }
-        .barcode-sticker {
-          width: 40mm;
-          height: 25mm;
-          box-sizing: border-box;
-          padding: 1mm 1.5mm;
-          page-break-after: always;
-          break-after: page;
-          page-break-inside: avoid;
-          overflow: hidden;
-          display: flex;
-          flex-direction: column;
-          justify-content: space-between;
-          text-align: center;
-          background: #ffffff;
-        }
-        .stk-shop { font-size: 7.5pt; font-weight: 800; text-transform: uppercase; color: #475569; }
-        .stk-name { font-size: 8.5pt; font-weight: 700; color: #000; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin: 1px 0; }
-        .stk-barcode svg { width: 100% !important; height: 14mm !important; display: block; }
-        .stk-price { font-size: 10pt; font-weight: 900; color: #000; }
-      `;
-
-      for (let i = 0; i < copies; i++) {
-        labelHTML += `
-          <div class="barcode-sticker">
-            <div class="stk-shop">${escapeHTML(shopName)}</div>
-            <div class="stk-name">${escapeHTML(item.name)}</div>
-            <div class="stk-barcode">${svgCode}</div>
-            <div class="stk-price">${fmt(item.sellPrice)}</div>
-          </div>
-        `;
-      }
-    } else if (layout === '50x25' || layout === '50x30') {
-      const hMm = layout === '50x30' ? '30mm' : '25mm';
-      const svgCode = BarcodeSystem.generateCode128SVG(barcodeVal, { width: 220, height: 60, margin: 4, fontSize: 12 });
-      pageCss = `
-        @page {
-          size: 50mm ${hMm};
-          margin: 0;
-        }
-        html, body {
-          width: 50mm;
-          height: ${hMm};
-          margin: 0;
-          padding: 0;
-          background: #ffffff;
-        }
-        .barcode-container { display: block; margin: 0; padding: 0; }
-        .barcode-sticker {
-          width: 50mm;
-          height: ${hMm};
-          box-sizing: border-box;
-          padding: 1.5mm 2mm;
-          page-break-after: always;
-          break-after: page;
-          page-break-inside: avoid;
-          overflow: hidden;
-          display: flex;
-          flex-direction: column;
-          justify-content: space-between;
-          text-align: center;
-          background: #ffffff;
-        }
-        .stk-shop { font-size: 8pt; font-weight: 800; text-transform: uppercase; color: #475569; }
-        .stk-name { font-size: 9.5pt; font-weight: 700; color: #000; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin: 1px 0; }
-        .stk-barcode svg { width: 100% !important; height: ${layout === '50x30' ? '17mm' : '14mm'} !important; display: block; }
-        .stk-price { font-size: 11pt; font-weight: 900; color: #000; }
-      `;
-
-      for (let i = 0; i < copies; i++) {
-        labelHTML += `
-          <div class="barcode-sticker">
-            <div class="stk-shop">${escapeHTML(shopName)}</div>
-            <div class="stk-name">${escapeHTML(item.name)}</div>
-            <div class="stk-barcode">${svgCode}</div>
-            <div class="stk-price">${fmt(item.sellPrice)}</div>
-          </div>
-        `;
-      }
+      labelHTML = imgs;
     } else {
-      // Generic single sticker / A4 Sheet layouts (2col, 3col, single)
-      const svgCode = BarcodeSystem.generateCode128SVG(barcodeVal, { width: 180, height: 48, fontSize: 11 });
-      const gridStyle = layout === 'single'
-        ? `display: flex; flex-direction: column; align-items: center; gap: 8px;`
-        : layout === '2col'
-          ? `display: grid; grid-template-columns: 1fr 1fr; gap: 10px; padding: 10px;`
-          : `display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; padding: 10px;`;
+      // A4 Sheet layouts (2col, 3col)
+      const canvas = BarcodeSystem.createLabelStickerCanvas(item, barcodeVal, shopName, '30x15');
+      const imgData = canvas.toDataURL('image/png');
+      const gridCols = layout === '2col' ? '1fr 1fr' : '1fr 1fr 1fr';
 
       pageCss = `
         @page {
-          margin: ${layout === 'single' ? '2mm' : '8mm'};
-          size: auto;
+          size: A4 portrait;
+          margin: 8mm;
+        }
+        html, body {
+          background: #ffffff;
+          margin: 0;
+          padding: 0;
+          font-family: sans-serif;
         }
         .barcode-container {
-          ${gridStyle}
+          display: grid;
+          grid-template-columns: ${gridCols};
+          gap: 6mm;
+          padding: 4mm;
         }
-        .barcode-sticker {
-          width: ${layout === 'single' ? '48mm' : '100%'};
-          max-width: 220px;
-          padding: 4px 6px;
-          text-align: center;
+        .print-label-img {
+          width: 100%;
+          height: auto;
+          display: block;
           border: 1px dashed #cbd5e1;
           border-radius: 4px;
           page-break-inside: avoid;
-          background: #ffffff;
         }
-        .stk-shop { font-size: 9px; font-weight: 800; text-transform: uppercase; color: #475569; }
-        .stk-name { font-size: 11.5px; font-weight: 700; color: #000; line-height: 1.2; margin: 2px 0 1px 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .stk-barcode svg { display: block; margin: 0 auto; max-width: 100%; height: auto; }
-        .stk-price { font-size: 13px; font-weight: 800; color: #000; line-height: 1.1; margin-top: 2px; }
       `;
 
+      let imgs = '';
       for (let i = 0; i < copies; i++) {
-        labelHTML += `
-          <div class="barcode-sticker">
-            <div class="stk-shop">${escapeHTML(shopName)}</div>
-            <div class="stk-name">${escapeHTML(item.name)}</div>
-            <div class="stk-barcode">${svgCode}</div>
-            <div class="stk-price">${fmt(item.sellPrice)}</div>
-          </div>
-        `;
+        imgs += `<img src="${imgData}" class="print-label-img" alt="Sticker">`;
       }
+      labelHTML = imgs;
     }
 
-    const printWin = window.open('', '_blank', 'width=800,height=600');
+    const printWin = window.open('', '_blank', 'width=600,height=500');
     if (!printWin) {
       toast("Pop-up window blocked. Please allow popups to print barcode labels.", "err");
       return;
@@ -832,7 +698,7 @@ const BarcodeSystem = {
           }
           ${pageCss}
           @media print {
-            .barcode-sticker {
+            .print-label-img {
               border: none !important;
             }
           }
@@ -848,12 +714,12 @@ const BarcodeSystem = {
               window.focus();
               window.print();
             } catch(e) {}
-            setTimeout(function() { window.close(); }, 1200);
+            setTimeout(function() { window.close(); }, 1500);
           }
           if (document.readyState === 'complete') {
-            setTimeout(startPrint, 150);
+            setTimeout(startPrint, 200);
           } else {
-            window.addEventListener('load', function() { setTimeout(startPrint, 150); });
+            window.addEventListener('load', function() { setTimeout(startPrint, 200); });
           }
         </script>
       </body>
