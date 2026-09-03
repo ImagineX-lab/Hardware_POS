@@ -82,7 +82,7 @@ const BarcodeSystem = {
   },
 
   /* ---------------- CODE 128 BARCODE GENERATOR (PURE JS) ---------------- */
-  // Encodes text to Code 128B patterns
+  // Encodes text to Code 128 patterns (Auto-selects Subset C for 2x thicker numeric bars)
   encodeCode128(text) {
     text = String(text || '').trim();
     if (!text) text = '000000';
@@ -102,16 +102,34 @@ const BarcodeSystem = {
       "114131", "311141", "411131", "211412", "211214", "211232", "2331112"
     ];
 
-    // Start with Code 128B start symbol (code 104)
-    let checksum = 104;
-    const sequence = [patterns[104]];
+    const isNumeric = /^\d+$/.test(text);
+    const sequence = [];
+    let checksum = 0;
 
-    for (let i = 0; i < text.length; i++) {
-      const charCode = text.charCodeAt(i);
-      let val = charCode - 32;
-      if (val < 0 || val > 95) val = 0;
-      checksum += val * (i + 1);
-      sequence.push(patterns[val]);
+    if (isNumeric && text.length % 2 === 0) {
+      // Code 128C (Numeric pairs: 2x thicker bars, compact, 100% scannable on small 30x15 labels!)
+      checksum = 105;
+      sequence.push(patterns[105]); // Start C
+
+      let pos = 1;
+      for (let i = 0; i < text.length; i += 2) {
+        const val = parseInt(text.slice(i, i + 2), 10);
+        checksum += val * pos;
+        sequence.push(patterns[val]);
+        pos++;
+      }
+    } else {
+      // Code 128B (Standard Alphanumeric)
+      checksum = 104;
+      sequence.push(patterns[104]); // Start B
+
+      for (let i = 0; i < text.length; i++) {
+        const charCode = text.charCodeAt(i);
+        let val = charCode - 32;
+        if (val < 0 || val > 95) val = 0;
+        checksum += val * (i + 1);
+        sequence.push(patterns[val]);
+      }
     }
 
     const checkVal = checksum % 103;
@@ -124,19 +142,25 @@ const BarcodeSystem = {
 
     return { text, fullCode, totalModules };
   },
+
   // Generates SVG string for Code 128 barcode
   generateCode128SVG(text, options = {}) {
     const { text: cleanText, fullCode, totalModules } = this.encodeCode128(text);
-    const width = options.width || 220;
+    const targetWidth = options.width || 220;
     const height = options.height || 60;
     const showText = options.showText !== false;
-    const fontSize = options.fontSize || 13;
+    const fontSize = options.fontSize || 12;
 
-    // Minimum 10-module Quiet Zone on left and right for scanner pattern recognition
-    const margin = options.margin !== undefined ? options.margin : 16;
-    const barAreaWidth = width - (margin * 2);
-    const moduleWidth = barAreaWidth / totalModules;
-    const barHeight = showText ? height - fontSize - 5 : height;
+    // Use exact integer module width (1 or 2 integer units) so bars are drawn with ZERO fractional pixel distortion!
+    let moduleWidth = 1;
+    if (totalModules * 2 <= targetWidth - 24) {
+      moduleWidth = 2;
+    }
+
+    const barAreaWidth = totalModules * moduleWidth;
+    const width = Math.max(targetWidth, barAreaWidth + 32);
+    const margin = Math.round((width - barAreaWidth) / 2);
+    const barHeight = showText ? height - fontSize - 6 : height;
 
     let svgBars = '';
     let currentX = margin;
@@ -145,14 +169,14 @@ const BarcodeSystem = {
     for (let digit of fullCode) {
       const w = parseInt(digit, 10) * moduleWidth;
       if (isBar) {
-        svgBars += `<rect x="${currentX.toFixed(2)}" y="2" width="${w.toFixed(2)}" height="${barHeight}" fill="#000000" shape-rendering="crispEdges" />`;
+        svgBars += `<rect x="${currentX}" y="2" width="${w}" height="${barHeight}" fill="#000000" shape-rendering="crispEdges" />`;
       }
       currentX += w;
       isBar = !isBar;
     }
 
     const textSvg = showText
-      ? `<text x="${(width / 2).toFixed(2)}" y="${height - 2}" text-anchor="middle" font-family="monospace, 'Courier New', sans-serif" font-size="${fontSize}" font-weight="700" fill="#000000">${escapeHTML(cleanText)}</text>`
+      ? `<text x="${Math.round(width / 2)}" y="${height - 2}" text-anchor="middle" font-family="monospace, 'Courier New', sans-serif" font-size="${fontSize}" font-weight="700" fill="#000000">${escapeHTML(cleanText)}</text>`
       : '';
 
     return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}" width="100%" height="${height}" style="display:block; margin:0 auto; background:#ffffff; shape-rendering:crispEdges;">
@@ -169,17 +193,20 @@ const BarcodeSystem = {
 
     ctx.imageSmoothingEnabled = false;
 
-    const moduleWidth = width / totalModules;
+    // Integer module width math for canvas
+    let moduleWidth = Math.max(1, Math.floor(width / totalModules));
+    const barAreaWidth = totalModules * moduleWidth;
+    const startX = Math.round(x + (width - barAreaWidth) / 2);
     const barHeight = showText ? height - fontSize - 4 : height;
 
     ctx.fillStyle = options.barColor || '#000000';
-    let currentX = x;
+    let currentX = startX;
     let isBar = true;
 
     for (let digit of fullCode) {
       const w = parseInt(digit, 10) * moduleWidth;
       if (isBar) {
-        ctx.fillRect(Math.round(currentX), Math.round(y), Math.max(1, Math.round(w)), Math.round(barHeight));
+        ctx.fillRect(Math.round(currentX), Math.round(y), Math.round(w), Math.round(barHeight));
       }
       currentX += w;
       isBar = !isBar;
