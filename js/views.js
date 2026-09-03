@@ -373,6 +373,9 @@ Views.sale = {
       const effectiveDisc = Math.max(0, origPrice - l.unitPrice);
       const lineTotal = Math.max(0, l.qty * l.unitPrice);
       const isDiscounted = (l.unitPrice < origPrice);
+      // Stock warning: show badge if cart qty is at or near max
+      const stockWarn = l.qty >= l.maxQty;
+      const stockNear = !stockWarn && l.qty >= l.maxQty * 0.8 && l.maxQty > 1;
       return `
         <div class="cart-row" style="padding:6px 0; border-bottom:1px solid var(--border);">
           <div class="cart-row-top" style="display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:4px;">
@@ -383,13 +386,15 @@ Views.sale = {
                   <span>⚖️ ලිහිල්: ${escapeHTML(l.looseInfo.shortText || '')}</span>
                   <span style="font-size:10px; color:#92400e; font-weight:600;">(Stock: -${l.qty} ${escapeHTML(l.unit)})</span>
                 </div>` : ''}
+              ${stockWarn ? `<div style="margin-top:3px; display:inline-flex; align-items:center; gap:4px; font-size:11px; font-weight:700; color:#b91c1c; background:#fef2f2; border:1px solid #fecaca; border-radius:4px; padding:2px 7px;"><i class="ph ph-warning-circle"></i> Stock සීමාව ඇත්තේ ${l.maxQty} ${escapeHTML(l.unit)} ක් පමණයි!</div>` : ''}
+              ${stockNear ? `<div style="margin-top:3px; display:inline-flex; align-items:center; gap:4px; font-size:11px; font-weight:600; color:#92400e; background:#fffbeb; border:1px solid #fde68a; border-radius:4px; padding:2px 7px;"><i class="ph ph-warning"></i> Stock ඇත්තේ ${l.maxQty} ${escapeHTML(l.unit)} ක් පමණයි</div>` : ''}
             </div>
             <button class="icon-btn" data-remove-idx="${idx}" title="${t('delete')}" style="font-size:16px; padding:2px 6px; border:none; background:none; color:var(--steel); cursor:pointer;">✕</button>
           </div>
           <div style="display:flex; align-items:center; justify-content:space-between; gap:8px;">
             <div style="display:flex; align-items:center; gap:4px; flex-wrap:wrap;">
               <span style="font-size:11px; font-weight:700; color:var(--steel);">QTY</span>
-              <input type="number" min="0.0001" step="any" max="${l.maxQty}" value="${l.qty}" data-qty-idx="${idx}" class="input" style="width:65px; height:32px; padding:4px 6px; font-size:14px; text-align:center;" title="Quantity">
+              <input type="number" min="0.0001" step="any" max="${l.maxQty}" value="${l.qty}" data-qty-idx="${idx}" class="input" style="width:65px; height:32px; padding:4px 6px; font-size:14px; text-align:center; border-color:${stockWarn ? '#ef4444' : 'var(--border)'}; background:${stockWarn ? '#fef2f2' : '#fff'};" title="Quantity (max: ${l.maxQty} ${escapeHTML(l.unit)})">
               
               <div style="display:inline-flex; align-items:center; gap:4px; margin-left:2px;">
                 <div style="display:inline-flex; flex-direction:column; align-items:flex-end; line-height:1.1;">
@@ -400,7 +405,7 @@ Views.sale = {
               </div>
 
               <!-- LOOSE CALCULATOR BUTTON RIGHT NEXT TO PRICE -->
-              <button type="button" class="btn-loose-toggle" data-loose-idx="${idx}" title="ලිහිල් විකිණීම සහ මිනුම් පරිවර්තනය [Shortcut: L] (kg, g, අඟල්, අඩි, L, ml, pcs...)" style="height:32px; padding:0 8px; font-size:11.5px; font-weight:700; border:1px solid ${l.looseInfo ? '#f59e0b' : 'var(--border)'}; border-radius:6px; background:${l.looseInfo ? '#fef3c7' : '#f8fafc'}; color:${l.looseInfo ? '#b45309' : '#334155'}; cursor:pointer; display:inline-flex; align-items:center; gap:3px; white-space:nowrap; transition:all 0.15s ease;">
+              <button type="button" class="btn-loose-toggle" data-loose-idx="${idx}" title="ලිහිල් විකිනීම සහ මිනුම් පරිවර්තනය [Shortcut: L] (kg, g, අගුල්, අඩි, L, ml, pcs...)" style="height:32px; padding:0 8px; font-size:11.5px; font-weight:700; border:1px solid ${l.looseInfo ? '#f59e0b' : 'var(--border)'}; border-radius:6px; background:${l.looseInfo ? '#fef3c7' : '#f8fafc'}; color:${l.looseInfo ? '#b45309' : '#334155'}; cursor:pointer; display:inline-flex; align-items:center; gap:3px; white-space:nowrap; transition:all 0.15s ease;">
                 <span>⚖️</span>
                 <span>${l.looseInfo ? escapeHTML(l.looseInfo.shortText || 'ලිහිල්') : 'ලිහිල්'}</span>
               </button>
@@ -491,7 +496,17 @@ Views.sale = {
       inp.addEventListener('change', (e) => {
         const idx = Number(e.target.dataset.qtyIdx);
         let v = Number(e.target.value) || 0.0001;
-        v = Math.max(0.0001, Math.min(v, cart[idx].maxQty));
+        const maxQ = cart[idx].maxQty;
+        if (v > maxQ) {
+          // Show specific stock limit warning
+          const msg = (t('sale_stock_limit') || 'Stock ප්‍රමාණවත් නැහැ! Stock ඇත්තේ {avail} {unit} ක් පමණයි.')
+            .replace('{avail}', maxQ)
+            .replace('{unit}', cart[idx].unit || '');
+          toast(msg, 'err');
+          v = maxQ;
+          e.target.value = maxQ;
+        }
+        v = Math.max(0.0001, Math.min(v, maxQ));
         v = Math.round(v * 10000) / 10000;
         cart[idx].qty = v;
         Views.sale.refreshCart();
@@ -1392,8 +1407,16 @@ Views.sale = {
     if (item.qty <= 0) { toast(t('sale_out_of_stock'), 'err'); return; }
     const existing = cart.find(l => l.itemId === itemId);
     if (existing) {
-      if (existing.qty < existing.maxQty) { existing.qty += 1; }
-      else { toast(t('sale_exceeds_stock'), 'err'); }
+      if (existing.qty < existing.maxQty) {
+        existing.qty += 1;
+      } else {
+        // Show specific message with exact available stock count
+        const msg = (t('sale_stock_limit') || 'Stock ප්‍රමාණවත් නැහැ! Stock ඇත්තේ {avail} {unit} ක් පමණයි.')
+          .replace('{avail}', existing.maxQty)
+          .replace('{unit}', existing.unit || item.unit || '');
+        toast(msg, 'err');
+        return;
+      }
     } else {
       cart.push({
         itemId,
