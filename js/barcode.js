@@ -133,10 +133,10 @@ const BarcodeSystem = {
     const showText = options.showText !== false;
     const fontSize = options.fontSize || 13;
 
-    const margin = 10;
+    const margin = options.margin !== undefined ? options.margin : 8;
     const barAreaWidth = width - (margin * 2);
     const moduleWidth = barAreaWidth / totalModules;
-    const barHeight = showText ? height - fontSize - 6 : height;
+    const barHeight = showText ? height - fontSize - 5 : height;
 
     let svgBars = '';
     let currentX = margin;
@@ -152,10 +152,10 @@ const BarcodeSystem = {
     }
 
     const textSvg = showText
-      ? `<text x="${(width / 2).toFixed(2)}" y="${height - 2}" text-anchor="middle" font-family="monospace, 'Courier New', sans-serif" font-size="${fontSize}" font-weight="700" fill="#1e293b" letter-spacing="2">${escapeHTML(cleanText)}</text>`
+      ? `<text x="${(width / 2).toFixed(2)}" y="${height - 2}" text-anchor="middle" font-family="monospace, 'Courier New', sans-serif" font-size="${fontSize}" font-weight="700" fill="#000000">${escapeHTML(cleanText)}</text>`
       : '';
 
-    return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}" width="${width}" height="${height}" style="display:block; margin:0 auto; background:#ffffff;">
+    return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}" width="100%" height="${height}" style="display:block; margin:0 auto; background:#ffffff;">
       ${svgBars}
       ${textSvg}
     </svg>`;
@@ -168,7 +168,7 @@ const BarcodeSystem = {
     const { text: cleanText, fullCode, totalModules } = this.encodeCode128(text);
 
     const moduleWidth = width / totalModules;
-    const barHeight = showText ? height - fontSize - 6 : height;
+    const barHeight = showText ? height - fontSize - 4 : height;
 
     ctx.fillStyle = options.barColor || '#000000';
     let currentX = x;
@@ -184,19 +184,70 @@ const BarcodeSystem = {
     }
 
     if (showText) {
-      ctx.fillStyle = options.textColor || '#0f172a';
+      ctx.fillStyle = options.textColor || '#000000';
       ctx.font = `bold ${fontSize}px "Courier New", monospace, sans-serif`;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'bottom';
-      const formatted = String(cleanText).split('').join(' ');
-      ctx.fillText(formatted, x + (width / 2), y + height);
+      ctx.fillText(String(cleanText), x + (width / 2), y + height);
     }
   },
 
   // Creates high-res canvas of the complete sticker label (Shop + Item + Barcode + Price)
-  createLabelStickerCanvas(item, barcodeVal, shopName) {
+  createLabelStickerCanvas(item, barcodeVal, shopName, layout = '30x15') {
     const canvas = document.createElement('canvas');
-    const scale = 2; // Retina / crisp print quality
+    
+    if (layout === '30x15') {
+      // 30mm x 15mm at high resolution (300+ DPI equivalent ratio: 708px x 354px)
+      const scale = 3;
+      const width = 354 * scale;  // 1062px
+      const height = 177 * scale; // 531px
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d');
+
+      // White Background
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, width, height);
+
+      // Price String
+      const priceStr = typeof fmt === 'function' ? fmt(item.sellPrice) : `රු. ${item.sellPrice}`;
+      ctx.fillStyle = '#000000';
+      ctx.font = `900 ${28 * scale}px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif`;
+      ctx.textAlign = 'right';
+      ctx.textBaseline = 'top';
+      const priceWidth = ctx.measureText(priceStr).width;
+      ctx.fillText(priceStr, width - (16 * scale), 14 * scale);
+
+      // Item Name on top left
+      ctx.font = `700 ${24 * scale}px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Iskoola Pota", sans-serif`;
+      ctx.textAlign = 'left';
+      let itemName = (item.name || '').trim();
+      const maxItemWidth = width - priceWidth - (40 * scale);
+      if (ctx.measureText(itemName).width > maxItemWidth) {
+        while (itemName.length > 0 && ctx.measureText(itemName + '...').width > maxItemWidth) {
+          itemName = itemName.slice(0, -1);
+        }
+        itemName += '...';
+      }
+      ctx.fillText(itemName, 16 * scale, 16 * scale);
+
+      // Barcode filling main body
+      const bcWidth = width - (24 * scale);
+      const bcHeight = height - (64 * scale);
+      const bcX = 12 * scale;
+      const bcY = 52 * scale;
+
+      this.drawBarcodeOnCanvas(ctx, barcodeVal, bcX, bcY, bcWidth, bcHeight, {
+        fontSize: 22 * scale,
+        barColor: '#000000',
+        textColor: '#000000'
+      });
+
+      return canvas;
+    }
+
+    // Default / standard sticker layout (50x30mm / 40x25mm)
+    const scale = 2;
     const width = 280 * scale;  // 560px
     const height = 180 * scale; // 360px
     canvas.width = width;
@@ -226,7 +277,7 @@ const BarcodeSystem = {
     const sName = (shopName || 'HARDWAREPOS').toUpperCase();
     ctx.fillText(sName, width / 2, 14 * scale);
 
-    // Item Name (truncated cleanly if too long)
+    // Item Name
     ctx.fillStyle = '#0f172a';
     ctx.font = `700 ${13.5 * scale}px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Iskoola Pota", sans-serif`;
     ctx.textAlign = 'center';
@@ -292,8 +343,8 @@ const BarcodeSystem = {
   },
 
   // Download Sticker Label as PNG image
-  downloadLabelPNG(item, barcodeVal, shopName) {
-    const canvas = this.createLabelStickerCanvas(item, barcodeVal, shopName);
+  downloadLabelPNG(item, barcodeVal, shopName, layout = '30x15') {
+    const canvas = this.createLabelStickerCanvas(item, barcodeVal, shopName, layout);
     const filename = this.getDownloadFilename('label', item.name, barcodeVal, 'png');
     this.saveCanvasToFile(canvas, filename);
   },
@@ -399,11 +450,15 @@ const BarcodeSystem = {
               <input type="number" class="input" id="lblCopies" min="1" max="100" value="1" style="font-weight:700; font-size:16px;">
             </div>
             <div class="field">
-              <label class="field-label">${t('barcode_paper_size') || 'ප්‍රමාණය / Layout'}</label>
-              <select class="input" id="lblLayout">
-                <option value="single">${t('barcode_thermal_single') || 'Thermal Sticker (50x30mm / 40x25mm)'}</option>
-                <option value="2col">${t('barcode_sheet_2col') || 'A4 / Sheet (2 Columns)'}</option>
-                <option value="3col">${t('barcode_sheet_3col') || 'A4 / Sheet (3 Columns)'}</option>
+              <label class="field-label">${t('barcode_paper_size') || 'ස්ටිකර් ප්‍රමාණය / Layout'}</label>
+              <select class="input" id="lblLayout" style="font-weight:700;">
+                <option value="30x15" selected>🏷 Thermal Sticker 30mm x 15mm (කුඩා - Small Fit)</option>
+                <option value="40x25">🏷 Thermal Sticker 40mm x 25mm</option>
+                <option value="50x25">🏷 Thermal Sticker 50mm x 25mm</option>
+                <option value="50x30">🏷 Thermal Sticker 50mm x 30mm (මධ්‍යම - Medium)</option>
+                <option value="single">🏷 Generic Thermal Sticker (Single)</option>
+                <option value="2col">📄 A4 / Sheet (2 Columns)</option>
+                <option value="3col">📄 A4 / Sheet (3 Columns)</option>
               </select>
             </div>
             <div style="background:var(--paper); border:1px solid var(--border); border-radius:8px; padding:10px; font-size:12.5px; color:var(--charcoal);">
@@ -414,8 +469,8 @@ const BarcodeSystem = {
             </div>
           </div>
           <div>
-            <label class="field-label">Label Preview</label>
-            <div id="labelLivePreview" style="background:#fff; border:2px dashed var(--border); border-radius:8px; padding:12px; display:flex; flex-direction:column; align-items:center; justify-content:center; min-height:160px; box-shadow:0 2px 6px rgba(0,0,0,0.05);">
+            <label class="field-label">Sticker Live Preview</label>
+            <div id="labelLivePreview" style="background:#f8fafc; border:2px dashed var(--border); border-radius:8px; padding:12px; display:flex; flex-direction:column; align-items:center; justify-content:center; min-height:170px; box-shadow:0 2px 6px rgba(0,0,0,0.05);">
               <!-- Rendered preview -->
             </div>
             <div style="margin-top:10px; display:flex; gap:6px; justify-content:center; flex-wrap:wrap;">
@@ -438,9 +493,9 @@ const BarcodeSystem = {
           <i class="ph ph-barcode"></i> Barcode PNG
         </button>
         <button class="btn btn-outline" id="doDownloadLabelBtn" style="font-weight:700; border-color:var(--primary); color:var(--primary); display:inline-flex; align-items:center; gap:6px;">
-          <i class="ph ph-download-simple"></i> ${t('barcode_download_label') || 'Label එක Download කරන්න (PNG)'}
+          <i class="ph ph-download-simple"></i> ${t('barcode_download_label') || 'Sticker (PNG) Download'}
         </button>
-        <button class="btn btn-primary" id="doPrintBarcodeBtn">
+        <button class="btn btn-primary" id="doPrintBarcodeBtn" style="font-weight:800;">
           <i class="ph ph-printer"></i> ${t('receipt_print') || 'Print කරන්න'}
         </button>
       `,
@@ -451,15 +506,45 @@ const BarcodeSystem = {
 
         const updatePreview = () => {
           if (!previewEl) return;
-          const svg = BarcodeSystem.generateCode128SVG(barcodeVal, { width: 190, height: 50, fontSize: 12 });
-          previewEl.innerHTML = `
-            <div style="text-align:center; max-width:210px; border:1px solid #e2e8f0; border-radius:6px; padding:8px 6px; background:#fff; font-family:var(--font-base);">
-              <div style="font-size:10px; font-weight:800; text-transform:uppercase; color:#64748b; letter-spacing:0.5px; margin-bottom:2px;">${escapeHTML(shopName)}</div>
-              <div style="font-size:12.5px; font-weight:700; color:#0f172a; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-bottom:4px;">${escapeHTML(item.name)}</div>
-              ${svg}
-              <div style="font-size:14px; font-weight:800; color:#0f172a; margin-top:3px;">${fmt(item.sellPrice)}</div>
-            </div>
-          `;
+          const layout = layoutSel.value;
+          
+          if (layout === '30x15') {
+            const svg = BarcodeSystem.generateCode128SVG(barcodeVal, { width: 220, height: 50, margin: 2, fontSize: 11 });
+            previewEl.innerHTML = `
+              <div style="font-size:11px; font-weight:700; color:var(--primary); margin-bottom:6px; text-align:center;">🏷 30mm x 15mm Sticker Preview</div>
+              <div style="width:240px; height:120px; border:2px dashed #94a3b8; border-radius:6px; padding:6px; background:#fff; font-family:var(--font-base); display:flex; flex-direction:column; justify-content:space-between; box-shadow:0 2px 8px rgba(0,0,0,0.08); margin:0 auto;">
+                <div style="display:flex; justify-content:space-between; align-items:center; width:100%; font-size:11px; line-height:1.1; color:#0f172a; font-weight:700;">
+                  <span style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:62%; font-weight:700;">${escapeHTML(item.name)}</span>
+                  <span style="font-weight:900; font-size:12px; color:#0f172a;">${fmt(item.sellPrice)}</span>
+                </div>
+                <div style="width:100%; flex:1; display:flex; align-items:center; justify-content:center; margin-top:2px;">
+                  ${svg}
+                </div>
+              </div>
+            `;
+          } else if (layout === '40x25') {
+            const svg = BarcodeSystem.generateCode128SVG(barcodeVal, { width: 220, height: 50, margin: 4, fontSize: 11 });
+            previewEl.innerHTML = `
+              <div style="font-size:11px; font-weight:700; color:var(--primary); margin-bottom:6px; text-align:center;">🏷 40mm x 25mm Sticker Preview</div>
+              <div style="width:240px; height:150px; border:2px dashed #94a3b8; border-radius:6px; padding:8px; background:#fff; font-family:var(--font-base); display:flex; flex-direction:column; justify-content:space-between; text-align:center; box-shadow:0 2px 8px rgba(0,0,0,0.08); margin:0 auto;">
+                <div style="font-size:10px; font-weight:800; text-transform:uppercase; color:#64748b;">${escapeHTML(shopName)}</div>
+                <div style="font-size:12px; font-weight:700; color:#0f172a; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${escapeHTML(item.name)}</div>
+                ${svg}
+                <div style="font-size:13.5px; font-weight:900; color:#0f172a;">${fmt(item.sellPrice)}</div>
+              </div>
+            `;
+          } else {
+            const svg = BarcodeSystem.generateCode128SVG(barcodeVal, { width: 190, height: 50, fontSize: 12 });
+            previewEl.innerHTML = `
+              <div style="font-size:11px; font-weight:700; color:var(--primary); margin-bottom:6px; text-align:center;">🏷 Standard Sticker Preview</div>
+              <div style="text-align:center; max-width:210px; border:2px dashed #94a3b8; border-radius:6px; padding:8px 6px; background:#fff; font-family:var(--font-base); box-shadow:0 2px 8px rgba(0,0,0,0.08); margin:0 auto;">
+                <div style="font-size:10px; font-weight:800; text-transform:uppercase; color:#64748b; letter-spacing:0.5px; margin-bottom:2px;">${escapeHTML(shopName)}</div>
+                <div style="font-size:12.5px; font-weight:700; color:#0f172a; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-bottom:4px;">${escapeHTML(item.name)}</div>
+                ${svg}
+                <div style="font-size:14px; font-weight:800; color:#0f172a; margin-top:3px;">${fmt(item.sellPrice)}</div>
+              </div>
+            `;
+          }
         };
 
         updatePreview();
@@ -467,7 +552,8 @@ const BarcodeSystem = {
         layoutSel.addEventListener('change', updatePreview);
 
         const handleDownloadLabel = () => {
-          BarcodeSystem.downloadLabelPNG(item, barcodeVal, shopName);
+          const layout = layoutSel.value;
+          BarcodeSystem.downloadLabelPNG(item, barcodeVal, shopName, layout);
           toast("✅ Barcode Sticker එක බාගත විය!", "ok");
         };
 
@@ -496,27 +582,234 @@ const BarcodeSystem = {
     });
   },
 
-  // Print Barcode stickers using iframe
+  // Print Barcode stickers using iframe / print window
   printLabels(item, barcodeVal, copies, layout, shopName) {
-    const svgCode = BarcodeSystem.generateCode128SVG(barcodeVal, { width: 180, height: 48, fontSize: 11 });
-    
+    let pageCss = '';
     let labelHTML = '';
-    for (let i = 0; i < copies; i++) {
-      labelHTML += `
-        <div class="barcode-sticker">
-          <div class="stk-shop">${escapeHTML(shopName)}</div>
-          <div class="stk-name">${escapeHTML(item.name)}</div>
-          <div class="stk-barcode">${svgCode}</div>
-          <div class="stk-price">${fmt(item.sellPrice)}</div>
-        </div>
-      `;
-    }
 
-    const gridStyle = layout === 'single'
-      ? `display: flex; flex-direction: column; align-items: center; gap: 8px;`
-      : layout === '2col'
-        ? `display: grid; grid-template-columns: 1fr 1fr; gap: 10px; padding: 10px;`
-        : `display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; padding: 10px;`;
+    if (layout === '30x15') {
+      const svgCode = BarcodeSystem.generateCode128SVG(barcodeVal, { width: 220, height: 50, margin: 2, fontSize: 11 });
+      pageCss = `
+        @page {
+          size: 30mm 15mm;
+          margin: 0;
+        }
+        html, body {
+          width: 30mm;
+          height: 15mm;
+          margin: 0;
+          padding: 0;
+          background: #ffffff;
+          font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+          -webkit-print-color-adjust: exact;
+        }
+        .barcode-container {
+          display: block;
+          margin: 0;
+          padding: 0;
+        }
+        .barcode-sticker {
+          width: 30mm;
+          height: 15mm;
+          box-sizing: border-box;
+          padding: 0.5mm 1mm;
+          page-break-after: always;
+          break-after: page;
+          page-break-inside: avoid;
+          overflow: hidden;
+          display: flex;
+          flex-direction: column;
+          justify-content: space-between;
+          background: #ffffff;
+        }
+        .stk-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          width: 100%;
+          font-size: 7.5pt;
+          line-height: 1.1;
+          color: #000000;
+          font-weight: 700;
+        }
+        .stk-name {
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          max-width: 60%;
+          font-size: 7.5pt;
+          font-weight: 700;
+          color: #000000;
+        }
+        .stk-price {
+          font-size: 8.5pt;
+          font-weight: 900;
+          white-space: nowrap;
+          color: #000000;
+        }
+        .stk-barcode {
+          width: 100%;
+          flex: 1;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
+        .stk-barcode svg {
+          width: 100% !important;
+          height: 10.5mm !important;
+          max-height: 100%;
+          display: block;
+        }
+      `;
+
+      for (let i = 0; i < copies; i++) {
+        labelHTML += `
+          <div class="barcode-sticker">
+            <div class="stk-header">
+              <span class="stk-name">${escapeHTML(item.name)}</span>
+              <span class="stk-price">${fmt(item.sellPrice)}</span>
+            </div>
+            <div class="stk-barcode">${svgCode}</div>
+          </div>
+        `;
+      }
+    } else if (layout === '40x25') {
+      const svgCode = BarcodeSystem.generateCode128SVG(barcodeVal, { width: 220, height: 55, margin: 4, fontSize: 11 });
+      pageCss = `
+        @page {
+          size: 40mm 25mm;
+          margin: 0;
+        }
+        html, body {
+          width: 40mm;
+          height: 25mm;
+          margin: 0;
+          padding: 0;
+          background: #ffffff;
+        }
+        .barcode-container { display: block; margin: 0; padding: 0; }
+        .barcode-sticker {
+          width: 40mm;
+          height: 25mm;
+          box-sizing: border-box;
+          padding: 1mm 1.5mm;
+          page-break-after: always;
+          break-after: page;
+          page-break-inside: avoid;
+          overflow: hidden;
+          display: flex;
+          flex-direction: column;
+          justify-content: space-between;
+          text-align: center;
+          background: #ffffff;
+        }
+        .stk-shop { font-size: 7.5pt; font-weight: 800; text-transform: uppercase; color: #475569; }
+        .stk-name { font-size: 8.5pt; font-weight: 700; color: #000; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin: 1px 0; }
+        .stk-barcode svg { width: 100% !important; height: 14mm !important; display: block; }
+        .stk-price { font-size: 10pt; font-weight: 900; color: #000; }
+      `;
+
+      for (let i = 0; i < copies; i++) {
+        labelHTML += `
+          <div class="barcode-sticker">
+            <div class="stk-shop">${escapeHTML(shopName)}</div>
+            <div class="stk-name">${escapeHTML(item.name)}</div>
+            <div class="stk-barcode">${svgCode}</div>
+            <div class="stk-price">${fmt(item.sellPrice)}</div>
+          </div>
+        `;
+      }
+    } else if (layout === '50x25' || layout === '50x30') {
+      const hMm = layout === '50x30' ? '30mm' : '25mm';
+      const svgCode = BarcodeSystem.generateCode128SVG(barcodeVal, { width: 220, height: 60, margin: 4, fontSize: 12 });
+      pageCss = `
+        @page {
+          size: 50mm ${hMm};
+          margin: 0;
+        }
+        html, body {
+          width: 50mm;
+          height: ${hMm};
+          margin: 0;
+          padding: 0;
+          background: #ffffff;
+        }
+        .barcode-container { display: block; margin: 0; padding: 0; }
+        .barcode-sticker {
+          width: 50mm;
+          height: ${hMm};
+          box-sizing: border-box;
+          padding: 1.5mm 2mm;
+          page-break-after: always;
+          break-after: page;
+          page-break-inside: avoid;
+          overflow: hidden;
+          display: flex;
+          flex-direction: column;
+          justify-content: space-between;
+          text-align: center;
+          background: #ffffff;
+        }
+        .stk-shop { font-size: 8pt; font-weight: 800; text-transform: uppercase; color: #475569; }
+        .stk-name { font-size: 9.5pt; font-weight: 700; color: #000; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin: 1px 0; }
+        .stk-barcode svg { width: 100% !important; height: ${layout === '50x30' ? '17mm' : '14mm'} !important; display: block; }
+        .stk-price { font-size: 11pt; font-weight: 900; color: #000; }
+      `;
+
+      for (let i = 0; i < copies; i++) {
+        labelHTML += `
+          <div class="barcode-sticker">
+            <div class="stk-shop">${escapeHTML(shopName)}</div>
+            <div class="stk-name">${escapeHTML(item.name)}</div>
+            <div class="stk-barcode">${svgCode}</div>
+            <div class="stk-price">${fmt(item.sellPrice)}</div>
+          </div>
+        `;
+      }
+    } else {
+      // Generic single sticker / A4 Sheet layouts (2col, 3col, single)
+      const svgCode = BarcodeSystem.generateCode128SVG(barcodeVal, { width: 180, height: 48, fontSize: 11 });
+      const gridStyle = layout === 'single'
+        ? `display: flex; flex-direction: column; align-items: center; gap: 8px;`
+        : layout === '2col'
+          ? `display: grid; grid-template-columns: 1fr 1fr; gap: 10px; padding: 10px;`
+          : `display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; padding: 10px;`;
+
+      pageCss = `
+        @page {
+          margin: ${layout === 'single' ? '2mm' : '8mm'};
+          size: auto;
+        }
+        .barcode-container {
+          ${gridStyle}
+        }
+        .barcode-sticker {
+          width: ${layout === 'single' ? '48mm' : '100%'};
+          max-width: 220px;
+          padding: 4px 6px;
+          text-align: center;
+          border: 1px dashed #cbd5e1;
+          border-radius: 4px;
+          page-break-inside: avoid;
+          background: #ffffff;
+        }
+        .stk-shop { font-size: 9px; font-weight: 800; text-transform: uppercase; color: #475569; }
+        .stk-name { font-size: 11.5px; font-weight: 700; color: #000; line-height: 1.2; margin: 2px 0 1px 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .stk-barcode svg { display: block; margin: 0 auto; max-width: 100%; height: auto; }
+        .stk-price { font-size: 13px; font-weight: 800; color: #000; line-height: 1.1; margin-top: 2px; }
+      `;
+
+      for (let i = 0; i < copies; i++) {
+        labelHTML += `
+          <div class="barcode-sticker">
+            <div class="stk-shop">${escapeHTML(shopName)}</div>
+            <div class="stk-name">${escapeHTML(item.name)}</div>
+            <div class="stk-barcode">${svgCode}</div>
+            <div class="stk-price">${fmt(item.sellPrice)}</div>
+          </div>
+        `;
+      }
+    }
 
     const printWin = window.open('', '_blank', 'width=800,height=600');
     if (!printWin) {
