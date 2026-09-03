@@ -804,6 +804,40 @@ Views.sale = {
         const rows = suggestBox.querySelectorAll('[data-add-item]');
         const rawQ = searchInp.value.trim();
 
+        // Helper to highlight row at selectedIndex
+        function updateSelection() {
+          rows.forEach((r, idx) => {
+            if (idx === selectedIndex) {
+              r.classList.add('selected-row');
+              r.scrollIntoView({ block: 'nearest' });
+            } else {
+              r.classList.remove('selected-row');
+            }
+          });
+        }
+
+        if (e.key === 'ArrowDown') {
+          e.preventDefault();
+          if (rows.length === 0) return;
+          selectedIndex = (selectedIndex + 1) % rows.length;
+          updateSelection();
+          return;
+        }
+
+        if (e.key === 'ArrowUp') {
+          e.preventDefault();
+          if (rows.length === 0) return;
+          selectedIndex = selectedIndex <= 0 ? rows.length - 1 : selectedIndex - 1;
+          updateSelection();
+          return;
+        }
+
+        if (e.key === 'Escape') {
+          suggestBox.innerHTML = '';
+          selectedIndex = -1;
+          return;
+        }
+
         if (e.key === 'Enter') {
           e.preventDefault();
           // Check if exact barcode matches a bill first
@@ -831,25 +865,11 @@ Views.sale = {
 
           // 2. Select from dropdown suggestions
           if (rows.length > 0) {
-            if (selectedIndex >= 0 && selectedIndex < rows.length) {
-              rows[selectedIndex].click();
-            } else {
-              rows[0].click();
-            }
+            const targetIdx = (selectedIndex >= 0 && selectedIndex < rows.length) ? selectedIndex : 0;
+            rows[targetIdx].click();
           }
           searchInp.blur();
           return;
-        }
-
-        function updateSelection() {
-          rows.forEach((r, idx) => {
-            if (idx === selectedIndex) {
-              r.classList.add('selected-row');
-              r.scrollIntoView({ block: 'nearest' });
-            } else {
-              r.classList.remove('selected-row');
-            }
-          });
         }
       });
     }
