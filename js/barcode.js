@@ -823,62 +823,17 @@ const BarcodeSystem = {
       <head>
         <title>Print Barcodes - ${escapeHTML(item.name)}</title>
         <style>
-          @page {
-            margin: ${layout === 'single' ? '2mm' : '8mm'};
-            size: auto;
-          }
           * { box-sizing: border-box; margin: 0; padding: 0; }
           body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
-            background: #fff;
-            color: #000;
+            background: #ffffff;
+            color: #000000;
+            -webkit-print-color-adjust: exact;
           }
-          .barcode-container {
-            ${gridStyle}
-          }
-          .barcode-sticker {
-            width: ${layout === 'single' ? '48mm' : '100%'};
-            max-width: 220px;
-            padding: 4px 6px;
-            text-align: center;
-            border: 1px dashed #cbd5e1;
-            border-radius: 4px;
-            page-break-inside: avoid;
-            background: #fff;
-          }
-          .stk-shop {
-            font-size: 9px;
-            font-weight: 800;
-            text-transform: uppercase;
-            color: #475569;
-            line-height: 1.1;
-          }
-          .stk-name {
-            font-size: 11.5px;
-            font-weight: 700;
-            color: #000;
-            line-height: 1.2;
-            margin: 2px 0 1px 0;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-          }
-          .stk-barcode svg {
-            display: block;
-            margin: 0 auto;
-            max-width: 100%;
-            height: auto;
-          }
-          .stk-price {
-            font-size: 13px;
-            font-weight: 800;
-            color: #000;
-            line-height: 1.1;
-            margin-top: 2px;
-          }
+          ${pageCss}
           @media print {
             .barcode-sticker {
-              border: none;
+              border: none !important;
             }
           }
         </style>
@@ -888,10 +843,18 @@ const BarcodeSystem = {
           ${labelHTML}
         </div>
         <script>
-          window.onload = function() {
-            window.print();
-            setTimeout(function() { window.close(); }, 800);
-          };
+          function startPrint() {
+            try {
+              window.focus();
+              window.print();
+            } catch(e) {}
+            setTimeout(function() { window.close(); }, 1200);
+          }
+          if (document.readyState === 'complete') {
+            setTimeout(startPrint, 150);
+          } else {
+            window.addEventListener('load', function() { setTimeout(startPrint, 150); });
+          }
         </script>
       </body>
       </html>
