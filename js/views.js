@@ -346,7 +346,6 @@ Views.sale = {
       }
         </div>
         <div class="item-name"><b>${escapeHTML(i.name)}</b></div>
-        ${i.barcode ? `<div style="font-size:10.5px; font-family:monospace; color:var(--primary); font-weight:700;"><i class="ph ph-barcode"></i> ${escapeHTML(i.barcode)}</div>` : ''}
         <div class="item-desc text-muted">${escapeHTML(i.description || '')}</div>
         <div>
           <div class="item-price">${fmt(i.sellPrice)}</div>
@@ -2127,8 +2126,6 @@ Views.sale = {
           <div style="margin:6px 0; display:flex; flex-direction:column; align-items:center; justify-content:center;">
             ${typeof BarcodeSystem !== 'undefined' ? BarcodeSystem.generateCode128SVG(sale.barcode || ('BILL-' + sale.id), { width: 190, height: 44, fontSize: 10 }) : ''}
           </div>
-
-          <div style="font-size:9px; color:#555; margin-top:4px;">imagineX software solution - 0761945587</div>
         </div>
       </div>
     `;
