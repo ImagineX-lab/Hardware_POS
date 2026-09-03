@@ -614,7 +614,7 @@ const BarcodeSystem = {
         BarcodeSystem.playBeep(true);
         Views.sale.addToCart(item.id);
         Views.sale.applyCustomerHardwareDiscount();
-        toast(`✅ <b>${escapeHTML(item.name)}</b> (Cart +1)`, 'ok');
+        toast(`✅ ${item.name} (Cart +1)`, 'ok');
         
         // Clear sale search if it contained the barcode
         const searchInp = document.getElementById('saleSearch');
