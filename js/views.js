@@ -2423,11 +2423,20 @@ Views.items = {
       if (code) {
         previewWrap.style.display = 'block';
         previewWrap.innerHTML = `
-          <div style="background:#fff; border:1px solid #cbd5e1; border-radius:6px; padding:6px 10px; display:inline-flex; align-items:center; gap:10px;">
+          <div style="background:#fff; border:1px solid #cbd5e1; border-radius:6px; padding:6px 10px; display:inline-flex; align-items:center; gap:10px; flex-wrap:wrap;">
             ${BarcodeSystem.generateCode128SVG(code, { width: 140, height: 36, fontSize: 10 })}
             <span class="small text-muted" style="font-size:11px;">Scannable Code 128</span>
+            <button type="button" class="btn btn-sm btn-outline" id="btnPreviewDlBarcode" title="Download Barcode (PNG)" style="height:28px; padding:2px 8px; font-size:11px; display:inline-flex; align-items:center; gap:4px; margin-left:auto;">
+              <i class="ph ph-download-simple"></i> Download
+            </button>
           </div>
         `;
+        previewWrap.querySelector('#btnPreviewDlBarcode')?.addEventListener('click', (e) => {
+          e.preventDefault();
+          const itemName = document.getElementById('f_name')?.value || (item && item.name) || 'item';
+          BarcodeSystem.downloadBarcodePNG(code, itemName);
+          toast("✅ Barcode රූපය බාගත විය!", "ok");
+        });
       } else {
         previewWrap.style.display = 'none';
         previewWrap.innerHTML = '';

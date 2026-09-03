@@ -100,6 +100,10 @@ const i18n = {
     receipt_thanks: "ස්තූතියි! නැවත එන්න.",
     receipt_print: "🖨 ප්‍රින්ට් කරන්න",
     receipt_completed: "බිල ගෙවිලා",
+    barcode_download_label: "Label එක Download කරන්න (PNG)",
+    barcode_download_code: "Barcode පමණක් (PNG)",
+    barcode_download_svg: "Barcode (SVG)",
+    barcode_downloaded: "Barcode එක බාගත විය!",
 
     // Items
     items_list: "බඩු List",
@@ -380,6 +384,10 @@ const i18n = {
     receipt_thanks: "Thank you! Come again.",
     receipt_print: "🖨 Print Receipt",
     receipt_completed: "Transaction Completed",
+    barcode_download_label: "Download Label (PNG)",
+    barcode_download_code: "Barcode Only (PNG)",
+    barcode_download_svg: "Barcode (SVG)",
+    barcode_downloaded: "Barcode downloaded successfully!",
 
     // Items
     items_list: "Item List",

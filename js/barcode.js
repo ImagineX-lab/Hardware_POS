@@ -81,16 +81,11 @@ const BarcodeSystem = {
     return '20' + Date.now().toString().slice(-10);
   },
 
-  /* ---------------- CODE 128 BARCODE SVG GENERATOR (PURE JS) ---------------- */
+  /* ---------------- CODE 128 BARCODE GENERATOR (PURE JS) ---------------- */
   // Encodes text to Code 128B patterns
-  generateCode128SVG(text, options = {}) {
+  encodeCode128(text) {
     text = String(text || '').trim();
     if (!text) text = '000000';
-
-    const width = options.width || 220;
-    const height = options.height || 60;
-    const showText = options.showText !== false;
-    const fontSize = options.fontSize || 13;
 
     // Code 128B pattern table (107 patterns)
     const patterns = [
@@ -109,7 +104,7 @@ const BarcodeSystem = {
 
     // Start with Code 128B start symbol (code 104)
     let checksum = 104;
-    let sequence = [patterns[104]];
+    const sequence = [patterns[104]];
 
     for (let i = 0; i < text.length; i++) {
       const charCode = text.charCodeAt(i);
@@ -126,6 +121,17 @@ const BarcodeSystem = {
     const fullCode = sequence.join('');
     let totalModules = 0;
     for (let c of fullCode) totalModules += parseInt(c, 10);
+
+    return { text, fullCode, totalModules };
+  },
+
+  // Generates SVG string for Code 128 barcode
+  generateCode128SVG(text, options = {}) {
+    const { text: cleanText, fullCode, totalModules } = this.encodeCode128(text);
+    const width = options.width || 220;
+    const height = options.height || 60;
+    const showText = options.showText !== false;
+    const fontSize = options.fontSize || 13;
 
     const margin = 10;
     const barAreaWidth = width - (margin * 2);
@@ -146,7 +152,7 @@ const BarcodeSystem = {
     }
 
     const textSvg = showText
-      ? `<text x="${(width / 2).toFixed(2)}" y="${height - 2}" text-anchor="middle" font-family="monospace, 'Courier New', sans-serif" font-size="${fontSize}" font-weight="700" fill="#1e293b" letter-spacing="2">${escapeHTML(text)}</text>`
+      ? `<text x="${(width / 2).toFixed(2)}" y="${height - 2}" text-anchor="middle" font-family="monospace, 'Courier New', sans-serif" font-size="${fontSize}" font-weight="700" fill="#1e293b" letter-spacing="2">${escapeHTML(cleanText)}</text>`
       : '';
 
     return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}" width="${width}" height="${height}" style="display:block; margin:0 auto; background:#ffffff;">
@@ -155,7 +161,205 @@ const BarcodeSystem = {
     </svg>`;
   },
 
-  /* ---------------- BARCODE LABEL STICKER PRINT MODAL ---------------- */
+  // Draw Code 128 barcode directly on HTML5 Canvas Context
+  drawBarcodeOnCanvas(ctx, text, x, y, width, height, options = {}) {
+    const showText = options.showText !== false;
+    const fontSize = options.fontSize || 14;
+    const { text: cleanText, fullCode, totalModules } = this.encodeCode128(text);
+
+    const moduleWidth = width / totalModules;
+    const barHeight = showText ? height - fontSize - 6 : height;
+
+    ctx.fillStyle = options.barColor || '#000000';
+    let currentX = x;
+    let isBar = true;
+
+    for (let digit of fullCode) {
+      const w = parseInt(digit, 10) * moduleWidth;
+      if (isBar) {
+        ctx.fillRect(Math.round(currentX), Math.round(y), Math.max(1, Math.round(w)), Math.round(barHeight));
+      }
+      currentX += w;
+      isBar = !isBar;
+    }
+
+    if (showText) {
+      ctx.fillStyle = options.textColor || '#0f172a';
+      ctx.font = `bold ${fontSize}px "Courier New", monospace, sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'bottom';
+      const formatted = String(cleanText).split('').join(' ');
+      ctx.fillText(formatted, x + (width / 2), y + height);
+    }
+  },
+
+  // Creates high-res canvas of the complete sticker label (Shop + Item + Barcode + Price)
+  createLabelStickerCanvas(item, barcodeVal, shopName) {
+    const canvas = document.createElement('canvas');
+    const scale = 2; // Retina / crisp print quality
+    const width = 280 * scale;  // 560px
+    const height = 180 * scale; // 360px
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext('2d');
+
+    // Background
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, width, height);
+
+    // Rounded border
+    ctx.strokeStyle = '#cbd5e1';
+    ctx.lineWidth = 2 * scale;
+    if (ctx.roundRect) {
+      ctx.beginPath();
+      ctx.roundRect(6 * scale, 6 * scale, width - (12 * scale), height - (12 * scale), 8 * scale);
+      ctx.stroke();
+    } else {
+      ctx.strokeRect(6 * scale, 6 * scale, width - (12 * scale), height - (12 * scale));
+    }
+
+    // Shop Name
+    ctx.fillStyle = '#64748b';
+    ctx.font = `800 ${11 * scale}px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'top';
+    const sName = (shopName || 'HARDWAREPOS').toUpperCase();
+    ctx.fillText(sName, width / 2, 14 * scale);
+
+    // Item Name (truncated cleanly if too long)
+    ctx.fillStyle = '#0f172a';
+    ctx.font = `700 ${13.5 * scale}px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Iskoola Pota", sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'top';
+    let itemName = (item.name || '').trim();
+    const maxTextWidth = width - (32 * scale);
+    if (ctx.measureText(itemName).width > maxTextWidth) {
+      while (itemName.length > 0 && ctx.measureText(itemName + '...').width > maxTextWidth) {
+        itemName = itemName.slice(0, -1);
+      }
+      itemName += '...';
+    }
+    ctx.fillText(itemName, width / 2, 30 * scale);
+
+    // Barcode
+    const bcWidth = 220 * scale;
+    const bcHeight = 66 * scale;
+    const bcX = (width - bcWidth) / 2;
+    const bcY = 56 * scale;
+    this.drawBarcodeOnCanvas(ctx, barcodeVal, bcX, bcY, bcWidth, bcHeight, {
+      fontSize: 12 * scale,
+      barColor: '#000000',
+      textColor: '#0f172a'
+    });
+
+    // Price
+    ctx.fillStyle = '#0f172a';
+    ctx.font = `900 ${16 * scale}px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Iskoola Pota", sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'bottom';
+    const priceText = typeof fmt === 'function' ? fmt(item.sellPrice) : `රු. ${item.sellPrice}`;
+    ctx.fillText(priceText, width / 2, height - (14 * scale));
+
+    return canvas;
+  },
+
+  // Creates high-res canvas of just the barcode with text
+  createBarcodeOnlyCanvas(barcodeVal) {
+    const canvas = document.createElement('canvas');
+    const scale = 2;
+    const width = 240 * scale;  // 480px
+    const height = 90 * scale;  // 180px
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext('2d');
+
+    // Quiet zone (pure white)
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, width, height);
+
+    const bcWidth = width - (24 * scale);
+    const bcHeight = height - (20 * scale);
+    const bcX = 12 * scale;
+    const bcY = 8 * scale;
+
+    this.drawBarcodeOnCanvas(ctx, barcodeVal, bcX, bcY, bcWidth, bcHeight, {
+      fontSize: 13 * scale,
+      barColor: '#000000',
+      textColor: '#0f172a'
+    });
+
+    return canvas;
+  },
+
+  // Download Sticker Label as PNG image
+  downloadLabelPNG(item, barcodeVal, shopName) {
+    const canvas = this.createLabelStickerCanvas(item, barcodeVal, shopName);
+    const filename = this.getDownloadFilename('label', item.name, barcodeVal, 'png');
+    this.saveCanvasToFile(canvas, filename);
+  },
+
+  // Download Barcode image only as PNG
+  downloadBarcodePNG(barcodeVal, itemName = 'item') {
+    const canvas = this.createBarcodeOnlyCanvas(barcodeVal);
+    const filename = this.getDownloadFilename('barcode', itemName, barcodeVal, 'png');
+    this.saveCanvasToFile(canvas, filename);
+  },
+
+  // Download Vector Barcode SVG file
+  downloadBarcodeSVG(barcodeVal, itemName = 'item') {
+    const svgContent = this.generateCode128SVG(barcodeVal, { width: 260, height: 80, fontSize: 13 });
+    const filename = this.getDownloadFilename('barcode', itemName, barcodeVal, 'svg');
+    const blob = new Blob([svgContent], { type: 'image/svg+xml;charset=utf-8' });
+    this.triggerDownloadBlob(blob, filename);
+  },
+
+  // Generate safe filename for download
+  getDownloadFilename(prefix, itemName, barcodeVal, ext = 'png') {
+    const cleanName = String(itemName || 'item')
+      .trim()
+      .replace(/[\\/:*?"<>|]/g, '_')
+      .replace(/\s+/g, '_')
+      .slice(0, 25);
+    const cleanCode = String(barcodeVal || '').replace(/[^a-zA-Z0-9_-]/g, '');
+    return `${prefix}_${cleanName}_${cleanCode}.${ext}`;
+  },
+
+  // Save Canvas to file (Blob with DataURL fallback)
+  saveCanvasToFile(canvas, filename) {
+    if (canvas.toBlob) {
+      canvas.toBlob((blob) => {
+        if (blob) {
+          this.triggerDownloadBlob(blob, filename);
+        } else {
+          this.triggerDownloadDataUrl(canvas.toDataURL('image/png'), filename);
+        }
+      }, 'image/png');
+    } else {
+      this.triggerDownloadDataUrl(canvas.toDataURL('image/png'), filename);
+    }
+  },
+
+  triggerDownloadBlob(blob, filename) {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 1500);
+  },
+
+  triggerDownloadDataUrl(dataUrl, filename) {
+    const a = document.createElement('a');
+    a.href = dataUrl;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  },
+
+  /* ---------------- BARCODE LABEL STICKER PRINT & DOWNLOAD MODAL ---------------- */
   async openLabelPrintModal(itemId, preferredBarcode = null) {
     const item = DB.getItem(itemId);
     if (!item) {
@@ -214,10 +418,32 @@ const BarcodeSystem = {
             <div id="labelLivePreview" style="background:#fff; border:2px dashed var(--border); border-radius:8px; padding:12px; display:flex; flex-direction:column; align-items:center; justify-content:center; min-height:160px; box-shadow:0 2px 6px rgba(0,0,0,0.05);">
               <!-- Rendered preview -->
             </div>
+            <div style="margin-top:10px; display:flex; gap:6px; justify-content:center; flex-wrap:wrap;">
+              <button type="button" class="btn btn-sm btn-outline" id="quickDlStickerBtn" title="Download Sticker Image (PNG)" style="font-size:11.5px; padding:5px 9px; display:inline-flex; align-items:center; gap:4px;">
+                <i class="ph ph-download-simple"></i> Sticker (PNG)
+              </button>
+              <button type="button" class="btn btn-sm btn-outline" id="quickDlBarcodeBtn" title="Download Barcode Only (PNG)" style="font-size:11.5px; padding:5px 9px; display:inline-flex; align-items:center; gap:4px;">
+                <i class="ph ph-barcode"></i> Barcode (PNG)
+              </button>
+              <button type="button" class="btn btn-sm btn-outline" id="quickDlSvgBtn" title="Download Vector SVG" style="font-size:11.5px; padding:5px 9px; display:inline-flex; align-items:center; gap:4px;">
+                <i class="ph ph-file-code"></i> SVG
+              </button>
+            </div>
           </div>
         </div>
       `,
-      footHTML: `<button class="btn btn-outline" data-close>${t('cancel')}</button><button class="btn btn-primary" id="doPrintBarcodeBtn"><i class="ph ph-printer"></i> ${t('receipt_print') || 'Print කරන්න'}</button>`,
+      footHTML: `
+        <button class="btn btn-outline" data-close>${t('cancel')}</button>
+        <button class="btn btn-outline" id="doDownloadBarcodeOnlyBtn" title="Barcode පමණක් PNG ලෙස බාගත කරන්න" style="display:inline-flex; align-items:center; gap:6px;">
+          <i class="ph ph-barcode"></i> Barcode PNG
+        </button>
+        <button class="btn btn-outline" id="doDownloadLabelBtn" style="font-weight:700; border-color:var(--primary); color:var(--primary); display:inline-flex; align-items:center; gap:6px;">
+          <i class="ph ph-download-simple"></i> ${t('barcode_download_label') || 'Label එක Download කරන්න (PNG)'}
+        </button>
+        <button class="btn btn-primary" id="doPrintBarcodeBtn">
+          <i class="ph ph-printer"></i> ${t('receipt_print') || 'Print කරන්න'}
+        </button>
+      `,
       onMount: (wrap) => {
         const previewEl = wrap.querySelector('#labelLivePreview');
         const copiesInp = wrap.querySelector('#lblCopies');
@@ -240,7 +466,28 @@ const BarcodeSystem = {
         copiesInp.addEventListener('input', updatePreview);
         layoutSel.addEventListener('change', updatePreview);
 
-        wrap.querySelector('#doPrintBarcodeBtn').addEventListener('click', () => {
+        const handleDownloadLabel = () => {
+          BarcodeSystem.downloadLabelPNG(item, barcodeVal, shopName);
+          toast("✅ Barcode Sticker එක බාගත විය!", "ok");
+        };
+
+        const handleDownloadBarcode = () => {
+          BarcodeSystem.downloadBarcodePNG(barcodeVal, item.name);
+          toast("✅ Barcode රූපය බාගත විය!", "ok");
+        };
+
+        const handleDownloadSvg = () => {
+          BarcodeSystem.downloadBarcodeSVG(barcodeVal, item.name);
+          toast("✅ Barcode SVG ගොනුව බාගත විය!", "ok");
+        };
+
+        wrap.querySelector('#doDownloadLabelBtn')?.addEventListener('click', handleDownloadLabel);
+        wrap.querySelector('#quickDlStickerBtn')?.addEventListener('click', handleDownloadLabel);
+        wrap.querySelector('#doDownloadBarcodeOnlyBtn')?.addEventListener('click', handleDownloadBarcode);
+        wrap.querySelector('#quickDlBarcodeBtn')?.addEventListener('click', handleDownloadBarcode);
+        wrap.querySelector('#quickDlSvgBtn')?.addEventListener('click', handleDownloadSvg);
+
+        wrap.querySelector('#doPrintBarcodeBtn')?.addEventListener('click', () => {
           const copies = Math.max(1, Math.min(100, Number(copiesInp.value) || 1));
           const layout = layoutSel.value;
           BarcodeSystem.printLabels(item, barcodeVal, copies, layout, shopName);
