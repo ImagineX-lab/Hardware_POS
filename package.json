@@ -32,6 +32,7 @@
     ],
     "win": {
       "target": "nsis",
+      "icon": "icon.png",
       "requestedExecutionLevel": "asInvoker"
     },
     "nsis": {

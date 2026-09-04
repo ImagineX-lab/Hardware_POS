@@ -159,29 +159,13 @@ module.exports = {
 
         const settings = await get(`SELECT * FROM settings WHERE key = 'shopName'`);
         if (!settings) {
-            await run(`INSERT INTO settings (key, value) VALUES ('shopName', 'HardwarePOS')`);
-        }
-        
-        // Seed demo items if db is empty
-        const count = await get(`SELECT COUNT(*) as c FROM items`);
-        if(count.c === 0) {
-            const demoItems = [
-                { name:"සිමෙන්ති (50kg)", category:"සිමෙන්ති හා වැලි", subCategory:"සිමෙන්ති", unit:"bag", costPrice:1450, sellPrice:1650, qty:40, reorderLevel:10 },
-                { name:"6mm ඇණ", category:"ඇණ හා බෝල්ට්", subCategory:"ඇණ", unit:"kg", costPrice:280, sellPrice:340, qty:25, reorderLevel:5 },
-                { name:'PVC පයිප්ප 1/2"', category:"පයිප්ප හා සනිටරි", subCategory:"Anton/National/Arpico බට", unit:"pcs", costPrice:320, sellPrice:400, qty:3, reorderLevel:8 },
-                { name:"විදුලි වයර් (2.5mm)", category:"විදුලි උපකරණ", subCategory:"වයර්", unit:"m", costPrice:65, sellPrice:85, qty:150, reorderLevel:20 },
-                { name:"සායම් (Enamel 1L)", category:"සායම් හා රසායනික", subCategory:"සායම්", unit:"L", costPrice:850, sellPrice:1050, qty:2, reorderLevel:6 },
-            ];
-            for(let it of demoItems) {
-                await run(`INSERT INTO items (name, category, subCategory, unit, costPrice, sellPrice, qty, reorderLevel, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-                [it.name, it.category, it.subCategory, it.unit, it.costPrice, it.sellPrice, it.qty, it.reorderLevel, Date.now()]);
-            }
+            await run(`INSERT INTO settings (key, value) VALUES ('shopName', 'රත්න HARDWARE')`);
         }
     },
 
     getSettings: async () => {
         const rows = await all(`SELECT * FROM settings`);
-        const defaults = { shopName: 'HardwarePOS', shopDescription: '', logo: '', logoSize: 38, fontSize: 15 };
+        const defaults = { shopName: 'රත්න HARDWARE', shopDescription: '', logo: 'icon.png', logoSize: 38, fontSize: 15 };
         const result = { ...defaults };
         if (rows) {
             rows.forEach(r => {
@@ -552,7 +536,6 @@ module.exports = {
         await run(`DELETE FROM customer_ledger`);
         await run(`DELETE FROM sales`);
         await run(`DELETE FROM purchases`);
-        await run(`DELETE FROM settings`);
         try {
             await run(`DELETE FROM sqlite_sequence`);
         } catch(e) {}

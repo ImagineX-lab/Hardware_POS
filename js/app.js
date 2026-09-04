@@ -38,12 +38,11 @@ const App = {
 
     document.documentElement.style.setProperty('--logo-size', logoSize + 'px');
 
-    if (s.logo && logoWrap && logoImg) {
-      logoImg.src = s.logo;
+    const logoSrc = s.logo || 'icon.png';
+    if (logoWrap && logoImg) {
+      logoImg.src = logoSrc;
       logoImg.style.height = logoSize + 'px';
       logoWrap.style.display = 'flex';
-    } else {
-      if (logoWrap) logoWrap.style.display = 'none';
     }
     // Always hide brand mark and shop name text — logo only
     if (brandMark) brandMark.style.display = 'none';
