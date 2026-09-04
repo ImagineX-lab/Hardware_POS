@@ -1,12 +1,14 @@
 {
   "name": "hardware-pos",
   "version": "1.0.0",
-  "description": "Hardware (කඩේ) සාප්පුවක් සඳහා නිර්මාණය කළ, සරලවම browser එකේ ක්‍රියාත්මක වන, සම්පූර්ණ POS (Point of Sale) පද්ධතියක්. Server එකක්, ඉන්ටර්නෙට් සම්බන්ධතාවයක්, හෝ install කිරීමක් අවශ්‍ය නොවේ.",
-  "main": "index.js",
+  "description": "Hardware (කඩේ) සාප්පුවක් සඳහා නිර්මාණය කළ සම්පූර්ණ POS (Point of Sale) පද්ධතියක්.",
+  "main": "main.js",
   "scripts": {
-    "start": "node server.js",
-    "dev": "node server.js",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start": "electron .",
+    "express": "node server.js",
+    "dev": "electron .",
+    "dist": "electron-builder",
+    "dist:win": "electron-builder --win nsis"
   },
   "keywords": [],
   "author": "",
@@ -16,5 +18,32 @@
     "cors": "^2.8.6",
     "express": "^5.2.1",
     "sqlite3": "^6.0.1"
+  },
+  "build": {
+    "appId": "com.hardwarepos.app",
+    "productName": "Hardware POS",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "**/*",
+      "!dist/*",
+      "!scratch/*"
+    ],
+    "win": {
+      "target": "nsis",
+      "requestedExecutionLevel": "asInvoker"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Hardware POS"
+    }
+  },
+  "devDependencies": {
+    "electron": "^44.2.0",
+    "electron-builder": "^26.15.3"
   }
 }

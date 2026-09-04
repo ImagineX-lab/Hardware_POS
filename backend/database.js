@@ -1,7 +1,24 @@
 const sqlite3 = require('sqlite3').verbose();
 const path = require('path');
+const fs = require('fs');
 
-const dbPath = path.join(__dirname, 'pos.db');
+let dataDir = __dirname;
+try {
+    const { app } = require('electron');
+    if (app && typeof app.getPath === 'function') {
+        dataDir = app.getPath('userData');
+    }
+} catch (e) {
+    if (process.env.APPDATA && process.versions && process.versions.electron) {
+        dataDir = path.join(process.env.APPDATA, 'HardwarePOS');
+    }
+}
+
+if (!fs.existsSync(dataDir)) {
+    fs.mkdirSync(dataDir, { recursive: true });
+}
+
+const dbPath = path.join(dataDir, 'pos.db');
 const db = new sqlite3.Database(dbPath);
 
 const run = (query, params = []) => new Promise((resolve, reject) => {
