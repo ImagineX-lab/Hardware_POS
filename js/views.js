@@ -2076,7 +2076,7 @@ Views.sale = {
     Views.sale.selectedCustomer = null;
     Views.sale.setPayType('cash');
     Views.sale.refreshCart();
-    Views.sale.showReceipt(sale);
+    Views.sale.printReceiptDirect(sale);
     App.updateSidebarCounts();
     // If this was a Quick Sale tab (not primary), close it to return to the main bill
     if (Views.sale.activeIdx > 0) {
@@ -2088,32 +2088,30 @@ Views.sale = {
     }
   },
 
-  showReceipt(sale) {
+  getReceiptHTML(sale) {
     const shopName = (DB.data.settings && DB.data.settings.shopName) || 'HardwarePOS';
     const shopDesc = (DB.data.settings && DB.data.settings.shopDescription) || '';
-    const logo = (DB.data.settings && DB.data.settings.logo) || '';
 
-    const html = `
+    return `
       <div class="receipt" id="printArea">
-        ${logo ? `<img class="receipt-logo" src="${logo}" alt="Shop Logo">` : ''}
         <h2>${escapeHTML(shopName)}</h2>
-        ${shopDesc ? `<div class="r-center" style="font-size:11px; color:#222; margin-bottom:4px; white-space:pre-line;">${escapeHTML(shopDesc)}</div>` : ''}
+        ${shopDesc ? `<div class="r-center" style="font-size:10px; color:#222; margin-bottom:3px; white-space:pre-line;">${escapeHTML(shopDesc)}</div>` : ''}
         
-        <div style="border-top:1px dashed #000; border-bottom:1px dashed #000; padding:4px 0; margin:4px 0; font-size:11px;">
-          <div style="display:flex; justify-content:space-between; align-items:center;">
+        <div style="border-top:1px dashed #000; border-bottom:1px dashed #000; padding:3px 0; margin:3px 0; font-size:10.5px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; gap:2px;">
             <span><b>INVOICE #${sale.id}</b></span>
-            <span>${(()=>{ const d=new Date(sale.date); return d.toLocaleDateString('en-GB') + ' ' + d.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}); })()}</span>
+            <span style="font-size:10px;">${(()=>{ const d=new Date(sale.date); return d.toLocaleDateString('en-GB') + ' ' + d.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}); })()}</span>
           </div>
-          ${sale.customerName ? `<div style="margin-top:2px; font-size:11px;">ගනුදෙනුකරු: <b>${escapeHTML(sale.customerName)}</b></div>` : ''}
+          ${sale.customerName ? `<div style="margin-top:2px; font-size:10px;">ගනුදෙනුකරු: <b>${escapeHTML(sale.customerName)}</b></div>` : ''}
         </div>
 
-        <table style="width:100%; border-collapse:collapse; margin:4px 0; font-size:11px;">
+        <table style="width:100%; border-collapse:collapse; margin:3px 0; font-size:10px; table-layout:fixed;">
           <thead>
             <tr style="border-bottom:1px dashed #000;">
-              <th style="text-align:left; padding-bottom:3px;">විස්තරය (Item)</th>
-              <th style="text-align:center; width:45px; padding-bottom:3px;">ගණන</th>
-              <th style="text-align:right; width:65px; padding-bottom:3px;">මිල</th>
-              <th style="text-align:right; width:75px; padding-bottom:3px;">එකතුව</th>
+              <th style="text-align:left; padding-bottom:2px; width:44%;">විස්තරය (Item)</th>
+              <th style="text-align:center; width:17%; padding-bottom:2px;">ගණන</th>
+              <th style="text-align:right; width:19%; padding-bottom:2px;">මිල</th>
+              <th style="text-align:right; width:20%; padding-bottom:2px;">එකතුව</th>
             </tr>
           </thead>
           <tbody>
@@ -2123,20 +2121,20 @@ Views.sale = {
               const lineTot = l.qty * l.unitPrice;
               return `
                 <tr>
-                  <td colspan="4" style="padding-top:4px; font-weight:700; color:#000;">${escapeHTML(l.name)}</td>
+                  <td colspan="4" style="padding-top:3px; font-weight:700; color:#000; font-size:10.5px; word-break:break-word;">${escapeHTML(l.name)}</td>
                 </tr>
                 <tr style="border-bottom:1px dotted #ccc;">
-                  <td style="padding-bottom:4px; font-size:10px; color:#555;">
+                  <td style="padding-bottom:3px; font-size:9.5px; color:#555; word-break:break-word;">
                     ${l.looseInfo ? `[ලිහිල්: ${escapeHTML(l.looseInfo.shortText || '')}]` : ''}
                     ${hasDisc ? `[Disc: -${fmt(origPrice - l.unitPrice)}]` : ''}
                   </td>
-                  <td style="text-align:center; padding-bottom:4px; font-size:11px; white-space:nowrap;">
+                  <td style="text-align:center; padding-bottom:3px; font-size:10px; white-space:nowrap;">
                     ${l.looseInfo ? `${l.looseInfo.looseQty} ${escapeHTML(l.looseInfo.looseUnit)}` : `${l.qty} ${escapeHTML(l.unit || '')}`}
                   </td>
-                  <td style="text-align:right; padding-bottom:4px; font-size:11px; white-space:nowrap;">
+                  <td style="text-align:right; padding-bottom:3px; font-size:10px; white-space:nowrap;">
                     ${(l.unitPrice).toLocaleString('en-LK', {minimumFractionDigits:2, maximumFractionDigits:2})}
                   </td>
-                  <td style="text-align:right; padding-bottom:4px; font-weight:700; font-size:11.5px; white-space:nowrap;">
+                  <td style="text-align:right; padding-bottom:3px; font-weight:700; font-size:10.5px; white-space:nowrap;">
                     ${fmt(lineTot)}
                   </td>
                 </tr>
@@ -2145,12 +2143,12 @@ Views.sale = {
           </tbody>
         </table>
 
-        <div style="border-top:1px dashed #000; padding-top:4px; margin-top:4px;">
+        <div style="border-top:1px dashed #000; padding-top:3px; margin-top:3px;">
           <div class="receipt-totals-row"><span>${t('sale_subtotal')} (Subtotal):</span><span>${fmt(sale.subtotal)}</span></div>
           ${sale.discount > 0 ? `<div class="receipt-totals-row"><span>${t('sale_discount')} (Discount):</span><span>- ${fmt(sale.discount)}</span></div>` : ''}
           <div class="receipt-totals-row grand">
-            <span style="font-size:12.5px; font-weight:800;">ශුද්ධ එකතුව (TOTAL):</span>
-            <span style="font-size:15px; font-weight:800;">${fmt(sale.total)}</span>
+            <span style="font-size:12px; font-weight:800;">ශුද්ධ එකතුව (TOTAL):</span>
+            <span style="font-size:13.5px; font-weight:800;">${fmt(sale.total)}</span>
           </div>
           <div class="receipt-totals-row" style="margin-top:2px;">
             <span>ගෙවීම් ක්‍රමය (Payment):</span>
@@ -2162,16 +2160,48 @@ Views.sale = {
           ` : ''}
         </div>
 
-        <div style="text-align:center; margin-top:8px; border-top:1px dashed #000; padding-top:6px;">
-          <div style="font-weight:700; font-size:11.5px; margin-bottom:3px;">${t('receipt_thanks')}</div>
-          <div style="font-size:9.5px; color:#222; margin-bottom:5px; line-height:1.4;">භාණ්ඩ ආපසු භාරදීමේදී මෙම බිල්පත ඉදිරිපත් කිරීම අනිවාර්ය වේ.</div>
+        <div style="text-align:center; margin-top:6px; border-top:1px dashed #000; padding-top:5px;">
+          <div style="font-weight:700; font-size:11px; margin-bottom:2px;">${t('receipt_thanks')}</div>
+          <div style="font-size:9px; color:#222; margin-bottom:4px; line-height:1.3;">භාණ්ඩ ආපසු භාරදීමේදී මෙම බිල්පත ඉදිරිපත් කිරීම අනිවාර්ය වේ.</div>
           
-          <div style="margin:6px 0; display:flex; flex-direction:column; align-items:center; justify-content:center;">
-            ${typeof BarcodeSystem !== 'undefined' ? BarcodeSystem.generateCode128SVG(sale.barcode || ('BILL-' + sale.id), { width: 190, height: 44, fontSize: 10 }) : ''}
+          <div style="margin:4px 0; display:flex; flex-direction:column; align-items:center; justify-content:center;">
+            ${typeof BarcodeSystem !== 'undefined' ? BarcodeSystem.generateCode128SVG(sale.barcode || ('BILL-' + sale.id), { width: 160, height: 38, fontSize: 9 }) : ''}
           </div>
         </div>
       </div>
     `;
+  },
+
+  async printReceiptDirect(sale) {
+    const html = Views.sale.getReceiptHTML(sale);
+    let hiddenContainer = document.getElementById('directPrintContainer');
+    if (!hiddenContainer) {
+      hiddenContainer = document.createElement('div');
+      hiddenContainer.id = 'directPrintContainer';
+      document.body.appendChild(hiddenContainer);
+    }
+    hiddenContainer.innerHTML = html;
+
+    if (window.electronAPI && typeof window.electronAPI.printReceipt === 'function') {
+      try {
+        await window.electronAPI.printReceipt({ silent: true });
+      } catch (err) {
+        console.error('Direct print error:', err);
+        window.print();
+      }
+    } else {
+      window.print();
+    }
+
+    setTimeout(() => {
+      if (hiddenContainer && hiddenContainer.parentNode) {
+        hiddenContainer.parentNode.removeChild(hiddenContainer);
+      }
+    }, 1500);
+  },
+
+  showReceipt(sale) {
+    const html = Views.sale.getReceiptHTML(sale);
     openModal({
       title: `${t('hist_preview') || 'බිල්පත'} #${sale.id} (80mm Thermal)`,
       bodyHTML: html,
@@ -2181,7 +2211,13 @@ Views.sale = {
       `,
       wide: false,
       onMount: (wrap) => {
-        wrap.querySelector('#printReceiptBtn').addEventListener('click', () => window.print());
+        wrap.querySelector('#printReceiptBtn').addEventListener('click', () => {
+          if (window.electronAPI && typeof window.electronAPI.printReceipt === 'function') {
+            window.electronAPI.printReceipt({ silent: true });
+          } else {
+            window.print();
+          }
+        });
       }
     });
   }

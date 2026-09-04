@@ -1501,6 +1501,10 @@ th.num {
   margin: 4px 0;
 }
 
+#directPrintContainer {
+  display: none;
+}
+
 /* ===== 80mm THERMAL PRINT STYLES ===== */
 @media print {
   @page {
@@ -1560,53 +1564,93 @@ th.num {
     visibility: hidden !important;
   }
 
+  #directPrintContainer {
+    display: block !important;
+    position: static !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
   #printArea,
-  #printArea * {
+  #printArea *,
+  #directPrintContainer,
+  #directPrintContainer * {
     visibility: visible !important;
   }
 
   #printArea {
     position: static !important;
     display: block !important;
-    width: 74mm !important;         /* 72-74mm printable area */
-    max-width: 74mm !important;
-    margin: 0 auto !important;
-    padding: 2mm 3mm 10mm 3mm !important; /* Bottom 10mm space for thermal auto-cutter */
+    width: 68mm !important;         /* 68mm safe printable width for 80mm thermal printers */
+    max-width: 68mm !important;
+    margin: 0 !important;
+    padding: 1mm 2mm 8mm 1mm !important; /* Bottom space for thermal cutter */
     font-family: 'Noto Sans Sinhala', -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif !important;
-    font-size: 11px !important;
-    line-height: 1.35 !important;
+    font-size: 10.5px !important;
+    line-height: 1.3 !important;
     color: #000 !important;
     background: #fff !important;
     box-sizing: border-box !important;
+    overflow: hidden !important;
   }
 
   #printArea h2 {
-    font-size: 15px !important;
+    font-size: 14.5px !important;
     font-weight: 800 !important;
     color: #000 !important;
+    text-align: center !important;
+    margin: 0 0 2px 0 !important;
   }
 
   #printArea table {
-    font-size: 10.5px !important;
+    width: 100% !important;
+    table-layout: fixed !important;
+    border-collapse: collapse !important;
+    font-size: 10px !important;
+    box-sizing: border-box !important;
   }
 
   #printArea th {
     font-weight: 800 !important;
     color: #000 !important;
     border-bottom: 1px dashed #000 !important;
+    padding: 2px 1px !important;
   }
 
   #printArea td {
     color: #000 !important;
+    padding: 2px 1px !important;
   }
 
   #printArea hr {
+    border: none !important;
     border-top: 1px dashed #000 !important;
+    margin: 3px 0 !important;
   }
 
   #printArea .r-center {
-    font-size: 10px !important;
+    font-size: 9.5px !important;
     color: #000 !important;
+    text-align: center !important;
+  }
+
+  #printArea .receipt-totals-row {
+    display: flex !important;
+    justify-content: space-between !important;
+    align-items: center !important;
+    font-size: 10.5px !important;
+    padding: 1.5px 0 !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+  }
+
+  #printArea .receipt-totals-row.grand {
+    font-size: 13.5px !important;
+    font-weight: 800 !important;
+    border-top: 1px dashed #000 !important;
+    border-bottom: 2px solid #000 !important;
+    padding: 3px 0 !important;
+    margin: 3px 0 !important;
   }
 }
 

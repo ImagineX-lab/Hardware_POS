@@ -1,8 +1,10 @@
-const { app, BrowserWindow, Menu } = require('electron');
+const { app, BrowserWindow, Menu, ipcMain } = require('electron');
 const path = require('path');
 const http = require('http');
 
 const fs = require('fs');
+const preloadPath = path.join(__dirname, 'preload.js');
+
 
 let mainWindow = null;
 const PORT = process.env.PORT || 3000;
@@ -30,7 +32,8 @@ function createWindow() {
         title: 'Hardware POS',
         webPreferences: {
             nodeIntegration: false,
-            contextIsolation: true
+            contextIsolation: true,
+            preload: preloadPath
         }
     };
 
@@ -55,6 +58,25 @@ function createWindow() {
         mainWindow = null;
     });
 }
+
+// IPC: silent direct print (no preview dialog)
+ipcMain.handle('print-receipt', (event, options) => {
+    return new Promise((resolve) => {
+        const win = BrowserWindow.fromWebContents(event.sender);
+        if (!win) return resolve({ success: false, error: 'No window' });
+        win.webContents.print(
+            {
+                silent: true,
+                printBackground: true,
+                margins: { marginType: 'none' },
+                ...options
+            },
+            (success, errorType) => {
+                resolve({ success, errorType: errorType || null });
+            }
+        );
+    });
+});
 
 // Start Express server inside Electron
 require('./server.js');
