@@ -2624,6 +2624,7 @@ Views.items = {
 
     // Predefined hardware store categories
     const HARDWARE_CATEGORIES = [
+      'යකඩ',
       'ගොඩනැගිලි උපකරණ',
       'විදුලි උපකරණ',
       'සෙවිලි උපකරණ',

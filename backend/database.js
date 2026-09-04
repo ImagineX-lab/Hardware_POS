@@ -19,6 +19,23 @@ if (!fs.existsSync(dataDir)) {
 }
 
 const dbPath = path.join(dataDir, 'pos.db');
+const bundledDbPath = path.join(__dirname, 'pos.db');
+
+if (dataDir !== __dirname) {
+    const dbExists = fs.existsSync(dbPath);
+    const dbEmpty = dbExists && fs.statSync(dbPath).size === 0;
+    if (!dbExists || dbEmpty) {
+        if (fs.existsSync(bundledDbPath) && fs.statSync(bundledDbPath).size > 0) {
+            try {
+                fs.copyFileSync(bundledDbPath, dbPath);
+                console.log('Successfully copied bundled pos.db to userData:', dbPath);
+            } catch (err) {
+                console.error('Failed to copy bundled pos.db to userData:', err);
+            }
+        }
+    }
+}
+
 const db = new sqlite3.Database(dbPath);
 
 const run = (query, params = []) => new Promise((resolve, reject) => {
@@ -161,6 +178,54 @@ module.exports = {
         if (!settings) {
             await run(`INSERT INTO settings (key, value) VALUES ('shopName', 'රත්න HARDWARE')`);
         }
+
+        const defaultItems = [
+            { name: 'අඟල් 1 L Bar (3mm)', category: 'යකඩ', subCategory: 'L Bar', unit: 'length', costPrice: 0, sellPrice: 2100, loosePrice: 150, packSize: 18, packUnit: 'ft', description: 'අඟල් 1 L Bar (3mm) - අඩි 18: රු. 2,100 | අඩි 1: රු. 150' },
+            { name: 'අඟල් 1 L Bar (5mm)', category: 'යකඩ', subCategory: 'L Bar', unit: 'length', costPrice: 0, sellPrice: 2750, loosePrice: 150, packSize: 18, packUnit: 'ft', description: 'අඟල් 1 L Bar (5mm) - අඩි 18: රු. 2,750 | අඩි 1: රු. 150' },
+            { name: '1 1/2" L Bar (3mm)', category: 'යකඩ', subCategory: 'L Bar', unit: 'length', costPrice: 0, sellPrice: 2750, loosePrice: 150, packSize: 18, packUnit: 'ft', description: '1 1/2" L Bar (3mm) - අඩි 18: රු. 2,750 | අඩි 1: රු. 150' },
+            { name: '1 1/2" L Bar (4mm)', category: 'යකඩ', subCategory: 'L Bar', unit: 'length', costPrice: 0, sellPrice: 3400, loosePrice: 200, packSize: 18, packUnit: 'ft', description: '1 1/2" L Bar (4mm) - අඩි 18: රු. 3,400 | අඩි 1: රු. 200' },
+            { name: '1 1/2" L Bar (5mm)', category: 'යකඩ', subCategory: 'L Bar', unit: 'length', costPrice: 0, sellPrice: 4350, loosePrice: 250, packSize: 18, packUnit: 'ft', description: '1 1/2" L Bar (5mm) - අඩි 18: රු. 4,350 | අඩි 1: රු. 250' },
+            { name: '2" x 1/4" L Bar (රු. 4,800)', category: 'යකඩ', subCategory: 'L Bar', unit: 'length', costPrice: 0, sellPrice: 4800, loosePrice: 300, packSize: 18, packUnit: 'ft', description: '2" x 1/4" L Bar - අඩි 18: රු. 4,800 | අඩි 1: රු. 300' },
+            { name: '2" x 1/4" L Bar (රු. 6,650)', category: 'යකඩ', subCategory: 'L Bar', unit: 'length', costPrice: 0, sellPrice: 6650, loosePrice: 400, packSize: 18, packUnit: 'ft', description: '2" x 1/4" L Bar - අඩි 18: රු. 6,650 | අඩි 1: රු. 400' },
+            { name: '1/4" x 1/2" පට්ටම', category: 'යකඩ', subCategory: 'පට්ටම් (Flat Iron)', unit: 'length', costPrice: 0, sellPrice: 950, loosePrice: 0, packSize: 18, packUnit: 'ft', description: '1/4" x 1/2" පට්ටම (Flat Iron) - රු. 950' },
+            { name: '3/4" පට්ටම', category: 'යකඩ', subCategory: 'පට්ටම් (Flat Iron)', unit: 'length', costPrice: 0, sellPrice: 1350, loosePrice: 100, packSize: 18, packUnit: 'ft', description: '3/4" පට්ටම (Flat Iron) - අඩි 18: රු. 1,350 | අඩි 1: රු. 100' },
+            { name: 'අඟල් 1 පට්ටම', category: 'යකඩ', subCategory: 'පට්ටම් (Flat Iron)', unit: 'length', costPrice: 0, sellPrice: 1950, loosePrice: 150, packSize: 18, packUnit: 'ft', description: 'අඟල් 1 පට්ටම (1" Flat Iron) - අඩි 18: රු. 1,950 | අඩි 1: රු. 150' },
+            { name: 'අඟල් 1 1/2 පට්ටම', category: 'යකඩ', subCategory: 'පට්ටම් (Flat Iron)', unit: 'length', costPrice: 0, sellPrice: 3450, loosePrice: 200, packSize: 18, packUnit: 'ft', description: 'අඟල් 1 1/2 පට්ටම (1 1/2" Flat Iron) - අඩි 18: රු. 3,450 | අඩි 1: රු. 200' },
+            { name: 'අඟල් 2 1/4 පට්ටම', category: 'යකඩ', subCategory: 'පට්ටම් (Flat Iron)', unit: 'length', costPrice: 0, sellPrice: 3600, loosePrice: 250, packSize: 18, packUnit: 'ft', description: 'අඟල් 2 1/4 පට්ටම (2 1/4" Flat Iron) - අඩි 18: රු. 3,600 | අඩි 1: රු. 250' },
+
+            // Box Bar items
+            { name: '1/2" Box Bar', category: 'යකඩ', subCategory: 'Box Bar', unit: 'length', costPrice: 0, sellPrice: 1050, loosePrice: 0, packSize: 18, packUnit: 'ft', description: '1/2" Box Bar (අඟල් 1/2) - අඩි 18: රු. 1,050' },
+            { name: '3/4" Box Bar (1.2mm)', category: 'යකඩ', subCategory: 'Box Bar', unit: 'length', costPrice: 0, sellPrice: 1300, loosePrice: 78, packSize: 18, packUnit: 'ft', description: '3/4" Box Bar (1.2mm) - අඩි 18: රු. 1,300 | 1/2: රු. 700' },
+            { name: '3/4" Box Bar (1.4mm)', category: 'යකඩ', subCategory: 'Box Bar', unit: 'length', costPrice: 0, sellPrice: 1450, loosePrice: 83, packSize: 18, packUnit: 'ft', description: '3/4" Box Bar (1.4mm) - අඩි 18: රු. 1,450 | 1/2: රු. 750' },
+            { name: 'අඟල් 1 Box Bar (1.2mm)', category: 'යකඩ', subCategory: 'Box Bar', unit: 'length', costPrice: 0, sellPrice: 1700, loosePrice: 100, packSize: 18, packUnit: 'ft', description: '1" Box Bar (1.2mm) - අඩි 18: රු. 1,700 | 1/2: රු. 900' },
+            { name: 'අඟල් 1 Box Bar (1.4mm)', category: 'යකඩ', subCategory: 'Box Bar', unit: 'length', costPrice: 0, sellPrice: 1950, loosePrice: 117, packSize: 18, packUnit: 'ft', description: '1" Box Bar (1.4mm) - අඩි 18: රු. 1,950 | 1/2: රු. 1,050' },
+            { name: 'අඟල් 1 Box Bar (1.6mm)', category: 'යකඩ', subCategory: 'Box Bar', unit: 'length', costPrice: 0, sellPrice: 2950, loosePrice: 156, packSize: 18, packUnit: 'ft', description: '1" Box Bar (1.6mm) - අඩි 18: රු. 2,950 | 1/2: රු. 1,400' },
+            { name: '1 1/2" Box Bar (1.2mm)', category: 'යකඩ', subCategory: 'Box Bar', unit: 'length', costPrice: 0, sellPrice: 2400, loosePrice: 156, packSize: 18, packUnit: 'ft', description: '1 1/2" Box Bar (1.2mm) - අඩි 18: රු. 2,400 | 1/2: රු. 1,400' },
+            { name: '1 1/2" Box Bar (1.4mm)', category: 'යකඩ', subCategory: 'Box Bar', unit: 'length', costPrice: 0, sellPrice: 2950, loosePrice: 172, packSize: 18, packUnit: 'ft', description: '1 1/2" Box Bar (1.4mm) - අඩි 18: රු. 2,950 | 1/2: රු. 1,550' },
+            { name: '1 1/2" Box Bar (1.6mm)', category: 'යකඩ', subCategory: 'Box Bar', unit: 'length', costPrice: 0, sellPrice: 3200, loosePrice: 189, packSize: 18, packUnit: 'ft', description: '1 1/2" Box Bar (1.6mm) - අඩි 18: රු. 3,200 | 1/2: රු. 1,700' },
+            { name: '2" x 2" Box Bar (1.2mm)', category: 'යකඩ', subCategory: 'Box Bar', unit: 'length', costPrice: 0, sellPrice: 3500, loosePrice: 200, packSize: 18, packUnit: 'ft', description: '2" x 2" Box Bar (1.2mm) - අඩි 18: රු. 3,500 | 1/2: රු. 1,800' },
+            { name: '2" x 2" Box Bar (1.4mm)', category: 'යකඩ', subCategory: 'Box Bar', unit: 'length', costPrice: 0, sellPrice: 3900, loosePrice: 222, packSize: 18, packUnit: 'ft', description: '2" x 2" Box Bar (1.4mm) - අඩි 18: රු. 3,900 | 1/2: රු. 2,000' },
+            { name: '2" x 2" Box Bar (1.6mm)', category: 'යකඩ', subCategory: 'Box Bar', unit: 'length', costPrice: 0, sellPrice: 4600, loosePrice: 267, packSize: 18, packUnit: 'ft', description: '2" x 2" Box Bar (1.6mm) - අඩි 18: රු. 4,600 | 1/2: රු. 2,400' }
+        ];
+
+        for (const it of defaultItems) {
+            const existing = await get(`SELECT id FROM items WHERE name = ?`, [it.name]);
+            if (!existing) {
+                await run(
+                    `INSERT INTO items (name, barcode, category, subCategory, unit, costPrice, sellPrice, qty, reorderLevel, packSize, packUnit, loosePrice, description, image, createdAt) VALUES (?, '', ?, ?, ?, ?, ?, 0, 5, ?, ?, ?, ?, '', ?)`,
+                    [it.name, it.category, it.subCategory, it.unit, it.costPrice, it.sellPrice, it.packSize, it.packUnit, it.loosePrice, it.description, Date.now()]
+                );
+            } else {
+                await run(
+                    `UPDATE items SET category = ?, subCategory = ?, sellPrice = ?, loosePrice = ?, packSize = ?, packUnit = ?, description = ? WHERE id = ?`,
+                    [it.category, it.subCategory, it.sellPrice, it.loosePrice, it.packSize, it.packUnit, it.description, existing.id]
+                );
+            }
+        }
+
+        try {
+            await run(`UPDATE items SET category = 'ගෘහ උපකරණ', subCategory = CASE WHEN category = 'Buckets' THEN 'බාල්දි' WHEN category = 'Cleaning' THEN 'පිරිසිදු කිරීම්' WHEN category = 'Storage' THEN 'රැක්ක' ELSE subCategory END WHERE category IN ('Buckets', 'Cleaning', 'Storage')`);
+        } catch(e) {}
     },
 
     getSettings: async () => {
