@@ -267,12 +267,7 @@ Views.sale = {
 
           <!-- Amount Paid & Change Due / Short for Cash -->
           <div class="field" id="amountPaidWrap" style="display:${Views.sale.payType === 'cash' ? 'block' : 'none'}; margin-bottom:4px;">
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:2px;">
-              <label class="field-label" style="margin:0; font-size:12px;">${t('sale_amount_paid')}</label>
-              <button type="button" id="btnExactAmount" style="padding:1px 7px; font-size:11px; font-weight:700; border-radius:4px; border:1px solid var(--border); background:var(--bg-light); color:var(--primary); cursor:pointer;" title="නියමිත මුදලම (Exact Total) ඇතුළත් කරන්න">
-                ${t('sale_exact_btn') || 'නියමිත මුදල (Exact)'}
-              </button>
-            </div>
+            <label class="field-label" style="margin-bottom:2px; font-size:12px;">${t('sale_amount_paid')}</label>
             <input class="input" id="saleAmountPaid" type="number" min="0" step="any" placeholder="0.00" value="${Views.sale.amountPaid || ''}" style="height:36px; padding:6px 10px; font-size:15px;" autocomplete="off">
             
             <!-- Message when amount paid is less than total -->
@@ -1048,20 +1043,6 @@ Views.sale = {
       });
     }
 
-    const exactBtn = document.getElementById('btnExactAmount');
-    if (exactBtn) {
-      exactBtn.addEventListener('click', () => {
-        const total = Views.sale.calcTotal();
-        const paidInput = document.getElementById('saleAmountPaid');
-        if (paidInput) {
-          paidInput.value = total > 0 ? total : '';
-          Views.sale.amountPaid = paidInput.value;
-          Views.sale.updateChangeDue();
-          paidInput.focus();
-          if (typeof paidInput.select === 'function') paidInput.select();
-        }
-      });
-    }
 
     const clearCartBtn = document.getElementById('clearCartBtn');
     if (clearCartBtn) {
