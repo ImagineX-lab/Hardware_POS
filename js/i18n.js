@@ -81,8 +81,10 @@ const i18n = {
     sale_subtotal: "එකතුව",
     sale_total: "මුළු එකතුව",
     sale_payment: "ගෙවීම",
-    sale_amount_paid: "ගෙව්ව මුදල (රු.)",
-    sale_change_due: "ඉතිරි (රු.)",
+    sale_amount_paid: "ගෙවූ මුදල (රු.)",
+    sale_change_due: "ඉතිරි මුදල (රු.)",
+    sale_amount_short: "මුදල අඩුයි! (රු.)",
+    sale_exact_btn: "නියමිත මුදල (Exact)",
 
     cart_unit_price: "මිල",
     cart_cost_price: "ගත්ත මිල (Cost)",
@@ -368,6 +370,8 @@ const i18n = {
     sale_payment: "Payment",
     sale_amount_paid: "Amount Paid (Rs.)",
     sale_change_due: "Change Due (Rs.)",
+    sale_amount_short: "Short Amount (Rs.)",
+    sale_exact_btn: "Exact Amount",
 
     cart_unit_price: "Price",
     cart_cost_price: "Cost",

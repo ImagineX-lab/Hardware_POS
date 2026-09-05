@@ -1854,6 +1854,40 @@ th.num {
   align-items: center;
 }
 
+.amount-short-box {
+  background: #fef2f2;
+  border: 1px solid #f87171;
+  border-radius: 8px;
+  padding: 7px 10px;
+  margin-top: 6px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #b91c1c;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  animation: pulse-short 0.25s ease-out;
+}
+
+@keyframes pulse-short {
+  0% { transform: scale(0.98); opacity: 0.8; }
+  50% { transform: scale(1.02); }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+.input.input-error {
+  border-color: #ef4444 !important;
+  background-color: #fff5f5 !important;
+  color: #b91c1c !important;
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.18) !important;
+}
+
+.input.input-success {
+  border-color: #10b981 !important;
+  background-color: #f0fdf4 !important;
+  color: #047857 !important;
+}
+
 /* ===== CATEGORY COMBO-BOX ===== */
 .combo-wrap {
   position: relative;

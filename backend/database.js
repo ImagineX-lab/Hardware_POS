@@ -224,20 +224,60 @@ module.exports = {
             { name: '1 1/2" Box Bar (1.6mm)', category: 'යකඩ', subCategory: 'Box Bar', unit: 'length', costPrice: 0, sellPrice: 3200, loosePrice: 189, packSize: 18, packUnit: 'ft', description: '1 1/2" Box Bar (1.6mm) - අඩි 18: රු. 3,200 | 1/2: රු. 1,700' },
             { name: '2" x 2" Box Bar (1.2mm)', category: 'යකඩ', subCategory: 'Box Bar', unit: 'length', costPrice: 0, sellPrice: 3500, loosePrice: 200, packSize: 18, packUnit: 'ft', description: '2" x 2" Box Bar (1.2mm) - අඩි 18: රු. 3,500 | 1/2: රු. 1,800' },
             { name: '2" x 2" Box Bar (1.4mm)', category: 'යකඩ', subCategory: 'Box Bar', unit: 'length', costPrice: 0, sellPrice: 3900, loosePrice: 222, packSize: 18, packUnit: 'ft', description: '2" x 2" Box Bar (1.4mm) - අඩි 18: රු. 3,900 | 1/2: රු. 2,000' },
-            { name: '2" x 2" Box Bar (1.6mm)', category: 'යකඩ', subCategory: 'Box Bar', unit: 'length', costPrice: 0, sellPrice: 4600, loosePrice: 267, packSize: 18, packUnit: 'ft', description: '2" x 2" Box Bar (1.6mm) - අඩි 18: රු. 4,600 | 1/2: රු. 2,400' }
+            { name: '2" x 2" Box Bar (1.6mm)', category: 'යකඩ', subCategory: 'Box Bar', unit: 'length', costPrice: 0, sellPrice: 4600, loosePrice: 267, packSize: 18, packUnit: 'ft', description: '2" x 2" Box Bar (1.6mm) - අඩි 18: රු. 4,600 | 1/2: රු. 2,400' },
+
+            // යකඩ ඇණ සහ බෝල්ට් ඇණ
+            { name: 'යකඩ ඇණ 1"', barcode: 'NAIL-1', category: 'ගොඩනැගිලි උපකරණ', subCategory: 'ඇණ වර්ග', unit: 'kg', costPrice: 0, sellPrice: 400, loosePrice: 400, packSize: 1, packUnit: 'kg', description: 'යකඩ ඇණ අඟල් 1 (1" Wire Nails) - 1 kg: රු. 400' },
+            { name: 'යකඩ ඇණ 1 1/2"', barcode: 'NAIL-1.5', category: 'ගොඩනැගිලි උපකරණ', subCategory: 'ඇණ වර්ග', unit: 'kg', costPrice: 0, sellPrice: 400, loosePrice: 400, packSize: 1, packUnit: 'kg', description: 'යකඩ ඇණ අඟල් 1 1/2 (1 1/2" Wire Nails) - 1 kg: රු. 400' },
+            { name: 'යකඩ ඇණ 2"', barcode: 'NAIL-2', category: 'ගොඩනැගිලි උපකරණ', subCategory: 'ඇණ වර්ග', unit: 'kg', costPrice: 0, sellPrice: 400, loosePrice: 400, packSize: 1, packUnit: 'kg', description: 'යකඩ ඇණ අඟල් 2 (2" Wire Nails) - 1 kg: රු. 400' },
+            { name: 'යකඩ ඇණ 3"', barcode: 'NAIL-3', category: 'ගොඩනැගිලි උපකරණ', subCategory: 'ඇණ වර්ග', unit: 'kg', costPrice: 0, sellPrice: 400, loosePrice: 400, packSize: 1, packUnit: 'kg', description: 'යකඩ ඇණ අඟල් 3 (3" Wire Nails) - 1 kg: රු. 400' },
+            { name: 'යකඩ ඇණ 3 1/2"', barcode: 'NAIL-3.5', category: 'ගොඩනැගිලි උපකරණ', subCategory: 'ඇණ වර්ග', unit: 'kg', costPrice: 0, sellPrice: 400, loosePrice: 400, packSize: 1, packUnit: 'kg', description: 'යකඩ ඇණ අඟල් 3 1/2 (3 1/2" Wire Nails) - 1 kg: රු. 400' },
+            { name: 'යකඩ ඇණ 4"', barcode: 'NAIL-4', category: 'ගොඩනැගිලි උපකරණ', subCategory: 'ඇණ වර්ග', unit: 'kg', costPrice: 0, sellPrice: 400, loosePrice: 400, packSize: 1, packUnit: 'kg', description: 'යකඩ ඇණ අඟල් 4 (4" Wire Nails) - 1 kg: රු. 400' },
+            { name: 'යකඩ ඇණ 5"', barcode: 'NAIL-5', category: 'ගොඩනැගිලි උපකරණ', subCategory: 'ඇණ වර්ග', unit: 'kg', costPrice: 0, sellPrice: 400, loosePrice: 400, packSize: 1, packUnit: 'kg', description: 'යකඩ ඇණ අඟල් 5 (5" Wire Nails) - 1 kg: රු. 400' },
+            { name: 'යකඩ ඇණ 6"', barcode: 'NAIL-6', category: 'ගොඩනැගිලි උපකරණ', subCategory: 'ඇණ වර්ග', unit: 'kg', costPrice: 0, sellPrice: 400, loosePrice: 400, packSize: 1, packUnit: 'kg', description: 'යකඩ ඇණ අඟල් 6 (6" Wire Nails) - 1 kg: රු. 400' },
+            { name: 'බෝල්ට් ඇණ', barcode: 'BOLT-NAIL', category: 'ගොඩනැගිලි උපකරණ', subCategory: 'ඇණ වර්ග', unit: 'kg', costPrice: 0, sellPrice: 450, loosePrice: 450, packSize: 1, packUnit: 'kg', description: 'බෝල්ට් ඇණ (Bolt Nails / Bolts) - 1 kg: රු. 450' },
+
+            // ඇස්බැස්ටෝ sheet (අලියා sheet)
+            { name: 'ඇස්බැස්ටෝ sheet අඩි 6 (අලියා sheet)', barcode: 'ASB-6FT', category: 'සෙවිලි උපකරණ', subCategory: 'ඇස්බැස්ටෝස් sheets', unit: 'sheet', costPrice: 0, sellPrice: 3600, loosePrice: 0, packSize: 1, packUnit: 'sheet', description: 'ඇස්බැස්ටෝ sheet (අලියා sheet) - අඩි 6: රු. 3,600' },
+            { name: 'ඇස්බැස්ටෝ sheet අඩි 8 (අලියා sheet)', barcode: 'ASB-8FT', category: 'සෙවිලි උපකරණ', subCategory: 'ඇස්බැස්ටෝස් sheets', unit: 'sheet', costPrice: 0, sellPrice: 4900, loosePrice: 0, packSize: 1, packUnit: 'sheet', description: 'ඇස්බැස්ටෝ sheet (අලියා sheet) - අඩි 8: රු. 4,900' },
+            { name: 'ඇස්බැස්ටෝ sheet අඩි 10 (අලියා sheet)', barcode: 'ASB-10FT', category: 'සෙවිලි උපකරණ', subCategory: 'ඇස්බැස්ටෝස් sheets', unit: 'sheet', costPrice: 0, sellPrice: 5900, loosePrice: 0, packSize: 1, packUnit: 'sheet', description: 'ඇස්බැස්ටෝ sheet (අලියා sheet) - අඩි 10: රු. 5,900' },
+            { name: 'ඇස්බැස්ටෝ sheet අඩි 12 (අලියා sheet)', barcode: 'ASB-12FT', category: 'සෙවිලි උපකරණ', subCategory: 'ඇස්බැස්ටෝස් sheets', unit: 'sheet', costPrice: 0, sellPrice: 7050, loosePrice: 0, packSize: 1, packUnit: 'sheet', description: 'ඇස්බැස්ටෝ sheet (අලියා sheet) - අඩි 12: රු. 7,050' },
+
+            // අලවංගු / යකඩ ඉනි
+            { name: 'අලවංගු / යකඩ ඉනි අඩි 5', barcode: 'CROWBAR-5FT', category: 'ගොඩනැගිලි උපකරණ', subCategory: 'අලවංගු / යකඩ ඉනි', unit: 'pcs', costPrice: 0, sellPrice: 4200, loosePrice: 0, packSize: 1, packUnit: 'pcs', description: 'අලවංගු / යකඩ ඉනි - අඩි 5: රු. 4,200' },
+            { name: 'අලවංගු / යකඩ ඉනි අඩි 6', barcode: 'CROWBAR-6FT', category: 'ගොඩනැගිලි උපකරණ', subCategory: 'අලවංගු / යකඩ ඉනි', unit: 'pcs', costPrice: 0, sellPrice: 4950, loosePrice: 0, packSize: 1, packUnit: 'pcs', description: 'අලවංගු / යකඩ ඉනි - අඩි 6: රු. 4,950' },
+
+            // වයරින් කේසින්
+            { name: 'වයරින් කේසින් 1/2"', barcode: 'CASING-0.5', category: 'විදුලි උපකරණ', subCategory: 'වයරින් කේසින්', unit: 'length', costPrice: 0, sellPrice: 350, loosePrice: 0, packSize: 1, packUnit: 'length', description: 'වයරින් කේසින් 1/2" (Wiring Casing): රු. 350' },
+            { name: 'වයරින් කේසින් 1/4"', barcode: 'CASING-0.25', category: 'විදුලි උපකරණ', subCategory: 'වයරින් කේසින්', unit: 'length', costPrice: 0, sellPrice: 470, loosePrice: 0, packSize: 1, packUnit: 'length', description: 'වයරින් කේසින් 1/4" (Wiring Casing): රු. 470' },
+            { name: 'වයරින් කේසින් අඟල් 1', barcode: 'CASING-1', category: 'විදුලි උපකරණ', subCategory: 'වයරින් කේසින්', unit: 'length', costPrice: 0, sellPrice: 450, loosePrice: 0, packSize: 1, packUnit: 'length', description: 'වයරින් කේසින් අඟල් 1 (1" Wiring Casing): රු. 450' },
+            { name: 'වයරින් කේසින් අඟල් 1 1/4', barcode: 'CASING-1.25', category: 'විදුලි උපකරණ', subCategory: 'වයරින් කේසින්', unit: 'length', costPrice: 0, sellPrice: 520, loosePrice: 0, packSize: 1, packUnit: 'length', description: 'වයරින් කේසින් අඟල් 1 1/4 (1 1/4" Wiring Casing): රු. 520' },
+            { name: 'වයරින් කේසින් අඟල් 1 1/2', barcode: 'CASING-1.5', category: 'විදුලි උපකරණ', subCategory: 'වයරින් කේසින්', unit: 'length', costPrice: 0, sellPrice: 850, loosePrice: 0, packSize: 1, packUnit: 'length', description: 'වයරින් කේසින් අඟල් 1 1/2 (1 1/2" Wiring Casing): රු. 850' },
+            { name: 'වයරින් කේසින් අඟල් 2', barcode: 'CASING-2', category: 'විදුලි උපකරණ', subCategory: 'වයරින් කේසින්', unit: 'length', costPrice: 0, sellPrice: 950, loosePrice: 0, packSize: 1, packUnit: 'length', description: 'වයරින් කේසින් අඟල් 2 (2" Wiring Casing): රු. 950' },
+
+            // කන්ඩියුට් බට
+            { name: '1/2 නම කන්ඩියුට් (කහ) - අඩි 12', barcode: 'COND-BEND-0.5', category: 'විදුලි උපකරණ', subCategory: 'කන්ඩියුට් බට', unit: 'length', costPrice: 0, sellPrice: 150, loosePrice: 0, packSize: 12, packUnit: 'ft', description: '1/2 නම කන්ඩියුට් (1/2 Bend Yellow Conduit) - අඩි 12: රු. 150' },
+            { name: '3/4 නම කන්ඩියුට් (කහ කාබ්චූයර්) - අඩි 12', barcode: 'COND-BEND-0.75', category: 'විදුලි උපකරණ', subCategory: 'කන්ඩියුට් බට', unit: 'length', costPrice: 0, sellPrice: 190, loosePrice: 0, packSize: 12, packUnit: 'ft', description: '3/4 නම කාබ්චූයර් (3/4 Bend Yellow Conduit) - අඩි 12: රු. 190' },
+            { name: 'අඟල් 1 නම කන්ඩියුට් (කහ) - අඩි 12', barcode: 'COND-BEND-1', category: 'විදුලි උපකරණ', subCategory: 'කන්ඩියුට් බට', unit: 'length', costPrice: 0, sellPrice: 250, loosePrice: 0, packSize: 12, packUnit: 'ft', description: 'අඟල් 1 නම කන්ඩියුට් කහ (1" Bend Yellow Conduit) - අඩි 12: රු. 250' },
+            { name: '1/2 සුදු කන්ඩියුට් - අඩි 12', barcode: 'COND-WHT-0.5', category: 'විදුලි උපකරණ', subCategory: 'කන්ඩියුට් බට', unit: 'length', costPrice: 0, sellPrice: 200, loosePrice: 0, packSize: 12, packUnit: 'ft', description: '1/2 සුදු කන්ඩියුට් (1/2" White Conduit) - අඩි 12: රු. 200' },
+            { name: '3/4 සුදු කන්ඩියුට් - අඩි 12', barcode: 'COND-WHT-0.75', category: 'විදුලි උපකරණ', subCategory: 'කන්ඩියුට් බට', unit: 'length', costPrice: 0, sellPrice: 250, loosePrice: 0, packSize: 12, packUnit: 'ft', description: '3/4 සුදු කන්ඩියුට් (3/4" White Conduit) - අඩි 12: රු. 250' },
+            { name: 'අඟල් 1 සුදු කන්ඩියුට් - අඩි 12', barcode: 'COND-WHT-1', category: 'විදුලි උපකරණ', subCategory: 'කන්ඩියුට් බට', unit: 'length', costPrice: 0, sellPrice: 350, loosePrice: 0, packSize: 12, packUnit: 'ft', description: '1 සුදු කන්ඩියුට් (1" White Conduit) - අඩි 12: රු. 350' },
+
+            // Loose පොටි (Eagle)
+            { name: 'Loose පොටි (Eagle)', barcode: 'EAGLE-POT-LOOSE', category: 'සායම් හා රසායනික', subCategory: 'සායම්', unit: 'kg', costPrice: 0, sellPrice: 75, loosePrice: 75, qty: 25, packSize: 1, packUnit: 'kg', description: 'Loose පොට් (Eagle / Egel) - 1 kg: රු. 75 | මුළු තොගය: 25 kg' }
         ];
 
         for (const it of defaultItems) {
             const existing = await get(`SELECT id FROM items WHERE name = ?`, [it.name]);
             if (!existing) {
                 await run(
-                    `INSERT INTO items (name, barcode, category, subCategory, unit, costPrice, sellPrice, qty, reorderLevel, packSize, packUnit, loosePrice, description, image, createdAt) VALUES (?, '', ?, ?, ?, ?, ?, 0, 5, ?, ?, ?, ?, '', ?)`,
-                    [it.name, it.category, it.subCategory, it.unit, it.costPrice, it.sellPrice, it.packSize, it.packUnit, it.loosePrice, it.description, Date.now()]
+                    `INSERT INTO items (name, barcode, category, subCategory, unit, costPrice, sellPrice, qty, reorderLevel, packSize, packUnit, loosePrice, description, image, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '', ?)`,
+                    [it.name, it.barcode || '', it.category, it.subCategory, it.unit, it.costPrice, it.sellPrice, it.qty || 0, it.reorderLevel || 5, it.packSize, it.packUnit, it.loosePrice, it.description, Date.now()]
                 );
             } else {
                 await run(
-                    `UPDATE items SET category = ?, subCategory = ?, sellPrice = ?, loosePrice = ?, packSize = ?, packUnit = ?, description = ? WHERE id = ?`,
-                    [it.category, it.subCategory, it.sellPrice, it.loosePrice, it.packSize, it.packUnit, it.description, existing.id]
+                    `UPDATE items SET barcode = COALESCE(NULLIF(?, ''), barcode), category = ?, subCategory = ?, sellPrice = ?, loosePrice = ?, packSize = ?, packUnit = ?, description = ? WHERE id = ?`,
+                    [it.barcode || '', it.category, it.subCategory, it.sellPrice, it.loosePrice, it.packSize, it.packUnit, it.description, existing.id]
                 );
             }
         }

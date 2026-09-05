@@ -265,13 +265,30 @@ Views.sale = {
             </div>
           </div>
 
-          <!-- Amount Paid & Change Due for Cash -->
+          <!-- Amount Paid & Change Due / Short for Cash -->
           <div class="field" id="amountPaidWrap" style="display:${Views.sale.payType === 'cash' ? 'block' : 'none'}; margin-bottom:4px;">
-            <label class="field-label" style="margin-bottom:2px; font-size:12px;">${t('sale_amount_paid')}</label>
-            <input class="input" id="saleAmountPaid" type="number" min="0" step="any" placeholder="0.00" value="${Views.sale.amountPaid || ''}" style="height:36px; padding:6px 10px; font-size:15px;">
-            <div id="changeDueWrap" class="change-due-box" style="display:${(Number(Views.sale.amountPaid) > 0) ? 'flex' : 'none'}; margin-top:4px; padding:6px 10px;">
-              <span style="font-size:13px;">${t('sale_change_due')}</span>
-              <span id="changeDueAmount" style="font-size:15px; font-weight:700;">${fmt(Math.max(0, (Number(Views.sale.amountPaid) || 0) - Views.sale.calcTotal()))}</span>
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:2px;">
+              <label class="field-label" style="margin:0; font-size:12px;">${t('sale_amount_paid')}</label>
+              <button type="button" id="btnExactAmount" style="padding:1px 7px; font-size:11px; font-weight:700; border-radius:4px; border:1px solid var(--border); background:var(--bg-light); color:var(--primary); cursor:pointer;" title="නියමිත මුදලම (Exact Total) ඇතුළත් කරන්න">
+                ${t('sale_exact_btn') || 'නියමිත මුදල (Exact)'}
+              </button>
+            </div>
+            <input class="input" id="saleAmountPaid" type="number" min="0" step="any" placeholder="0.00" value="${Views.sale.amountPaid || ''}" style="height:36px; padding:6px 10px; font-size:15px;" autocomplete="off">
+            
+            <!-- Message when amount paid is less than total -->
+            <div id="amountShortWrap" class="amount-short-box" style="display:none; margin-top:4px; padding:6px 10px;">
+              <span style="font-size:12px; display:inline-flex; align-items:center; gap:4px;">
+                <i class="ph ph-warning-circle" style="font-size:15px;"></i> මුදල අඩුයි!
+              </span>
+              <span style="font-size:13.5px; font-weight:800;">තව රු. <span id="amountShortAmount">0.00</span> ක් මදි</span>
+            </div>
+
+            <!-- Message when amount paid is sufficient / Change due -->
+            <div id="changeDueWrap" class="change-due-box" style="display:none; margin-top:4px; padding:6px 10px;">
+              <span style="font-size:12.5px; display:inline-flex; align-items:center; gap:4px;">
+                <i class="ph ph-check-circle" style="font-size:15px;"></i> ${t('sale_change_due')}
+              </span>
+              <span id="changeDueAmount" style="font-size:14.5px; font-weight:700;">0.00</span>
             </div>
           </div>
 
@@ -414,7 +431,11 @@ Views.sale = {
               <div class="cart-row-price" style="font-size:16px; font-weight:700; color:var(--primary-dark);">
                 ${fmt(lineTotal)}
               </div>
-              ${isDiscounted ? `<div style="font-size:10.5px; color:var(--success); font-weight:600;" title="මුල් මිල: Rs ${fmt(origPrice)} | එකකට රු. ${fmt(effectiveDisc)} අඩුවුණා">(-${fmt(effectiveDisc * l.qty)})</div>` : ''}
+              ${isDiscounted ? `
+                <div style="font-size:11px; color:var(--success); font-weight:700; display:flex; align-items:center; justify-content:flex-end; gap:4px;" title="මුල් මිල: Rs ${fmt(origPrice)} | එකකට රු. ${fmt(effectiveDisc)} අඩුවුණා">
+                  <span style="font-size:10px; color:#b45309; background:#fef3c7; border:1px solid #fde68a; border-radius:3px; padding:0 4px; font-weight:700;">අඩුයි</span>
+                  <span>(-${fmt(effectiveDisc * l.qty)})</span>
+                </div>` : ''}
             </div>
           </div>
         </div>
@@ -467,15 +488,43 @@ Views.sale = {
   },
 
   updateChangeDue() {
-    const paid = Number(document.getElementById('saleAmountPaid')?.value) || Number(Views.sale.amountPaid) || 0;
-    Views.sale.amountPaid = paid > 0 ? paid : '';
+    const paidInput = document.getElementById('saleAmountPaid');
+    const paidVal = paidInput ? paidInput.value.trim() : (Views.sale.amountPaid !== undefined && Views.sale.amountPaid !== '' ? String(Views.sale.amountPaid).trim() : '');
+    const paid = Number(paidVal) || 0;
+    Views.sale.amountPaid = paidVal !== '' ? paidVal : '';
     const total = Views.sale.calcTotal();
-    const change = Math.max(0, paid - total);
-    const wrap = document.getElementById('changeDueWrap');
-    const amtEl = document.getElementById('changeDueAmount');
-    if (wrap && amtEl) {
-      wrap.style.display = paid > 0 ? 'flex' : 'none';
-      amtEl.textContent = fmt(change);
+
+    const changeWrap = document.getElementById('changeDueWrap');
+    const shortWrap = document.getElementById('amountShortWrap');
+    const changeAmtEl = document.getElementById('changeDueAmount');
+    const shortAmtEl = document.getElementById('amountShortAmount');
+
+    if (paidInput) {
+      paidInput.classList.remove('input-error', 'input-success');
+    }
+
+    if (!paidVal || isNaN(paid) || paid <= 0) {
+      if (changeWrap) changeWrap.style.display = 'none';
+      if (shortWrap) shortWrap.style.display = 'none';
+      return;
+    }
+
+    if (total > 0 && paid < total) {
+      const shortDiff = total - paid;
+      if (changeWrap) changeWrap.style.display = 'none';
+      if (shortWrap) {
+        shortWrap.style.display = 'flex';
+        if (shortAmtEl) shortAmtEl.textContent = fmt(shortDiff);
+      }
+      if (paidInput) paidInput.classList.add('input-error');
+    } else {
+      const change = Math.max(0, paid - total);
+      if (shortWrap) shortWrap.style.display = 'none';
+      if (changeWrap) {
+        changeWrap.style.display = 'flex';
+        if (changeAmtEl) changeAmtEl.textContent = fmt(change);
+      }
+      if (paidInput) paidInput.classList.add('input-success');
     }
   },
 
@@ -993,14 +1042,23 @@ Views.sale = {
             if (typeof target.select === 'function') target.select();
           } else {
             const activeBtn = Views.sale.payType === 'cash' ? payCashBtn : payCreditBtn;
-            if (activeBtn) {
-              activeBtn.focus();
-            } else {
-              const lastIdx = cart.length - 1;
-              const targetInp = document.querySelector(`[data-discount-idx="${lastIdx}"]`) || document.querySelector(`[data-qty-idx="${lastIdx}"]`);
-              if (targetInp) { targetInp.focus(); if (typeof targetInp.select === 'function') targetInp.select(); }
-            }
+            if (activeBtn) activeBtn.focus();
           }
+        }
+      });
+    }
+
+    const exactBtn = document.getElementById('btnExactAmount');
+    if (exactBtn) {
+      exactBtn.addEventListener('click', () => {
+        const total = Views.sale.calcTotal();
+        const paidInput = document.getElementById('saleAmountPaid');
+        if (paidInput) {
+          paidInput.value = total > 0 ? total : '';
+          Views.sale.amountPaid = paidInput.value;
+          Views.sale.updateChangeDue();
+          paidInput.focus();
+          if (typeof paidInput.select === 'function') paidInput.select();
         }
       });
     }
@@ -1419,6 +1477,7 @@ Views.sale = {
     if (paidWrap) paidWrap.style.display = type === 'cash' ? 'block' : 'none';
     const custField = document.getElementById('customerSelectionField');
     if (custField) custField.style.display = type === 'credit' ? 'block' : 'none';
+    Views.sale.updateChangeDue();
   },
 
   addToCart(itemId) {
@@ -2048,10 +2107,39 @@ Views.sale = {
     }
 
     const itemDiscounts = Views.sale.calcItemDiscounts();
-    const overallDiscount = Number(document.getElementById('saleDiscount').value) || 0;
+    const overallDiscount = Number(document.getElementById('saleDiscount')?.value) || 0;
     const discount = overallDiscount + itemDiscounts;
-    const amountPaid = Number(document.getElementById('saleAmountPaid')?.value) || Number(Views.sale.amountPaid) || 0;
     const total = Views.sale.calcTotal();
+    const paidInput = document.getElementById('saleAmountPaid');
+    const paidVal = paidInput ? paidInput.value.trim() : (Views.sale.amountPaid !== undefined && Views.sale.amountPaid !== '' ? String(Views.sale.amountPaid).trim() : '');
+    const amountPaid = Number(paidVal) || 0;
+
+    // Validate cash payment: Must be entered and must not be less than total
+    if (payType === 'cash') {
+      if (total > 0) {
+        if (!paidVal || isNaN(amountPaid) || amountPaid <= 0) {
+          toast(`කරුණාකර ලැබුණු මුදල ඇතුළත් කරන්න! (නියමිත මුදල: රු. ${fmt(total)})`, 'err');
+          if (paidInput) {
+            paidInput.classList.add('input-error');
+            paidInput.focus();
+            if (typeof paidInput.select === 'function') paidInput.select();
+          }
+          return;
+        }
+
+        if (amountPaid < total) {
+          const shortDiff = total - amountPaid;
+          toast(`ලැබුණු මුදල අඩුයි! බිල මුද්‍රණය කළ නොහැක. (තව රු. ${fmt(shortDiff)} ක් අවශ්‍යයි)`, 'err');
+          if (paidInput) {
+            paidInput.classList.add('input-error');
+            paidInput.focus();
+            if (typeof paidInput.select === 'function') paidInput.select();
+          }
+          return;
+        }
+      }
+    }
+
     const changeAmount = Math.max(0, amountPaid - total);
 
     const lines = cart.map(l => ({
