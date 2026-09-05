@@ -2095,23 +2095,23 @@ Views.sale = {
     return `
       <div class="receipt" id="printArea">
         <h2>${escapeHTML(shopName)}</h2>
-        ${shopDesc ? `<div class="r-center" style="font-size:10px; color:#222; margin-bottom:3px; white-space:pre-line;">${escapeHTML(shopDesc)}</div>` : ''}
+        ${shopDesc ? `<div class="r-center" style="font-size:9.5px; color:#222; margin-bottom:3px; white-space:pre-line;">${escapeHTML(shopDesc)}</div>` : ''}
         
-        <div style="border-top:1px dashed #000; border-bottom:1px dashed #000; padding:3px 0; margin:3px 0; font-size:10.5px;">
-          <div style="display:flex; justify-content:space-between; align-items:center; gap:2px;">
+        <div style="border-top:1px dashed #000; border-bottom:1px dashed #000; padding:2px 0; margin:3px 0; font-size:10px; width:100%; box-sizing:border-box;">
+          <div style="display:flex; justify-content:space-between; align-items:center; width:100%;">
             <span><b>INVOICE #${sale.id}</b></span>
-            <span style="font-size:10px;">${(()=>{ const d=new Date(sale.date); return d.toLocaleDateString('en-GB') + ' ' + d.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}); })()}</span>
+            <span style="font-size:9.5px;">${(()=>{ const d=new Date(sale.date); return d.toLocaleDateString('en-GB') + ' ' + d.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}); })()}</span>
           </div>
-          ${sale.customerName ? `<div style="margin-top:2px; font-size:10px;">ගනුදෙනුකරු: <b>${escapeHTML(sale.customerName)}</b></div>` : ''}
+          ${sale.customerName ? `<div style="margin-top:2px; font-size:9.5px;">ගනුදෙනුකරු: <b>${escapeHTML(sale.customerName)}</b></div>` : ''}
         </div>
 
-        <table style="width:100%; border-collapse:collapse; margin:3px 0; font-size:10px; table-layout:fixed;">
+        <table style="width:100%; border-collapse:collapse; margin:2px 0; font-size:9.5px; table-layout:fixed; box-sizing:border-box;">
           <thead>
             <tr style="border-bottom:1px dashed #000;">
-              <th style="text-align:left; padding-bottom:2px; width:44%;">විස්තරය (Item)</th>
-              <th style="text-align:center; width:17%; padding-bottom:2px;">ගණන</th>
-              <th style="text-align:right; width:19%; padding-bottom:2px;">මිල</th>
-              <th style="text-align:right; width:20%; padding-bottom:2px;">එකතුව</th>
+              <th style="text-align:left; padding:2px 0; width:36%;">විස්තරය (Item)</th>
+              <th style="text-align:center; width:20%; padding:2px 0;">ගණන</th>
+              <th style="text-align:right; width:20%; padding:2px 0;">මිල</th>
+              <th style="text-align:right; width:24%; padding:2px 0;">එකතුව</th>
             </tr>
           </thead>
           <tbody>
@@ -2121,21 +2121,21 @@ Views.sale = {
               const lineTot = l.qty * l.unitPrice;
               return `
                 <tr>
-                  <td colspan="4" style="padding-top:3px; font-weight:700; color:#000; font-size:10.5px; word-break:break-word;">${escapeHTML(l.name)}</td>
+                  <td colspan="4" style="padding-top:2px; font-weight:700; color:#000; font-size:10px; word-break:break-word;">${escapeHTML(l.name)}</td>
                 </tr>
                 <tr style="border-bottom:1px dotted #ccc;">
-                  <td style="padding-bottom:3px; font-size:9.5px; color:#555; word-break:break-word;">
+                  <td style="padding-bottom:2px; font-size:9px; color:#444; word-break:break-word;">
                     ${l.looseInfo ? `[ලිහිල්: ${escapeHTML(l.looseInfo.shortText || '')}]` : ''}
-                    ${hasDisc ? `[Disc: -${fmt(origPrice - l.unitPrice)}]` : ''}
+                    ${hasDisc ? `[Disc: -${(origPrice - l.unitPrice).toLocaleString('en-LK', {minimumFractionDigits:2})}]` : ''}
                   </td>
-                  <td style="text-align:center; padding-bottom:3px; font-size:10px; white-space:nowrap;">
+                  <td style="text-align:center; padding-bottom:2px; font-size:9.5px; white-space:nowrap;">
                     ${l.looseInfo ? `${l.looseInfo.looseQty} ${escapeHTML(l.looseInfo.looseUnit)}` : `${l.qty} ${escapeHTML(l.unit || '')}`}
                   </td>
-                  <td style="text-align:right; padding-bottom:3px; font-size:10px; white-space:nowrap;">
+                  <td style="text-align:right; padding-bottom:2px; font-size:9.5px; white-space:nowrap;">
                     ${(l.unitPrice).toLocaleString('en-LK', {minimumFractionDigits:2, maximumFractionDigits:2})}
                   </td>
-                  <td style="text-align:right; padding-bottom:3px; font-weight:700; font-size:10.5px; white-space:nowrap;">
-                    ${fmt(lineTot)}
+                  <td style="text-align:right; padding-bottom:2px; font-weight:700; font-size:9.5px; white-space:nowrap;">
+                    ${(lineTot).toLocaleString('en-LK', {minimumFractionDigits:2, maximumFractionDigits:2})}
                   </td>
                 </tr>
               `;
@@ -2143,14 +2143,14 @@ Views.sale = {
           </tbody>
         </table>
 
-        <div style="border-top:1px dashed #000; padding-top:3px; margin-top:3px;">
+        <div style="border-top:1px dashed #000; padding-top:2px; margin-top:2px; width:100%; box-sizing:border-box;">
           <div class="receipt-totals-row"><span>${t('sale_subtotal')} (Subtotal):</span><span>${fmt(sale.subtotal)}</span></div>
           ${sale.discount > 0 ? `<div class="receipt-totals-row"><span>${t('sale_discount')} (Discount):</span><span>- ${fmt(sale.discount)}</span></div>` : ''}
           <div class="receipt-totals-row grand">
-            <span style="font-size:12px; font-weight:800;">ශුද්ධ එකතුව (TOTAL):</span>
-            <span style="font-size:13.5px; font-weight:800;">${fmt(sale.total)}</span>
+            <span style="font-size:11px; font-weight:800;">ශුද්ධ එකතුව (TOTAL):</span>
+            <span style="font-size:12px; font-weight:800;">${fmt(sale.total)}</span>
           </div>
-          <div class="receipt-totals-row" style="margin-top:2px;">
+          <div class="receipt-totals-row" style="margin-top:1px;">
             <span>ගෙවීම් ක්‍රමය (Payment):</span>
             <b>${sale.paymentType === 'credit' ? `ණයට (Credit) - ${escapeHTML(sale.customerName || '')}` : 'මුදල් (Cash)'}</b>
           </div>
@@ -2160,12 +2160,12 @@ Views.sale = {
           ` : ''}
         </div>
 
-        <div style="text-align:center; margin-top:6px; border-top:1px dashed #000; padding-top:5px;">
-          <div style="font-weight:700; font-size:11px; margin-bottom:2px;">${t('receipt_thanks')}</div>
-          <div style="font-size:9px; color:#222; margin-bottom:4px; line-height:1.3;">භාණ්ඩ ආපසු භාරදීමේදී මෙම බිල්පත ඉදිරිපත් කිරීම අනිවාර්ය වේ.</div>
+        <div style="text-align:center; margin-top:4px; border-top:1px dashed #000; padding-top:4px;">
+          <div style="font-weight:700; font-size:10px; margin-bottom:1px;">${t('receipt_thanks')}</div>
+          <div style="font-size:8.5px; color:#222; margin-bottom:3px; line-height:1.25;">භාණ්ඩ ආපසු භාරදීමේදී මෙම බිල්පත ඉදිරිපත් කිරීම අනිවාර්ය වේ.</div>
           
-          <div style="margin:4px 0; display:flex; flex-direction:column; align-items:center; justify-content:center;">
-            ${typeof BarcodeSystem !== 'undefined' ? BarcodeSystem.generateCode128SVG(sale.barcode || ('BILL-' + sale.id), { width: 160, height: 38, fontSize: 9 }) : ''}
+          <div style="margin:3px 0; display:flex; flex-direction:column; align-items:center; justify-content:center;">
+            ${typeof BarcodeSystem !== 'undefined' ? BarcodeSystem.generateCode128SVG(sale.barcode || ('BILL-' + sale.id), { width: 140, height: 32, fontSize: 8 }) : ''}
           </div>
         </div>
       </div>

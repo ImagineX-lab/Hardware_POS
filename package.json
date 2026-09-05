@@ -30,8 +30,20 @@
       "!dist/*",
       "!scratch/*"
     ],
+    "asar": true,
+    "asarUnpack": [
+      "**/node_modules/sqlite3/**/*",
+      "backend/pos.db"
+    ],
     "win": {
-      "target": "nsis",
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
       "icon": "icon.ico",
       "requestedExecutionLevel": "asInvoker"
     },
@@ -40,7 +52,8 @@
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "Hardware POS"
+      "shortcutName": "Hardware POS",
+      "runAfterFinish": true
     }
   },
   "devDependencies": {

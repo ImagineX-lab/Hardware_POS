@@ -1,28 +1,50 @@
-const { app, BrowserWindow, Menu, ipcMain } = require('electron');
+const { app, BrowserWindow, Menu, ipcMain, dialog } = require('electron');
 const path = require('path');
-const http = require('http');
-
 const fs = require('fs');
-const preloadPath = path.join(__dirname, 'preload.js');
-
+const { startServer } = require('./server.js');
 
 let mainWindow = null;
-const PORT = process.env.PORT || 3000;
+let serverInstance = null;
+let activePort = 3000;
 
-function checkServerReady(url, callback) {
-    const request = http.get(url, (res) => {
-        if (res.statusCode === 200 || res.statusCode === 304 || res.statusCode === 404) {
-            callback(true);
-        } else {
-            setTimeout(() => checkServerReady(url, callback), 200);
+// Enforce single instance lock
+const gotTheLock = app.requestSingleInstanceLock();
+
+if (!gotTheLock) {
+    app.quit();
+} else {
+    app.on('second-instance', () => {
+        if (mainWindow) {
+            if (mainWindow.isMinimized()) mainWindow.restore();
+            mainWindow.focus();
         }
     });
-    request.on('error', () => {
-        setTimeout(() => checkServerReady(url, callback), 200);
+
+    app.whenReady().then(async () => {
+        try {
+            const serverInfo = await startServer(3000);
+            serverInstance = serverInfo.server;
+            activePort = serverInfo.port;
+            createWindow(activePort);
+        } catch (err) {
+            console.error('Failed to start Hardware POS server:', err);
+            dialog.showErrorBox(
+                'Hardware POS Startup Error',
+                `Failed to initialize the local server.\n\nError: ${err.message || err}`
+            );
+            app.quit();
+        }
+
+        app.on('activate', () => {
+            if (BrowserWindow.getAllWindows().length === 0) {
+                createWindow(activePort);
+            }
+        });
     });
 }
 
-function createWindow() {
+function createWindow(port) {
+    const preloadPath = path.join(__dirname, 'preload.js');
     const iconPath = path.join(__dirname, 'icon.png');
     const windowOptions = {
         width: 1280,
@@ -30,6 +52,7 @@ function createWindow() {
         minWidth: 1024,
         minHeight: 700,
         title: 'Hardware POS',
+        autoHideMenuBar: true,
         webPreferences: {
             nodeIntegration: false,
             contextIsolation: true,
@@ -42,17 +65,10 @@ function createWindow() {
     }
 
     mainWindow = new BrowserWindow(windowOptions);
+    Menu.setApplicationMenu(null);
 
-    Menu.setApplicationMenu(null); // Optional: remove standard default menu for clean POS interface
-
-    const serverUrl = `http://localhost:${PORT}`;
-    
-    // Ensure Express server has started before loading URL
-    checkServerReady(serverUrl, () => {
-        if (mainWindow) {
-            mainWindow.loadURL(serverUrl);
-        }
-    });
+    const serverUrl = `http://127.0.0.1:${port}`;
+    mainWindow.loadURL(serverUrl);
 
     mainWindow.on('closed', () => {
         mainWindow = null;
@@ -78,20 +94,10 @@ ipcMain.handle('print-receipt', (event, options) => {
     });
 });
 
-// Start Express server inside Electron
-require('./server.js');
-
-app.whenReady().then(() => {
-    createWindow();
-
-    app.on('activate', () => {
-        if (BrowserWindow.getAllWindows().length === 0) {
-            createWindow();
-        }
-    });
-});
-
 app.on('window-all-closed', () => {
+    if (serverInstance && typeof serverInstance.close === 'function') {
+        serverInstance.close();
+    }
     if (process.platform !== 'darwin') {
         app.quit();
     }

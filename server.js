@@ -142,9 +142,48 @@ app.post('/api/wipe', async (req, res) => {
     res.json({ success: true });
 });
 
-const PORT = process.env.PORT || 3000;
-db.init().then(() => {
-    app.listen(PORT, () => {
-        console.log(`Server is running on http://localhost:${PORT}`);
+function startServer(preferredPort = 3000) {
+    return new Promise(async (resolve, reject) => {
+        try {
+            await db.init();
+        } catch (dbErr) {
+            console.error('Database initialization error:', dbErr);
+            return reject(dbErr);
+        }
+
+        let currentPort = Number(process.env.PORT) || preferredPort || 3000;
+        const maxAttempts = 20;
+        let attempts = 0;
+
+        function tryListen(port) {
+            const server = app.listen(port, '127.0.0.1');
+            server.on('listening', () => {
+                const actualPort = server.address().port;
+                console.log(`Hardware POS Server is running on http://127.0.0.1:${actualPort}`);
+                resolve({ server, port: actualPort, app });
+            });
+            server.on('error', (err) => {
+                if (err.code === 'EADDRINUSE' && attempts < maxAttempts) {
+                    attempts++;
+                    const nextPort = port + 1;
+                    console.warn(`Port ${port} in use on this PC, trying fallback port ${nextPort}...`);
+                    tryListen(nextPort);
+                } else {
+                    reject(err);
+                }
+            });
+        }
+
+        tryListen(currentPort);
     });
-});
+}
+
+// Auto-start if executed directly via `node server.js`
+if (require.main === module) {
+    startServer(process.env.PORT || 3000).catch((err) => {
+        console.error('Failed to start server:', err);
+        process.exit(1);
+    });
+}
+
+module.exports = { app, startServer };

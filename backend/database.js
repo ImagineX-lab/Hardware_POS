@@ -4,18 +4,27 @@ const fs = require('fs');
 
 let dataDir = __dirname;
 try {
-    const { app } = require('electron');
+    const electron = require('electron');
+    const app = electron.app || (electron.remote && electron.remote.app);
     if (app && typeof app.getPath === 'function') {
         dataDir = app.getPath('userData');
+    } else if (process.env.APPDATA) {
+        dataDir = path.join(process.env.APPDATA, 'Hardware POS');
     }
 } catch (e) {
-    if (process.env.APPDATA && process.versions && process.versions.electron) {
-        dataDir = path.join(process.env.APPDATA, 'HardwarePOS');
+    if (process.env.APPDATA) {
+        dataDir = path.join(process.env.APPDATA, 'Hardware POS');
     }
 }
 
 if (!fs.existsSync(dataDir)) {
-    fs.mkdirSync(dataDir, { recursive: true });
+    try {
+        fs.mkdirSync(dataDir, { recursive: true });
+    } catch (err) {
+        console.error('Failed to create data directory in APPDATA, falling back to temp:', err);
+        dataDir = path.join(require('os').tmpdir(), 'HardwarePOS');
+        fs.mkdirSync(dataDir, { recursive: true });
+    }
 }
 
 const dbPath = path.join(dataDir, 'pos.db');
@@ -23,14 +32,24 @@ const bundledDbPath = path.join(__dirname, 'pos.db');
 
 if (dataDir !== __dirname) {
     const dbExists = fs.existsSync(dbPath);
-    const dbEmpty = dbExists && fs.statSync(dbPath).size === 0;
+    let dbEmpty = true;
+    if (dbExists) {
+        try {
+            dbEmpty = fs.statSync(dbPath).size === 0;
+        } catch (e) {
+            dbEmpty = true;
+        }
+    }
     if (!dbExists || dbEmpty) {
-        if (fs.existsSync(bundledDbPath) && fs.statSync(bundledDbPath).size > 0) {
+        if (fs.existsSync(bundledDbPath)) {
             try {
-                fs.copyFileSync(bundledDbPath, dbPath);
-                console.log('Successfully copied bundled pos.db to userData:', dbPath);
+                const bundledData = fs.readFileSync(bundledDbPath);
+                if (bundledData && bundledData.length > 0) {
+                    fs.writeFileSync(dbPath, bundledData);
+                    console.log('Successfully copied bundled pos.db to userData:', dbPath);
+                }
             } catch (err) {
-                console.error('Failed to copy bundled pos.db to userData:', err);
+                console.warn('Could not copy bundled pos.db, will create fresh schema on init():', err.message);
             }
         }
     }
