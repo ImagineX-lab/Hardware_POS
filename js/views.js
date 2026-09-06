@@ -2161,12 +2161,12 @@ Views.sale = {
     const shopName = (DB.data.settings && DB.data.settings.shopName) || 'HardwarePOS';
     const shopDesc = (DB.data.settings && DB.data.settings.shopDescription) || '';
     const logo = (DB.data.settings && DB.data.settings.logo) || '';
-    const rawLogoSize = Number(DB.data.settings && DB.data.settings.logoSize) || 45;
-    const logoSize = Math.min(Math.max(rawLogoSize * 1.5, 65), 100);
+    const rawLogoSize = Number(DB.data.settings && DB.data.settings.logoSize) || 50;
+    const logoSize = Math.min(Math.max(rawLogoSize * 1.8, 85), 150);
 
     return `
       <div class="receipt" id="printArea">
-        ${logo ? `<div style="text-align:center; margin-bottom:6px;"><img class="receipt-logo" src="${logo}" alt="Logo" style="height:${logoSize}px; max-height:95px; max-width:220px; object-fit:contain; margin:0 auto; display:block;"></div>` : ''}
+        ${logo ? `<div style="text-align:center; margin-bottom:6px;"><img class="receipt-logo" src="${logo}" alt="Logo" style="height:${logoSize}px; max-height:140px; max-width:250px; object-fit:contain; margin:0 auto; display:block;"></div>` : ''}
         <h2>${escapeHTML(shopName)}</h2>
         ${shopDesc ? `<div class="r-center" style="font-size:9.5px; color:#222; margin-bottom:3px; white-space:pre-line;">${escapeHTML(shopDesc)}</div>` : ''}
         
@@ -4254,7 +4254,7 @@ Views.settings = {
             </div>
 
             <div id="logoPreviewWrap" class="mt-14" style="display: ${hasLogo ? 'flex' : 'none'}; align-items: center; gap: 14px; background: var(--paper); padding: 12px; border-radius: 8px;">
-              <img id="settingsLogoPreview" src="${s.logo || ''}" alt="Logo Preview" style="height: ${logoSize}px; max-height: 100px; object-fit: contain; border-radius: 6px;">
+              <img id="settingsLogoPreview" src="${s.logo || ''}" alt="Logo Preview" style="height: ${logoSize}px; max-height: 120px; object-fit: contain; border-radius: 6px;">
               <button class="btn btn-danger" id="removeLogoBtn" style="font-size: 12px; padding: 6px 12px;">${t('settings_logo_remove')}</button>
             </div>
 
@@ -4263,7 +4263,7 @@ Views.settings = {
                 <label class="field-label" style="margin-bottom: 0;">${t('settings_logo_size')}</label>
                 <span id="logoSizeVal" class="pill" style="font-weight: 700;">${logoSize}px</span>
               </div>
-              <input type="range" id="logoSizeRange" min="20" max="120" step="2" value="${logoSize}" style="width: 100%; cursor: pointer;">
+              <input type="range" id="logoSizeRange" min="20" max="160" step="2" value="${logoSize}" style="width: 100%; cursor: pointer;">
             </div>
           </div>
 
