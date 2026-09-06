@@ -2181,10 +2181,10 @@ Views.sale = {
         <table style="width:100%; border-collapse:collapse; margin:2px 0; font-size:9.5px; table-layout:fixed; box-sizing:border-box;">
           <thead>
             <tr style="border-bottom:1px dashed #000;">
-              <th style="text-align:left; padding:2px 0; width:36%;">විස්තරය</th>
+              <th style="text-align:left; padding:2px 0; width:28%;">විස්තරය</th>
               <th style="text-align:center; width:20%; padding:2px 0;">ගණන</th>
-              <th style="text-align:right; width:20%; padding:2px 0;">මිල</th>
-              <th style="text-align:right; width:24%; padding:2px 0;">එකතුව</th>
+              <th style="text-align:right; width:24%; padding:2px 0;">මිල</th>
+              <th style="text-align:right; width:28%; padding:2px 0;">එකතුව</th>
             </tr>
           </thead>
           <tbody>
