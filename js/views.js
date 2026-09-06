@@ -2160,9 +2160,13 @@ Views.sale = {
   getReceiptHTML(sale) {
     const shopName = (DB.data.settings && DB.data.settings.shopName) || 'HardwarePOS';
     const shopDesc = (DB.data.settings && DB.data.settings.shopDescription) || '';
+    const logo = (DB.data.settings && DB.data.settings.logo) || '';
+    const rawLogoSize = Number(DB.data.settings && DB.data.settings.logoSize) || 45;
+    const logoSize = Math.min(Math.max(rawLogoSize * 1.5, 65), 100);
 
     return `
       <div class="receipt" id="printArea">
+        ${logo ? `<div style="text-align:center; margin-bottom:6px;"><img class="receipt-logo" src="${logo}" alt="Logo" style="height:${logoSize}px; max-height:95px; max-width:220px; object-fit:contain; margin:0 auto; display:block;"></div>` : ''}
         <h2>${escapeHTML(shopName)}</h2>
         ${shopDesc ? `<div class="r-center" style="font-size:9.5px; color:#222; margin-bottom:3px; white-space:pre-line;">${escapeHTML(shopDesc)}</div>` : ''}
         
@@ -2177,7 +2181,7 @@ Views.sale = {
         <table style="width:100%; border-collapse:collapse; margin:2px 0; font-size:9.5px; table-layout:fixed; box-sizing:border-box;">
           <thead>
             <tr style="border-bottom:1px dashed #000;">
-              <th style="text-align:left; padding:2px 0; width:36%;">විස්තරය (Item)</th>
+              <th style="text-align:left; padding:2px 0; width:36%;">විස්තරය</th>
               <th style="text-align:center; width:20%; padding:2px 0;">ගණන</th>
               <th style="text-align:right; width:20%; padding:2px 0;">මිල</th>
               <th style="text-align:right; width:24%; padding:2px 0;">එකතුව</th>
@@ -4247,7 +4251,7 @@ Views.settings = {
             </div>
 
             <div id="logoPreviewWrap" class="mt-14" style="display: ${hasLogo ? 'flex' : 'none'}; align-items: center; gap: 14px; background: var(--paper); padding: 12px; border-radius: 8px;">
-              <img id="settingsLogoPreview" src="${s.logo || ''}" alt="Logo Preview" style="height: ${logoSize}px; max-height: 80px; object-fit: contain; border-radius: 6px;">
+              <img id="settingsLogoPreview" src="${s.logo || ''}" alt="Logo Preview" style="height: ${logoSize}px; max-height: 100px; object-fit: contain; border-radius: 6px;">
               <button class="btn btn-danger" id="removeLogoBtn" style="font-size: 12px; padding: 6px 12px;">${t('settings_logo_remove')}</button>
             </div>
 
@@ -4256,7 +4260,7 @@ Views.settings = {
                 <label class="field-label" style="margin-bottom: 0;">${t('settings_logo_size')}</label>
                 <span id="logoSizeVal" class="pill" style="font-weight: 700;">${logoSize}px</span>
               </div>
-              <input type="range" id="logoSizeRange" min="20" max="100" step="2" value="${logoSize}" style="width: 100%; cursor: pointer;">
+              <input type="range" id="logoSizeRange" min="20" max="120" step="2" value="${logoSize}" style="width: 100%; cursor: pointer;">
             </div>
           </div>
 

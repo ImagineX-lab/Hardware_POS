@@ -1455,10 +1455,10 @@ th.num {
 }
 
 .receipt-logo {
-  max-height: 48px;
-  max-width: 180px;
+  max-height: 90px;
+  max-width: 220px;
   object-fit: contain;
-  margin: 0 auto 4px auto;
+  margin: 0 auto 6px auto;
   display: block;
 }
 
@@ -1622,6 +1622,14 @@ th.num {
     box-sizing: border-box !important;
     overflow: hidden !important;
     word-break: break-word !important;
+  }
+
+  #printArea .receipt-logo {
+    display: block !important;
+    max-height: 90px !important;
+    max-width: 220px !important;
+    margin: 0 auto 6px auto !important;
+    object-fit: contain !important;
   }
 
   #printArea h2 {
