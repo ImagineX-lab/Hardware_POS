@@ -457,15 +457,6 @@ textarea {
   grid-template-columns: 1fr 1fr;
 }
 
-@media screen and (max-width:1100px) {
-  .grid-4 {
-    grid-template-columns: repeat(2, 1fr);
-  }
-
-  .grid-2 {
-    grid-template-columns: 1fr;
-  }
-}
 
 .card {
   background: var(--card);
@@ -881,12 +872,6 @@ th.num {
   flex-direction: column;
 }
 
-@media screen and (max-width:1100px) {
-  .sale-layout {
-    grid-template-columns: 1fr;
-    height: auto;
-  }
-}
 
 .pos-categories {
   display: flex;
@@ -1242,6 +1227,12 @@ th.num {
   width: 80px;
   padding: 4px 6px !important;
   font-size: 12px !important;
+  height: 28px;
+  text-align: right;
+  border: 1px solid var(--orange);
+  background: var(--paper);
+  flex-shrink: 0;
+  border-radius: 6px;
 }
 
 .btn-loose-toggle:focus,
@@ -1249,13 +1240,6 @@ th.num {
   outline: 2px solid var(--orange, #f59e0b) !important;
   outline-offset: 1px !important;
   box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.3) !important;
-}
-
-height: 28px;
-text-align: right;
-border-color: var(--orange);
-background: var(--paper);
-flex-shrink: 0;
 }
 
 .totals-box {
@@ -1458,53 +1442,55 @@ flex-shrink: 0;
 .receipt {
   position: relative;
   width: 100%;
-  max-width: 290px;
-  /* ≈ 72-74mm printable area for 80mm paper */
+  max-width: 275px;
+  /* ≈ 68mm-70mm printable area for 80mm paper */
   margin: 0 auto;
   font-family: 'Noto Sans Sinhala', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, monospace;
-  font-size: 11.5px;
+  font-size: 10.5px;
   color: #000;
-  line-height: 1.38;
-  padding: 8px 6px;
+  line-height: 1.35;
+  padding: 6px 4px;
   background: #fff;
   box-sizing: border-box;
 }
 
 .receipt-logo {
-  max-height: 48px;
-  max-width: 180px;
+  max-height: 90px;
+  max-width: 220px;
   object-fit: contain;
-  margin: 0 auto 4px auto;
+  margin: 0 auto 6px auto;
   display: block;
 }
 
 .receipt h2 {
   text-align: center;
-  font-size: 16px;
+  font-size: 15px;
   font-weight: 800;
   color: #000;
   font-family: 'Noto Sans Sinhala', -apple-system, sans-serif;
-  margin: 0 0 3px 0;
+  margin: 0 0 2px 0;
   letter-spacing: 0.3px;
 }
 
 .receipt .r-center {
   text-align: center;
-  font-size: 10.5px;
+  font-size: 9.5px;
   color: #222;
-  margin-bottom: 4px;
+  margin-bottom: 3px;
 }
 
 .receipt table {
   width: 100%;
-  font-size: 11px;
+  font-size: 9.5px;
   border-collapse: collapse;
-  margin: 4px 0;
+  margin: 3px 0;
+  table-layout: fixed;
+  box-sizing: border-box;
 }
 
 .receipt td,
 .receipt th {
-  padding: 3px 0;
+  padding: 2px 0;
   vertical-align: top;
   color: #000;
 }
@@ -1513,37 +1499,39 @@ flex-shrink: 0;
   font-weight: 800;
   color: #000;
   border-bottom: 1px dashed #000;
-  padding-bottom: 4px;
+  padding-bottom: 3px;
 }
 
 .receipt hr {
   border: none;
   border-top: 1px dashed #444;
-  margin: 5px 0;
+  margin: 4px 0;
 }
 
 .receipt hr.hr-double {
   border-top: 1px dashed #000;
   border-bottom: 1px solid #000;
   height: 2px;
-  margin: 6px 0;
+  margin: 5px 0;
 }
 
 .receipt-totals-row {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  font-size: 11.5px;
+  font-size: 10.5px;
   padding: 1.5px 0;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .receipt-totals-row.grand {
-  font-size: 14.5px;
+  font-size: 12.5px;
   font-weight: 800;
   border-top: 1px dashed #000;
   border-bottom: 2px solid #000;
-  padding: 4px 0;
-  margin: 4px 0;
+  padding: 3px 0;
+  margin: 3px 0;
 }
 
 /* ===== 80mm THERMAL PRINT STYLES ===== */
@@ -1553,6 +1541,10 @@ flex-shrink: 0;
     /* 80mm roll width, auto length */
     margin: 0;
     /* Zero margin to maximize printable area */
+  }
+
+  *, *::before, *::after {
+    box-sizing: border-box !important;
   }
 
   html,
@@ -1616,38 +1608,55 @@ flex-shrink: 0;
   #printArea {
     position: static !important;
     display: block !important;
-    width: 74mm !important;
-    /* 72-74mm printable area */
-    max-width: 74mm !important;
+    width: 68mm !important;
+    /* 68mm safe printable area prevents cut-off on 80mm roll */
+    max-width: 68mm !important;
     margin: 0 auto !important;
-    padding: 2mm 3mm 10mm 3mm !important;
-    /* Bottom 10mm space for thermal auto-cutter */
+    padding: 1mm 2mm 8mm 2mm !important;
+    /* Bottom 8mm space for thermal auto-cutter */
     font-family: 'Noto Sans Sinhala', -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif !important;
-    font-size: 11px !important;
-    line-height: 1.35 !important;
+    font-size: 10px !important;
+    line-height: 1.3 !important;
     color: #000 !important;
     background: #fff !important;
     box-sizing: border-box !important;
+    overflow: hidden !important;
+    word-break: break-word !important;
+  }
+
+  #printArea .receipt-logo {
+    display: block !important;
+    max-height: 90px !important;
+    max-width: 220px !important;
+    margin: 0 auto 6px auto !important;
+    object-fit: contain !important;
   }
 
   #printArea h2 {
-    font-size: 15px !important;
+    font-size: 14.5px !important;
     font-weight: 800 !important;
     color: #000 !important;
+    margin: 0 0 2px 0 !important;
   }
 
   #printArea table {
-    font-size: 10.5px !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    font-size: 9.5px !important;
+    table-layout: fixed !important;
+    box-sizing: border-box !important;
   }
 
   #printArea th {
     font-weight: 800 !important;
     color: #000 !important;
     border-bottom: 1px dashed #000 !important;
+    padding: 2px 0 !important;
   }
 
   #printArea td {
     color: #000 !important;
+    padding: 2px 0 !important;
   }
 
   #printArea hr {
@@ -1655,8 +1664,21 @@ flex-shrink: 0;
   }
 
   #printArea .r-center {
-    font-size: 10px !important;
+    font-size: 9.5px !important;
     color: #000 !important;
+  }
+
+  #printArea .receipt-totals-row {
+    font-size: 10px !important;
+    padding: 1px 0 !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+  }
+
+  #printArea .receipt-totals-row.grand {
+    font-size: 11.5px !important;
+    font-weight: 800 !important;
+    padding: 2px 0 !important;
   }
 }
 
@@ -1840,6 +1862,40 @@ flex-shrink: 0;
   align-items: center;
 }
 
+.amount-short-box {
+  background: #fef2f2;
+  border: 1px solid #f87171;
+  border-radius: 8px;
+  padding: 7px 10px;
+  margin-top: 6px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #b91c1c;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  animation: pulse-short 0.25s ease-out;
+}
+
+@keyframes pulse-short {
+  0% { transform: scale(0.98); opacity: 0.8; }
+  50% { transform: scale(1.02); }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+.input.input-error {
+  border-color: #ef4444 !important;
+  background-color: #fff5f5 !important;
+  color: #b91c1c !important;
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.18) !important;
+}
+
+.input.input-success {
+  border-color: #10b981 !important;
+  background-color: #f0fdf4 !important;
+  color: #047857 !important;
+}
+
 /* ===== CATEGORY COMBO-BOX ===== */
 .combo-wrap {
   position: relative;
@@ -1954,12 +2010,347 @@ flex-shrink: 0;
   font-weight: 400;
 }
 
-/* ===== RESPONSIVE MEDIA QUERIES ===== */
+/* ===== COMPREHENSIVE RESPONSIVE DESIGN SYSTEM ===== */
 
-/* Tablets & Small Laptops (max-width: 1024px) */
-@media screen and (max-width: 1024px) {
+/* --- Base Fluid Containers & Touch Optimization --- */
+.table-wrap {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: #fff;
+}
+
+.table-wrap::-webkit-scrollbar {
+  height: 6px;
+}
+
+.table-wrap::-webkit-scrollbar-thumb {
+  background: #D8D3C6;
+  border-radius: 4px;
+}
+
+.table-wrap table {
+  min-width: 600px;
+}
+
+/* Subtabs smooth swipe */
+.cust-subtabs {
+  overflow-x: auto;
+  white-space: nowrap;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+
+.cust-subtabs::-webkit-scrollbar {
+  display: none;
+}
+
+/* Category pills smooth swipe */
+.pos-categories {
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+
+.pos-categories::-webkit-scrollbar {
+  display: none;
+}
+
+/* --- 1. Large Laptops & Standard Desktops (max-width: 1200px) --- */
+@media screen and (max-width: 1200px) {
+  .sale-layout {
+    grid-template-columns: 1.25fr 1fr;
+    gap: 12px;
+  }
+
+  .grid-4 {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+/* --- 2. Compact Desktops, POS Monitors & 1024x768 Displays --- */
+@media screen and (max-width: 1100px) and (min-width: 769px), screen and (max-height: 820px) and (min-width: 769px) {
+  .sidebar {
+    width: 62px;
+    flex: 0 0 62px;
+  }
+
+  .sidebar:hover {
+    width: 220px;
+    flex: 0 0 220px;
+  }
+
+  .brand {
+    padding: 12px 10px;
+  }
+
+  .nav {
+    padding: 10px 6px;
+    gap: 6px;
+  }
+
+  .nav-btn {
+    padding: 8px 10px;
+    font-size: 13px;
+    min-height: 38px;
+    gap: 8px;
+  }
+
+  .topbar {
+    height: 48px;
+    flex: 0 0 48px;
+    padding: 0 16px;
+  }
+
+  .topbar-title {
+    font-size: 16.5px;
+  }
+
+  .topbar-right {
+    font-size: 12px;
+    gap: 8px;
+  }
+
+  .topbar-calc-btn,
+  .topbar-bell-btn {
+    width: 32px;
+    height: 32px;
+    font-size: 16px;
+  }
+
+  .view-wrap {
+    padding: 10px 14px 16px;
+  }
+
+  .card {
+    padding: 14px;
+    border-radius: 10px;
+  }
+
+  /* POS Billing View on 1024x768 Desktop */
+  .sale-layout {
+    grid-template-columns: 1.15fr 0.85fr;
+    gap: 10px;
+    min-height: 0;
+    height: calc(100vh - 68px);
+    align-items: stretch;
+  }
+
+  .sale-layout > .card:first-child {
+    height: 100%;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    padding: 10px 12px;
+  }
+
+  .sale-layout > .card:last-child {
+    height: 100%;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    padding: 10px 12px;
+    position: static;
+  }
+
+  .pos-categories {
+    margin-top: 6px;
+    margin-bottom: 6px;
+    padding-bottom: 4px;
+    gap: 5px;
+  }
+
+  .cat-btn {
+    padding: 4px 10px;
+    font-size: 11.5px;
+  }
+
+  .pos-item-grid {
+    grid-template-columns: repeat(auto-fill, minmax(105px, 1fr)) !important;
+    gap: 6px !important;
+    flex: 1;
+    overflow-y: auto;
+    padding-right: 4px;
+    align-content: start;
+  }
+
+  .pos-item-card {
+    min-height: 155px;
+    padding: 5px 6px 8px;
+    border-radius: 8px;
+  }
+
+  .pos-item-img {
+    height: 48px;
+    margin-bottom: 4px;
+  }
+
+  .pos-item-card .item-name {
+    font-size: 11.5px;
+    min-height: 28px;
+    line-height: 1.25;
+    margin-bottom: 2px;
+  }
+
+  .pos-item-card .item-desc {
+    font-size: 10px;
+    margin-bottom: 2px;
+  }
+
+  .pos-item-card .item-price {
+    font-size: 13.5px;
+  }
+
+  .pos-item-card .item-cost {
+    font-size: 9.5px;
+  }
+
+  .pos-item-card .item-qty {
+    font-size: 9.5px;
+    padding: 0 4px;
+  }
+
+  /* Cart panel compact layout */
+  .cart-tabs-bar {
+    margin-bottom: 4px;
+  }
+
+  .cart-tab {
+    padding: 3px 8px;
+    font-size: 11.5px;
+  }
+
+  .cart-list-wrap {
+    flex: 1;
+    max-height: none;
+    overflow-y: auto;
+    margin-bottom: 4px;
+    padding-right: 4px;
+  }
+
+  .cart-row {
+    padding: 5px 0;
+    gap: 4px;
+  }
+
+  .cart-item-name {
+    font-size: 12.5px;
+  }
+
+  .cart-row-price {
+    font-size: 14.5px;
+  }
+
+  .cart-row input[type=number] {
+    width: 65px;
+    height: 30px;
+    padding: 4px 6px;
+    font-size: 13px;
+  }
+
+  .cart-price-input {
+    width: 65px;
+    height: 26px;
+  }
+
+  .selected-cust-card {
+    padding: 5px 8px;
+    margin-top: 4px;
+    font-size: 12px;
+  }
+
+  .totals-box {
+    margin-top: 4px;
+    padding-top: 4px;
+  }
+
+  .totals-line {
+    padding: 2px 0;
+    font-size: 12.5px;
+  }
+
+  .totals-line.grand {
+    font-size: 16.5px;
+    padding-top: 4px;
+    margin-top: 3px;
+  }
+
+  .pay-toggle {
+    margin: 5px 0;
+    gap: 5px;
+  }
+
+  .pay-toggle button {
+    padding: 6px 8px;
+    font-size: 11.5px;
+  }
+
+  /* Dashboard Cards on 1024x768 */
+  .grid-4 {
+    grid-template-columns: repeat(4, 1fr);
+    gap: 10px;
+  }
+
+  .stat-card {
+    padding: 10px 12px;
+    gap: 3px;
+  }
+
+  .stat-label {
+    font-size: 10.5px;
+  }
+
+  .stat-value {
+    font-size: 20px;
+  }
+
+  .stat-sub {
+    font-size: 11px;
+  }
+
+  /* Table & Form sizing */
+  table {
+    font-size: 12.5px;
+  }
+
+  thead th, tbody td {
+    padding: 7px 10px;
+  }
+
+  .input, select.input {
+    padding: 7px 10px;
+    font-size: 13px;
+  }
+
+  .btn {
+    padding: 7px 12px;
+    font-size: 12.5px;
+  }
+
+  .page-header {
+    margin-bottom: 10px;
+  }
+
+  .modal-backdrop {
+    padding: 12px;
+  }
+
+  .modal {
+    max-height: 90vh;
+  }
+
+  .modal-body {
+    padding: 14px 18px;
+  }
+}
+
+/* --- 3. Tablets Portrait & Mobile Devices (max-width: 768px) --- */
+@media screen and (max-width: 768px) {
   .app {
     flex-direction: column;
+    min-height: 100vh;
   }
 
   .sidebar {
@@ -1969,6 +2360,7 @@ flex-shrink: 0;
     position: sticky;
     top: 0;
     z-index: 100;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
   }
 
   .brand-text,
@@ -1979,52 +2371,63 @@ flex-shrink: 0;
   }
 
   .brand {
-    padding: 10px 14px;
-  }
-
-  .sidebar:hover .brand {
-    flex-direction: row;
+    padding: 10px 16px;
+    display: flex;
     align-items: center;
-    text-align: left;
-    gap: 10px;
+    justify-content: flex-start;
+    gap: 12px;
   }
 
-  .sidebar:hover .brand-text {
-    align-items: flex-start;
-    text-align: left;
+  .brand-logo-wrap {
+    max-height: 38px;
+  }
+
+  #brandLogoImg {
+    max-height: 38px;
   }
 
   .nav {
     flex-direction: row;
     overflow-x: auto;
     white-space: nowrap;
-    padding: 6px 10px 10px;
+    padding: 6px 12px 10px;
     gap: 6px;
     -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
     border-top: 1px solid rgba(255, 255, 255, 0.08);
   }
 
+  .nav::-webkit-scrollbar {
+    display: none;
+  }
+
   .nav-btn {
-    padding: 8px 12px;
+    padding: 8px 14px;
     font-size: 13px;
     flex-shrink: 0;
+    min-height: 38px;
+    border-radius: 8px;
+  }
+
+  .sidebar-foot {
+    display: none;
   }
 
   .topbar {
-    padding: 8px 16px;
+    padding: 8px 14px;
     height: auto;
-    min-height: 52px;
-    flex-wrap: wrap;
+    min-height: 50px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
     gap: 8px;
-    position: relative;
-  }
-
-  .topbar-right {
-    flex-wrap: wrap;
+    position: sticky;
+    top: 0;
+    z-index: 90;
   }
 
   .view-wrap {
-    padding: 16px 14px 40px;
+    padding: 14px 12px 40px;
   }
 
   .grid-3 {
@@ -2034,81 +2437,381 @@ flex-shrink: 0;
   .sale-layout {
     grid-template-columns: 1fr;
     height: auto;
+    gap: 14px;
+  }
+
+  .sale-layout > .card:first-child {
+    height: auto;
+    max-height: none;
+    overflow: visible;
+  }
+
+  .sale-layout > .card:last-child {
+    position: static;
   }
 
   .pos-item-grid {
-    grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)) !important;
+    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)) !important;
+    max-height: 480px;
+    overflow-y: auto;
   }
-}
+  .page-header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+    margin-bottom: 14px;
+  }
 
-/* Mobile Devices (max-width: 640px) */
-@media screen and (max-width: 640px) {
+  .page-header-left {
+    justify-content: space-between;
+    width: 100%;
+  }
 
-  .grid-4,
-  .grid-3,
-  .grid-2 {
-    grid-template-columns: 1fr;
+  .page-header-title {
+    font-size: 17px;
+  }
+
+  .page-header-right {
+    width: 100%;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .page-header-right input.input,
+  .page-header-right select.input,
+  .page-header-right input {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    flex: 1 1 180px;
+  }
+
+  .page-header-right .btn {
+    flex: 1 1 auto;
+    justify-content: center;
+    min-height: 38px;
+    white-space: nowrap;
   }
 
   .section-head {
     flex-direction: column;
     align-items: stretch;
+    gap: 10px;
   }
 
-  .section-head>div {
+  .section-head > div {
     flex-wrap: wrap;
     width: 100%;
+    gap: 8px;
   }
 
   .section-head input,
   .section-head select,
   .section-head button {
     width: 100% !important;
+    max-width: 100% !important;
+  }
+
+  /* Modals responsiveness */
+  .modal-backdrop {
+    padding: 10px;
+    align-items: center;
+  }
+
+  .modal {
+    max-width: 100%;
+    width: 100%;
+    max-height: 94vh;
+    border-radius: 12px;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .modal-head {
+    padding: 14px 16px;
+    flex-shrink: 0;
+  }
+
+  .modal-head h3 {
+    font-size: 15px;
+  }
+
+  .modal-body {
+    padding: 14px 16px;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    flex: 1 1 auto;
+  }
+
+  .modal-foot {
+    padding: 12px 16px;
+    flex-shrink: 0;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .modal-foot .btn {
+    flex: 1 1 110px;
+    min-height: 38px;
+  }
+
+  /* Form columns inside modals */
+  .modal .grid-2,
+  .modal .grid-3,
+  .modal .grid-4 {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  /* Toast Notification */
+  .toast {
+    left: 14px;
+    right: 14px;
+    bottom: 16px;
+    max-width: none;
+    text-align: center;
+    border-radius: 10px;
+    padding: 12px 16px;
+  }
+
+  /* Dropdown positioning */
+  .notif-dropdown {
+    position: fixed;
+    left: 12px;
+    right: 12px;
+    top: 56px;
+    width: auto;
+    max-width: none;
+  }
+}
+
+/* --- 4. Mobile Devices (max-width: 640px) --- */
+@media screen and (max-width: 640px) {
+  body {
+    font-size: 14px;
+  }
+
+  .view-wrap {
+    padding: 12px 10px 30px;
+  }
+
+  .grid-4,
+  .grid-3,
+  .grid-2 {
+    grid-template-columns: 1fr;
+    gap: 10px;
   }
 
   .topbar {
-    flex-direction: column;
-    align-items: flex-start;
+    padding: 8px 12px;
+    min-height: 48px;
     gap: 6px;
-    padding: 10px 14px;
   }
 
   .topbar-title {
-    font-size: 17px;
+    font-size: 15.5px;
+    max-width: 170px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  #todayDate {
+    display: none;
   }
 
   .topbar-right {
-    width: 100%;
-    justify-content: space-between;
-    font-size: 12px;
+    gap: 6px;
+  }
+
+  .top-lang-btn {
+    padding: 3px 7px;
+    font-size: 11px;
   }
 
   .stat-card {
-    padding: 14px;
+    padding: 12px 14px;
   }
 
   .stat-value {
     font-size: 22px;
   }
 
-  .modal-dialog {
-    max-width: 96vw;
-    margin: 8px;
+  .card {
     padding: 14px;
+    border-radius: 12px;
   }
 
+  /* POS Billing on Mobile */
   .pos-item-grid {
     grid-template-columns: repeat(auto-fill, minmax(115px, 1fr)) !important;
     gap: 8px !important;
+    max-height: 420px;
   }
 
   .pos-item-card {
-    padding: 7px 7px 10px;
-    min-height: 200px;
+    padding: 6px 6px 10px;
+    min-height: 195px;
+    border-radius: 10px;
   }
 
   .pos-item-img {
-    height: 60px;
+    height: 58px;
+    margin-bottom: 5px;
+  }
+
+  .pos-item-card .item-name {
+    font-size: 12px;
+    min-height: 30px;
+    line-height: 1.3;
+  }
+
+  .pos-item-card .item-price {
+    font-size: 14px;
+  }
+
+  .cart-tabs-wrap {
+    gap: 4px;
+  }
+
+  .cart-tab {
+    padding: 4px 8px;
+    font-size: 11.5px;
+  }
+
+  .cart-row {
+    padding: 10px 0;
+    gap: 6px;
+  }
+
+  .cart-row-top {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+  }
+
+  .cart-row-top .cart-row-price {
+    align-self: flex-end;
+  }
+
+  .cart-row-bottom {
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .cart-item-name {
+    font-size: 13.5px;
+  }
+
+  .pay-toggle {
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+
+  .pay-toggle button {
+    padding: 9px 6px;
+    font-size: 12px;
+    flex: 1 1 30%;
+    min-width: 65px;
+  }
+
+  .totals-line.grand {
+    font-size: 17px;
+  }
+
+  /* Button sizing on mobile */
+  .btn {
+    padding: 9px 12px;
+    font-size: 13px;
+  }
+
+  /* Combo dropdown & suggestions full fit */
+  .combo-dropdown,
+  .cust-suggest,
+  .search-suggest {
+    max-width: 100%;
+  }
+
+  /* Receipt modal dialog */
+  .receipt {
+    max-width: 100%;
+    padding: 6px 4px;
+  }
+}
+
+/* --- 5. Small Mobile Screens (max-width: 420px) --- */
+@media screen and (max-width: 420px) {
+  .brand {
+    padding: 8px 10px;
+    gap: 8px;
+  }
+
+  .brand-mark {
+    width: 32px;
+    height: 32px;
+    font-size: 14px;
+  }
+
+  .brand-text strong {
+    font-size: 14px;
+  }
+
+  .nav {
+    padding: 4px 8px 8px;
+    gap: 4px;
+  }
+
+  .nav-btn {
+    padding: 6px 9px;
+    font-size: 11.5px;
+    gap: 5px;
+  }
+
+  .nav-ico {
+    font-size: 15px;
+    width: 16px;
+  }
+
+  .topbar-title {
+    font-size: 14px;
+    max-width: 130px;
+  }
+
+  .topbar-calc-btn,
+  .topbar-bell-btn {
+    width: 32px;
+    height: 32px;
+    font-size: 16px;
+  }
+
+  .pos-item-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 6px !important;
+  }
+
+  .pos-item-card {
+    min-height: 180px;
+    padding: 5px 5px 8px;
+  }
+
+  .pos-item-img {
+    height: 50px;
+  }
+
+  .cart-row input[type=number] {
+    width: 68px;
+    height: 34px;
+    font-size: 13px;
+  }
+
+  .cart-price-input {
+    width: 68px;
+  }
+
+  .btn-sm {
+    padding: 5px 7px;
+    font-size: 11.5px;
   }
 }
 
@@ -2386,4 +3089,8 @@ flex-shrink: 0;
 .notif-empty-text {
   font-size: 12.5px;
   font-weight: 600;
+}
+
+.cat-badge-click:hover {
+  text-decoration: underline;
 }

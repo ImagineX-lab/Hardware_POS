@@ -265,13 +265,25 @@ Views.sale = {
             </div>
           </div>
 
-          <!-- Amount Paid & Change Due for Cash -->
+          <!-- Amount Paid & Change Due / Short for Cash -->
           <div class="field" id="amountPaidWrap" style="display:${Views.sale.payType === 'cash' ? 'block' : 'none'}; margin-bottom:4px;">
             <label class="field-label" style="margin-bottom:2px; font-size:12px;">${t('sale_amount_paid')}</label>
-            <input class="input" id="saleAmountPaid" type="number" min="0" step="any" placeholder="0.00" value="${Views.sale.amountPaid || ''}" style="height:36px; padding:6px 10px; font-size:15px;">
-            <div id="changeDueWrap" class="change-due-box" style="display:${(Number(Views.sale.amountPaid) > 0) ? 'flex' : 'none'}; margin-top:4px; padding:6px 10px;">
-              <span style="font-size:13px;">${t('sale_change_due')}</span>
-              <span id="changeDueAmount" style="font-size:15px; font-weight:700;">${fmt(Math.max(0, (Number(Views.sale.amountPaid) || 0) - Views.sale.calcTotal()))}</span>
+            <input class="input" id="saleAmountPaid" type="number" min="0" step="any" placeholder="0.00" value="${Views.sale.amountPaid || ''}" style="height:36px; padding:6px 10px; font-size:15px;" autocomplete="off">
+            
+            <!-- Message when amount paid is less than total -->
+            <div id="amountShortWrap" class="amount-short-box" style="display:none; margin-top:4px; padding:6px 10px;">
+              <span style="font-size:12px; display:inline-flex; align-items:center; gap:4px;">
+                <i class="ph ph-warning-circle" style="font-size:15px;"></i> මුදල අඩුයි!
+              </span>
+              <span style="font-size:13.5px; font-weight:800;">තව රු. <span id="amountShortAmount">0.00</span> ක් මදි</span>
+            </div>
+
+            <!-- Message when amount paid is sufficient / Change due -->
+            <div id="changeDueWrap" class="change-due-box" style="display:none; margin-top:4px; padding:6px 10px;">
+              <span style="font-size:12.5px; display:inline-flex; align-items:center; gap:4px;">
+                <i class="ph ph-check-circle" style="font-size:15px;"></i> ${t('sale_change_due')}
+              </span>
+              <span id="changeDueAmount" style="font-size:14.5px; font-weight:700;">0.00</span>
             </div>
           </div>
 
@@ -414,7 +426,11 @@ Views.sale = {
               <div class="cart-row-price" style="font-size:16px; font-weight:700; color:var(--primary-dark);">
                 ${fmt(lineTotal)}
               </div>
-              ${isDiscounted ? `<div style="font-size:10.5px; color:var(--success); font-weight:600;" title="මුල් මිල: Rs ${fmt(origPrice)} | එකකට රු. ${fmt(effectiveDisc)} අඩුවුණා">(-${fmt(effectiveDisc * l.qty)})</div>` : ''}
+              ${isDiscounted ? `
+                <div style="font-size:11px; color:var(--success); font-weight:700; display:flex; align-items:center; justify-content:flex-end; gap:4px;" title="මුල් මිල: Rs ${fmt(origPrice)} | එකකට රු. ${fmt(effectiveDisc)} අඩුවුණා">
+                  <span style="font-size:10px; color:#b45309; background:#fef3c7; border:1px solid #fde68a; border-radius:3px; padding:0 4px; font-weight:700;">අඩුයි</span>
+                  <span>(-${fmt(effectiveDisc * l.qty)})</span>
+                </div>` : ''}
             </div>
           </div>
         </div>
@@ -467,15 +483,43 @@ Views.sale = {
   },
 
   updateChangeDue() {
-    const paid = Number(document.getElementById('saleAmountPaid')?.value) || Number(Views.sale.amountPaid) || 0;
-    Views.sale.amountPaid = paid > 0 ? paid : '';
+    const paidInput = document.getElementById('saleAmountPaid');
+    const paidVal = paidInput ? paidInput.value.trim() : (Views.sale.amountPaid !== undefined && Views.sale.amountPaid !== '' ? String(Views.sale.amountPaid).trim() : '');
+    const paid = Number(paidVal) || 0;
+    Views.sale.amountPaid = paidVal !== '' ? paidVal : '';
     const total = Views.sale.calcTotal();
-    const change = Math.max(0, paid - total);
-    const wrap = document.getElementById('changeDueWrap');
-    const amtEl = document.getElementById('changeDueAmount');
-    if (wrap && amtEl) {
-      wrap.style.display = paid > 0 ? 'flex' : 'none';
-      amtEl.textContent = fmt(change);
+
+    const changeWrap = document.getElementById('changeDueWrap');
+    const shortWrap = document.getElementById('amountShortWrap');
+    const changeAmtEl = document.getElementById('changeDueAmount');
+    const shortAmtEl = document.getElementById('amountShortAmount');
+
+    if (paidInput) {
+      paidInput.classList.remove('input-error', 'input-success');
+    }
+
+    if (!paidVal || isNaN(paid) || paid <= 0) {
+      if (changeWrap) changeWrap.style.display = 'none';
+      if (shortWrap) shortWrap.style.display = 'none';
+      return;
+    }
+
+    if (total > 0 && paid < total) {
+      const shortDiff = total - paid;
+      if (changeWrap) changeWrap.style.display = 'none';
+      if (shortWrap) {
+        shortWrap.style.display = 'flex';
+        if (shortAmtEl) shortAmtEl.textContent = fmt(shortDiff);
+      }
+      if (paidInput) paidInput.classList.add('input-error');
+    } else {
+      const change = Math.max(0, paid - total);
+      if (shortWrap) shortWrap.style.display = 'none';
+      if (changeWrap) {
+        changeWrap.style.display = 'flex';
+        if (changeAmtEl) changeAmtEl.textContent = fmt(change);
+      }
+      if (paidInput) paidInput.classList.add('input-success');
     }
   },
 
@@ -993,17 +1037,12 @@ Views.sale = {
             if (typeof target.select === 'function') target.select();
           } else {
             const activeBtn = Views.sale.payType === 'cash' ? payCashBtn : payCreditBtn;
-            if (activeBtn) {
-              activeBtn.focus();
-            } else {
-              const lastIdx = cart.length - 1;
-              const targetInp = document.querySelector(`[data-discount-idx="${lastIdx}"]`) || document.querySelector(`[data-qty-idx="${lastIdx}"]`);
-              if (targetInp) { targetInp.focus(); if (typeof targetInp.select === 'function') targetInp.select(); }
-            }
+            if (activeBtn) activeBtn.focus();
           }
         }
       });
     }
+
 
     const clearCartBtn = document.getElementById('clearCartBtn');
     if (clearCartBtn) {
@@ -1419,6 +1458,7 @@ Views.sale = {
     if (paidWrap) paidWrap.style.display = type === 'cash' ? 'block' : 'none';
     const custField = document.getElementById('customerSelectionField');
     if (custField) custField.style.display = type === 'credit' ? 'block' : 'none';
+    Views.sale.updateChangeDue();
   },
 
   addToCart(itemId) {
@@ -2048,10 +2088,39 @@ Views.sale = {
     }
 
     const itemDiscounts = Views.sale.calcItemDiscounts();
-    const overallDiscount = Number(document.getElementById('saleDiscount').value) || 0;
+    const overallDiscount = Number(document.getElementById('saleDiscount')?.value) || 0;
     const discount = overallDiscount + itemDiscounts;
-    const amountPaid = Number(document.getElementById('saleAmountPaid')?.value) || Number(Views.sale.amountPaid) || 0;
     const total = Views.sale.calcTotal();
+    const paidInput = document.getElementById('saleAmountPaid');
+    const paidVal = paidInput ? paidInput.value.trim() : (Views.sale.amountPaid !== undefined && Views.sale.amountPaid !== '' ? String(Views.sale.amountPaid).trim() : '');
+    const amountPaid = Number(paidVal) || 0;
+
+    // Validate cash payment: Must be entered and must not be less than total
+    if (payType === 'cash') {
+      if (total > 0) {
+        if (!paidVal || isNaN(amountPaid) || amountPaid <= 0) {
+          toast(`කරුණාකර ලැබුණු මුදල ඇතුළත් කරන්න! (නියමිත මුදල: රු. ${fmt(total)})`, 'err');
+          if (paidInput) {
+            paidInput.classList.add('input-error');
+            paidInput.focus();
+            if (typeof paidInput.select === 'function') paidInput.select();
+          }
+          return;
+        }
+
+        if (amountPaid < total) {
+          const shortDiff = total - amountPaid;
+          toast(`ලැබුණු මුදල අඩුයි! බිල මුද්‍රණය කළ නොහැක. (තව රු. ${fmt(shortDiff)} ක් අවශ්‍යයි)`, 'err');
+          if (paidInput) {
+            paidInput.classList.add('input-error');
+            paidInput.focus();
+            if (typeof paidInput.select === 'function') paidInput.select();
+          }
+          return;
+        }
+      }
+    }
+
     const changeAmount = Math.max(0, amountPaid - total);
 
     const lines = cart.map(l => ({
@@ -2091,27 +2160,31 @@ Views.sale = {
   getReceiptHTML(sale) {
     const shopName = (DB.data.settings && DB.data.settings.shopName) || 'HardwarePOS';
     const shopDesc = (DB.data.settings && DB.data.settings.shopDescription) || '';
+    const logo = (DB.data.settings && DB.data.settings.logo) || '';
+    const rawLogoSize = Number(DB.data.settings && DB.data.settings.logoSize) || 45;
+    const logoSize = Math.min(Math.max(rawLogoSize * 1.5, 65), 100);
 
     return `
       <div class="receipt" id="printArea">
+        ${logo ? `<div style="text-align:center; margin-bottom:6px;"><img class="receipt-logo" src="${logo}" alt="Logo" style="height:${logoSize}px; max-height:95px; max-width:220px; object-fit:contain; margin:0 auto; display:block;"></div>` : ''}
         <h2>${escapeHTML(shopName)}</h2>
-        ${shopDesc ? `<div class="r-center" style="font-size:10px; color:#222; margin-bottom:3px; white-space:pre-line;">${escapeHTML(shopDesc)}</div>` : ''}
+        ${shopDesc ? `<div class="r-center" style="font-size:9.5px; color:#222; margin-bottom:3px; white-space:pre-line;">${escapeHTML(shopDesc)}</div>` : ''}
         
-        <div style="border-top:1px dashed #000; border-bottom:1px dashed #000; padding:3px 0; margin:3px 0; font-size:10.5px;">
-          <div style="display:flex; justify-content:space-between; align-items:center; gap:2px;">
+        <div style="border-top:1px dashed #000; border-bottom:1px dashed #000; padding:2px 0; margin:3px 0; font-size:10px; width:100%; box-sizing:border-box;">
+          <div style="display:flex; justify-content:space-between; align-items:center; width:100%;">
             <span><b>INVOICE #${sale.id}</b></span>
-            <span style="font-size:10px;">${(()=>{ const d=new Date(sale.date); return d.toLocaleDateString('en-GB') + ' ' + d.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}); })()}</span>
+            <span style="font-size:9.5px;">${(()=>{ const d=new Date(sale.date); return d.toLocaleDateString('en-GB') + ' ' + d.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}); })()}</span>
           </div>
-          ${sale.customerName ? `<div style="margin-top:2px; font-size:10px;">ගනුදෙනුකරු: <b>${escapeHTML(sale.customerName)}</b></div>` : ''}
+          ${sale.customerName ? `<div style="margin-top:2px; font-size:9.5px;">ගනුදෙනුකරු: <b>${escapeHTML(sale.customerName)}</b></div>` : ''}
         </div>
 
-        <table style="width:100%; border-collapse:collapse; margin:3px 0; font-size:10px; table-layout:fixed;">
+        <table style="width:100%; border-collapse:collapse; margin:2px 0; font-size:9.5px; table-layout:fixed; box-sizing:border-box;">
           <thead>
             <tr style="border-bottom:1px dashed #000;">
-              <th style="text-align:left; padding-bottom:2px; width:44%;">විස්තරය (Item)</th>
-              <th style="text-align:center; width:17%; padding-bottom:2px;">ගණන</th>
-              <th style="text-align:right; width:19%; padding-bottom:2px;">මිල</th>
-              <th style="text-align:right; width:20%; padding-bottom:2px;">එකතුව</th>
+              <th style="text-align:left; padding:2px 0; width:36%;">විස්තරය</th>
+              <th style="text-align:center; width:20%; padding:2px 0;">ගණන</th>
+              <th style="text-align:right; width:20%; padding:2px 0;">මිල</th>
+              <th style="text-align:right; width:24%; padding:2px 0;">එකතුව</th>
             </tr>
           </thead>
           <tbody>
@@ -2121,21 +2194,21 @@ Views.sale = {
               const lineTot = l.qty * l.unitPrice;
               return `
                 <tr>
-                  <td colspan="4" style="padding-top:3px; font-weight:700; color:#000; font-size:10.5px; word-break:break-word;">${escapeHTML(l.name)}</td>
+                  <td colspan="4" style="padding-top:2px; font-weight:700; color:#000; font-size:10px; word-break:break-word;">${escapeHTML(l.name)}</td>
                 </tr>
                 <tr style="border-bottom:1px dotted #ccc;">
-                  <td style="padding-bottom:3px; font-size:9.5px; color:#555; word-break:break-word;">
+                  <td style="padding-bottom:2px; font-size:9px; color:#444; word-break:break-word;">
                     ${l.looseInfo ? `[ලිහිල්: ${escapeHTML(l.looseInfo.shortText || '')}]` : ''}
-                    ${hasDisc ? `[Disc: -${fmt(origPrice - l.unitPrice)}]` : ''}
+                    ${hasDisc ? `[Disc: -${(origPrice - l.unitPrice).toLocaleString('en-LK', {minimumFractionDigits:2})}]` : ''}
                   </td>
-                  <td style="text-align:center; padding-bottom:3px; font-size:10px; white-space:nowrap;">
+                  <td style="text-align:center; padding-bottom:2px; font-size:9.5px; white-space:nowrap;">
                     ${l.looseInfo ? `${l.looseInfo.looseQty} ${escapeHTML(l.looseInfo.looseUnit)}` : `${l.qty} ${escapeHTML(l.unit || '')}`}
                   </td>
-                  <td style="text-align:right; padding-bottom:3px; font-size:10px; white-space:nowrap;">
+                  <td style="text-align:right; padding-bottom:2px; font-size:9.5px; white-space:nowrap;">
                     ${(l.unitPrice).toLocaleString('en-LK', {minimumFractionDigits:2, maximumFractionDigits:2})}
                   </td>
-                  <td style="text-align:right; padding-bottom:3px; font-weight:700; font-size:10.5px; white-space:nowrap;">
-                    ${fmt(lineTot)}
+                  <td style="text-align:right; padding-bottom:2px; font-weight:700; font-size:9.5px; white-space:nowrap;">
+                    ${(lineTot).toLocaleString('en-LK', {minimumFractionDigits:2, maximumFractionDigits:2})}
                   </td>
                 </tr>
               `;
@@ -2143,14 +2216,14 @@ Views.sale = {
           </tbody>
         </table>
 
-        <div style="border-top:1px dashed #000; padding-top:3px; margin-top:3px;">
+        <div style="border-top:1px dashed #000; padding-top:2px; margin-top:2px; width:100%; box-sizing:border-box;">
           <div class="receipt-totals-row"><span>${t('sale_subtotal')} (Subtotal):</span><span>${fmt(sale.subtotal)}</span></div>
           ${sale.discount > 0 ? `<div class="receipt-totals-row"><span>${t('sale_discount')} (Discount):</span><span>- ${fmt(sale.discount)}</span></div>` : ''}
           <div class="receipt-totals-row grand">
-            <span style="font-size:12px; font-weight:800;">ශුද්ධ එකතුව (TOTAL):</span>
-            <span style="font-size:13.5px; font-weight:800;">${fmt(sale.total)}</span>
+            <span style="font-size:11px; font-weight:800;">ශුද්ධ එකතුව (TOTAL):</span>
+            <span style="font-size:12px; font-weight:800;">${fmt(sale.total)}</span>
           </div>
-          <div class="receipt-totals-row" style="margin-top:2px;">
+          <div class="receipt-totals-row" style="margin-top:1px;">
             <span>ගෙවීම් ක්‍රමය (Payment):</span>
             <b>${sale.paymentType === 'credit' ? `ණයට (Credit) - ${escapeHTML(sale.customerName || '')}` : 'මුදල් (Cash)'}</b>
           </div>
@@ -2160,12 +2233,12 @@ Views.sale = {
           ` : ''}
         </div>
 
-        <div style="text-align:center; margin-top:6px; border-top:1px dashed #000; padding-top:5px;">
-          <div style="font-weight:700; font-size:11px; margin-bottom:2px;">${t('receipt_thanks')}</div>
-          <div style="font-size:9px; color:#222; margin-bottom:4px; line-height:1.3;">භාණ්ඩ ආපසු භාරදීමේදී මෙම බිල්පත ඉදිරිපත් කිරීම අනිවාර්ය වේ.</div>
+        <div style="text-align:center; margin-top:4px; border-top:1px dashed #000; padding-top:4px;">
+          <div style="font-weight:700; font-size:10px; margin-bottom:1px;">${t('receipt_thanks')}</div>
+          <div style="font-size:8.5px; color:#222; margin-bottom:3px; line-height:1.25;">භාණ්ඩ ආපසු භාරදීමේදී මෙම බිල්පත ඉදිරිපත් කිරීම අනිවාර්ය වේ.</div>
           
-          <div style="margin:4px 0; display:flex; flex-direction:column; align-items:center; justify-content:center;">
-            ${typeof BarcodeSystem !== 'undefined' ? BarcodeSystem.generateCode128SVG(sale.barcode || ('BILL-' + sale.id), { width: 160, height: 38, fontSize: 9 }) : ''}
+          <div style="margin:3px 0; display:flex; flex-direction:column; align-items:center; justify-content:center;">
+            ${typeof BarcodeSystem !== 'undefined' ? BarcodeSystem.generateCode128SVG(sale.barcode || ('BILL-' + sale.id), { width: 140, height: 32, fontSize: 8 }) : ''}
           </div>
           <div style="font-size:9.5px; font-weight:700; color:#000; margin-top:5px; text-align:center; letter-spacing:0.2px;">
             ImagineX Software Solution - 0761945587
@@ -2229,15 +2302,43 @@ Views.sale = {
 /* ================= ITEMS ================= */
 Views.items = {
   searchQ: '',
+  selectedCategory: 'all',
+  groupByCategory: false,
+
   render() {
+    const allItems = DB.allItems();
+    const categories = [...new Set(allItems.map(i => (i.category || '').trim()).filter(Boolean))].sort();
+    const catCounts = {};
+    allItems.forEach(i => {
+      const c = (i.category || '').trim() || 'වෙනත්';
+      catCounts[c] = (catCounts[c] || 0) + 1;
+    });
+
+    const currentCat = Views.items.selectedCategory || 'all';
+
     return `
       ${Views.renderPageHeader({
       icon: 'ph-package',
       title: t('items_list'),
-      count: DB.allItems().length,
+      count: allItems.length,
       search: { id: 'itemsSearch', placeholder: t('search_placeholder'), value: Views.items.searchQ },
       actions: [{ id: 'addItemBtn', label: t('items_add_btn'), cls: 'btn-primary' }]
     })}
+
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; gap:12px; flex-wrap:wrap;">
+        <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+          <select class="input" id="itemsCategorySelect" style="width:190px; cursor:pointer;" title="කාණ්ඩය අනුව තෝරන්න">
+            <option value="all" ${currentCat === 'all' ? 'selected' : ''}>📁 සියලුම කාණ්ඩ (${allItems.length})</option>
+            ${categories.map(c => `<option value="${escapeHTML(c)}" ${currentCat === c ? 'selected' : ''}>📁 ${escapeHTML(c)} (${catCounts[c] || 0})</option>`).join('')}
+            ${catCounts['වෙනත්'] ? `<option value="වෙනත්" ${currentCat === 'වෙනත්' ? 'selected' : ''}>🏷️ වෙනත් (${catCounts['වෙනත්']})</option>` : ''}
+          </select>
+
+          <button class="btn btn-sm ${Views.items.groupByCategory ? 'btn-primary' : 'btn-outline'}" id="itemsGroupByToggle" title="කාණ්ඩ අනුව වෙන් කර බලන්න" style="height:36px; padding:0 12px; display:inline-flex; align-items:center; gap:6px;">
+            <i class="ph ph-squares-four" style="font-size:16px;"></i> ${Views.items.groupByCategory ? 'කාණ්ඩ අනුව (ක්‍රියාත්මකයි)' : 'කාණ්ඩ අනුව වෙන්කරන්න'}
+          </button>
+        </div>
+      </div>
+
       <div id="itemsTableWrap">${Views.items.tableHTML()}</div>
     `;
   },
@@ -2245,8 +2346,95 @@ Views.items = {
   tableHTML() {
     let list = DB.allItems();
     const q = (Views.items.searchQ || '').trim();
-    if (q) list = list.filter(i => Singlish.match(i.name, q) || Singlish.match(i.category || '', q) || Singlish.match(i.description || '', q) || (i.barcode && i.barcode.toLowerCase().includes(q.toLowerCase())));
-    if (!list.length) return `<div class="card"><div class="empty-state"><div class="em-ico"><i class="ph ph-package"></i></div><h3>${t('items_no_items')}</h3><div class="small">${t('items_no_items_sub')}</div></div></div>`;
+    if (q) list = list.filter(i => Singlish.match(i.name, q) || Singlish.match(i.category || '', q) || Singlish.match(i.subCategory || '', q) || Singlish.match(i.description || '', q) || (i.barcode && i.barcode.toLowerCase().includes(q.toLowerCase())));
+
+    const currentCat = Views.items.selectedCategory || 'all';
+    if (currentCat !== 'all') {
+      if (currentCat === 'වෙනත්') {
+        list = list.filter(i => !i.category || (i.category || '').trim() === 'වෙනත්' || (i.category || '').trim() === '');
+      } else {
+        list = list.filter(i => (i.category || '').trim() === currentCat);
+      }
+    }
+
+    if (!list.length) return `<div class="card"><div class="empty-state"><div class="em-ico"><i class="ph ph-package"></i></div><h3>${t('items_no_items')}</h3><div class="small">${currentCat !== 'all' ? `"${escapeHTML(currentCat)}" කාණ්ඩයේ භාණ්ඩ කිසිවක් නැත.` : t('items_no_items_sub')}</div></div></div>`;
+
+    const renderRow = (i) => {
+      const status = i.qty <= 0 ? `<span class="pill pill-danger">${t('status_out')}</span>`
+        : i.qty <= i.reorderLevel ? `<span class="pill pill-warn">${t('status_low')}</span>`
+          : `<span class="pill pill-ok">${t('status_ok')}</span>`;
+      return `
+        <tr>
+          <td>
+            <div style="width:36px; height:36px; border-radius:6px; overflow:hidden; background:var(--paper); display:flex; align-items:center; justify-content:center; border:1px solid var(--border);">
+              ${i.image ? `<img src="${i.image}" style="width:100%; height:100%; object-fit:cover;">` : `<i class="ph ph-package" style="font-size:18px;"></i>`}
+            </div>
+          </td>
+          <td>
+            <b>${escapeHTML(i.name)}</b>
+            ${i.barcode ? `<div style="font-size:11px; font-family:monospace; color:var(--primary); font-weight:700;"><i class="ph ph-barcode"></i> ${escapeHTML(i.barcode)}</div>` : ''}
+          </td>
+          <td>
+            <span class="cat-badge-click" data-cat-click="${escapeHTML(i.category || 'වෙනත්')}" title="මෙම කාණ්ඩය පමණක් බලන්න" style="cursor:pointer; display:inline-flex; align-items:center; gap:4px; font-weight:600; color:var(--primary);">
+              <i class="ph ph-folder" style="font-size:13px;"></i> ${escapeHTML(i.category || 'වෙනත්')}
+            </span>
+            ${i.subCategory ? `<div style="font-size:11px; color:var(--steel); margin-top:2px;">↳ ${escapeHTML(i.subCategory)}</div>` : ''}
+          </td>
+          <td class="num">${fmt(i.costPrice)}</td>
+          <td class="num">${fmt(i.sellPrice)}</td>
+          <td class="num">${i.qty} ${escapeHTML(i.unit)}</td>
+          <td>${status}</td>
+          <td>
+            <button class="icon-btn" data-print-barcode="${i.id}" title="${t('barcode_print_label') || 'Print Barcode'}"><i class="ph ph-barcode"></i></button>
+            <button class="icon-btn" data-edit-item="${i.id}" title="${t('items_edit')}">✎</button>
+            <button class="icon-btn" data-del-item="${i.id}" title="${t('delete')}"><i class="ph ph-trash"></i></button>
+          </td>
+        </tr>`;
+    };
+
+    if (Views.items.groupByCategory) {
+      const groups = {};
+      list.forEach(i => {
+        const cat = (i.category || '').trim() || 'වෙනත්';
+        if (!groups[cat]) groups[cat] = [];
+        groups[cat].push(i);
+      });
+
+      const catKeys = Object.keys(groups).sort();
+      return catKeys.map(cat => {
+        const catItems = groups[cat];
+        const catTotalQty = catItems.reduce((acc, it) => acc + (Number(it.qty) || 0), 0);
+        const catTotalVal = catItems.reduce((acc, it) => acc + ((Number(it.costPrice) || 0) * (Number(it.qty) || 0)), 0);
+
+        return `
+          <div class="category-group-card" style="margin-bottom:20px; background:var(--card); border:1px solid var(--border); border-radius:var(--radius); overflow:hidden; box-shadow:0 1px 3px rgba(0,0,0,0.05);">
+            <div style="background:var(--paper); padding:10px 16px; display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border); flex-wrap:wrap; gap:8px;">
+              <div style="display:flex; align-items:center; gap:8px;">
+                <i class="ph ph-folder-open" style="font-size:18px; color:var(--primary);"></i>
+                <h3 style="margin:0; font-size:15px; font-weight:700; color:var(--charcoal);">${escapeHTML(cat)}</h3>
+                <span class="pill pill-ok" style="font-size:11px; padding:1px 8px;">${catItems.length} items</span>
+              </div>
+              <div style="font-size:12px; color:var(--steel); display:flex; gap:14px;">
+                <span>තොග ප්‍රමාණය: <b style="color:var(--charcoal);">${catTotalQty}</b></span>
+                <span>තොග වටිනාකම: <b style="color:var(--primary);">${fmt(catTotalVal)}</b></span>
+              </div>
+            </div>
+            <div class="table-wrap" style="border:none; border-radius:0;">
+              <table>
+                <thead><tr>
+                  <th style="width:46px;">Photo</th><th>${t('items_name')}</th><th>${t('items_category')}</th><th class="num">${t('items_cost_price')}</th><th class="num">${t('items_sell_price')}</th>
+                  <th class="num">${t('word_qty')}</th><th>${t('items_status')}</th><th></th>
+                </tr></thead>
+                <tbody>
+                  ${catItems.map(renderRow).join('')}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
     return `
       <div class="table-wrap">
         <table>
@@ -2255,33 +2443,7 @@ Views.items = {
             <th class="num">${t('word_qty')}</th><th>${t('items_status')}</th><th></th>
           </tr></thead>
           <tbody>
-            ${list.map(i => {
-      const status = i.qty <= 0 ? `<span class="pill pill-danger">${t('status_out')}</span>`
-        : i.qty <= i.reorderLevel ? `<span class="pill pill-warn">${t('status_low')}</span>`
-          : `<span class="pill pill-ok">${t('status_ok')}</span>`;
-      return `
-              <tr>
-                <td>
-                  <div style="width:36px; height:36px; border-radius:6px; overflow:hidden; background:var(--paper); display:flex; align-items:center; justify-content:center; border:1px solid var(--border);">
-                    ${i.image ? `<img src="${i.image}" style="width:100%; height:100%; object-fit:cover;">` : `<i class="ph ph-package" style="font-size:18px;"></i>`}
-                  </div>
-                </td>
-                <td>
-                  <b>${escapeHTML(i.name)}</b>
-                  ${i.barcode ? `<div style="font-size:11px; font-family:monospace; color:var(--primary); font-weight:700;"><i class="ph ph-barcode"></i> ${escapeHTML(i.barcode)}</div>` : ''}
-                </td>
-                <td class="text-muted">${escapeHTML(i.category)}</td>
-                <td class="num">${fmt(i.costPrice)}</td>
-                <td class="num">${fmt(i.sellPrice)}</td>
-                <td class="num">${i.qty} ${escapeHTML(i.unit)}</td>
-                <td>${status}</td>
-                <td>
-                  <button class="icon-btn" data-print-barcode="${i.id}" title="${t('barcode_print_label') || 'Print Barcode'}"><i class="ph ph-barcode"></i></button>
-                  <button class="icon-btn" data-edit-item="${i.id}" title="${t('items_edit')}">✎</button>
-                  <button class="icon-btn" data-del-item="${i.id}" title="${t('delete')}"><i class="ph ph-trash"></i></button>
-                </td>
-              </tr>`;
-    }).join('')}
+            ${list.map(renderRow).join('')}
           </tbody>
         </table>
       </div>
@@ -2810,16 +2972,66 @@ Views.items = {
     });
   },
 
-  bind() {
-    document.getElementById('addItemBtn').addEventListener('click', Views.items.openAddModal);
-    const search = document.getElementById('itemsSearch');
-    search.addEventListener('input', () => {
-      Views.items.searchQ = search.value;
-      document.getElementById('itemsTableWrap').innerHTML = Views.items.tableHTML();
+  refreshItemsView() {
+    const currentCat = Views.items.selectedCategory || 'all';
+    const catSelect = document.getElementById('itemsCategorySelect');
+    if (catSelect) catSelect.value = currentCat;
+
+    const groupToggle = document.getElementById('itemsGroupByToggle');
+    if (groupToggle) {
+      groupToggle.className = `btn btn-sm ${Views.items.groupByCategory ? 'btn-primary' : 'btn-outline'}`;
+      groupToggle.innerHTML = `<i class="ph ph-squares-four" style="font-size:16px;"></i> ${Views.items.groupByCategory ? 'කාණ්ඩ අනුව (ක්‍රියාත්මකයි)' : 'කාණ්ඩ අනුව වෙන්කරන්න'}`;
+    }
+
+    const wrap = document.getElementById('itemsTableWrap');
+    if (wrap) {
+      wrap.innerHTML = Views.items.tableHTML();
       Views.items.bindRowActions();
+      Views.items.bindCategoryRowClicks();
+    }
+  },
+
+  bindCategoryRowClicks() {
+    document.querySelectorAll('[data-cat-click]').forEach(el => {
+      el.addEventListener('click', (e) => {
+        e.stopPropagation();
+        Views.items.selectedCategory = el.dataset.catClick;
+        Views.items.refreshItemsView();
+      });
     });
+  },
+
+  bind() {
+    document.getElementById('addItemBtn')?.addEventListener('click', Views.items.openAddModal);
+    const search = document.getElementById('itemsSearch');
+    if (search) {
+      search.addEventListener('input', () => {
+        Views.items.searchQ = search.value;
+        document.getElementById('itemsTableWrap').innerHTML = Views.items.tableHTML();
+        Views.items.bindRowActions();
+        Views.items.bindCategoryRowClicks();
+      });
+      setTimeout(() => search.focus(), 100);
+    }
+
+    const catSelect = document.getElementById('itemsCategorySelect');
+    if (catSelect) {
+      catSelect.addEventListener('change', (e) => {
+        Views.items.selectedCategory = e.target.value;
+        Views.items.refreshItemsView();
+      });
+    }
+
+    const groupToggle = document.getElementById('itemsGroupByToggle');
+    if (groupToggle) {
+      groupToggle.addEventListener('click', () => {
+        Views.items.groupByCategory = !Views.items.groupByCategory;
+        Views.items.refreshItemsView();
+      });
+    }
+
     Views.items.bindRowActions();
-    setTimeout(() => search.focus(), 100);
+    Views.items.bindCategoryRowClicks();
   },
   bindRowActions() {
     document.querySelectorAll('[data-print-barcode]').forEach(b => {
@@ -2842,18 +3054,18 @@ Views.items = {
   }
 };
 
+
 /* ================= STOCK REPORT & LOW STOCK ================= */
 Views.stock = {
   activeTab: 'items', // 'items' | 'report'
   itemsSearchQ: '',
   reportSearchQ: '',
   filterType: 'all', // 'all' | 'low'
+  selectedCategory: 'all',
+  groupByCategory: false,
+  reportCategory: 'all',
 
   render() {
-    const allItems = DB.allItems();
-    const lowItems = DB.lowStockItems();
-    const totalValue = DB.stockValue();
-
     return `
       <div class="page-header" style="margin-bottom: 12px;">
         <div class="page-header-left">
@@ -2862,7 +3074,7 @@ Views.stock = {
         </div>
       </div>
 
-      <div class="tabs-nav mb-20" style="display:flex; gap:10px; margin-bottom:20px; border-bottom:1px solid var(--border); padding-bottom:8px;">
+      <div class="tabs-nav mb-20" style="display:flex; gap:10px; margin-bottom:16px; border-bottom:1px solid var(--border); padding-bottom:8px;">
         <button class="btn btn-sm ${Views.stock.activeTab === 'items' ? 'btn-primary' : 'btn-outline'}" id="stockTabItemsBtn">📦 භාණ්ඩ ලැයිස්තුව (Items List)</button>
         <button class="btn btn-sm ${Views.stock.activeTab === 'report' ? 'btn-primary' : 'btn-outline'}" id="stockTabReportBtn">📊 තොග වාර්තාව (Stock Report)</button>
       </div>
@@ -2874,11 +3086,37 @@ Views.stock = {
   },
 
   itemsTabHTML() {
+    const allItems = DB.allItems();
+    const categories = [...new Set(allItems.map(i => (i.category || '').trim()).filter(Boolean))].sort();
+    
+    // Calculate counts per category
+    const catCounts = {};
+    allItems.forEach(i => {
+      const c = (i.category || '').trim() || 'වෙනත්';
+      catCounts[c] = (catCounts[c] || 0) + 1;
+    });
+
+    const currentCat = Views.stock.selectedCategory || 'all';
+
     return `
-      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; gap:16px; flex-wrap:wrap;">
-        <input class="input" id="itemsSearch" placeholder="🔍 සොයන්න (නම, කාණ්ඩය...)" style="width:260px" value="${escapeHTML(Views.stock.itemsSearchQ || '')}">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; gap:12px; flex-wrap:wrap;">
+        <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap; flex:1;">
+          <input class="input" id="itemsSearch" placeholder="🔍 සොයන්න (නම, කාණ්ඩය, barcode...)" style="width:230px" value="${escapeHTML(Views.stock.itemsSearchQ || '')}">
+          
+          <select class="input" id="itemsCategorySelect" style="width:190px; cursor:pointer;" title="කාණ්ඩය අනුව තෝරන්න">
+            <option value="all" ${currentCat === 'all' ? 'selected' : ''}>📁 සියලුම කාණ්ඩ (${allItems.length})</option>
+            ${categories.map(c => `<option value="${escapeHTML(c)}" ${currentCat === c ? 'selected' : ''}>📁 ${escapeHTML(c)} (${catCounts[c] || 0})</option>`).join('')}
+            ${catCounts['වෙනත්'] ? `<option value="වෙනත්" ${currentCat === 'වෙනත්' ? 'selected' : ''}>🏷️ වෙනත් (${catCounts['වෙනත්']})</option>` : ''}
+          </select>
+
+          <button class="btn btn-sm ${Views.stock.groupByCategory ? 'btn-primary' : 'btn-outline'}" id="itemsGroupByToggle" title="කාණ්ඩ අනුව වෙන් කර බලන්න" style="height:36px; padding:0 12px; display:inline-flex; align-items:center; gap:6px;">
+            <i class="ph ph-squares-four" style="font-size:16px;"></i> ${Views.stock.groupByCategory ? 'කාණ්ඩ අනුව (ක්‍රියාත්මකයි)' : 'කාණ්ඩ අනුව වෙන්කරන්න'}
+          </button>
+        </div>
+
         <button class="btn btn-primary" id="addItemBtn">＋ අලුත් භාණ්ඩයක් එක් කරන්න</button>
       </div>
+
       <div id="itemsTableWrap">${Views.stock.itemsTableHTML()}</div>
     `;
   },
@@ -2887,14 +3125,21 @@ Views.stock = {
     const allItems = DB.allItems();
     const lowItems = DB.lowStockItems();
     const totalValue = DB.stockValue();
+    const categories = [...new Set(allItems.map(i => (i.category || '').trim()).filter(Boolean))].sort();
 
     return `
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; gap:16px; flex-wrap:wrap;">
-        <input class="input" id="stockSearch" placeholder="🔍 සොයන්න (භාණ්ඩයේ නම...)" style="width:260px" value="${escapeHTML(Views.stock.reportSearchQ || '')}">
-        <select class="input" id="stockFilter" style="width:200px">
-          <option value="all" ${Views.stock.filterType === 'all' ? 'selected' : ''}>සියලුම තොග</option>
-          <option value="low" ${Views.stock.filterType === 'low' ? 'selected' : ''}>⚠ අඩු තොග පමණක් (${lowItems.length})</option>
-        </select>
+        <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+          <input class="input" id="stockSearch" placeholder="🔍 සොයන්න (භාණ්ඩයේ නම...)" style="width:230px" value="${escapeHTML(Views.stock.reportSearchQ || '')}">
+          <select class="input" id="stockFilter" style="width:180px">
+            <option value="all" ${Views.stock.filterType === 'all' ? 'selected' : ''}>සියලුම තොග</option>
+            <option value="low" ${Views.stock.filterType === 'low' ? 'selected' : ''}>⚠ අඩු තොග පමණක් (${lowItems.length})</option>
+          </select>
+          <select class="input" id="stockCategoryFilter" style="width:180px">
+            <option value="all" ${(Views.stock.reportCategory || 'all') === 'all' ? 'selected' : ''}>📁 සියලුම කාණ්ඩ</option>
+            ${categories.map(c => `<option value="${escapeHTML(c)}" ${(Views.stock.reportCategory || 'all') === c ? 'selected' : ''}>📁 ${escapeHTML(c)}</option>`).join('')}
+          </select>
+        </div>
       </div>
 
       <div class="grid grid-3 mb-20" style="margin-bottom:16px;">
@@ -2922,8 +3167,102 @@ Views.stock = {
   itemsTableHTML() {
     let list = DB.allItems();
     const q = (Views.stock.itemsSearchQ || '').trim();
-    if (q) list = list.filter(i => Singlish.match(i.name, q) || Singlish.match(i.category || '', q) || Singlish.match(i.description || '', q) || (i.barcode && i.barcode.toLowerCase().includes(q.toLowerCase())));
-    if (!list.length) return `<div class="card"><div class="empty-state"><div class="em-ico"><i class="ph ph-package"></i></div><h3>${t('items_no_items')}</h3><div class="small">${t('items_no_items_sub')}</div></div></div>`;
+    if (q) {
+      list = list.filter(i => Singlish.match(i.name, q) || Singlish.match(i.category || '', q) || Singlish.match(i.subCategory || '', q) || Singlish.match(i.description || '', q) || (i.barcode && i.barcode.toLowerCase().includes(q.toLowerCase())));
+    }
+
+    const currentCat = Views.stock.selectedCategory || 'all';
+    if (currentCat !== 'all') {
+      if (currentCat === 'වෙනත්') {
+        list = list.filter(i => !i.category || (i.category || '').trim() === 'වෙනත්' || (i.category || '').trim() === '');
+      } else {
+        list = list.filter(i => (i.category || '').trim() === currentCat);
+      }
+    }
+
+    if (!list.length) {
+      return `<div class="card"><div class="empty-state"><div class="em-ico"><i class="ph ph-package"></i></div><h3>${t('items_no_items')}</h3><div class="small">${currentCat !== 'all' ? `"${escapeHTML(currentCat)}" කාණ්ඩයේ භාණ්ඩ කිසිවක් නැත.` : t('items_no_items_sub')}</div></div></div>`;
+    }
+
+    const renderRow = (i) => {
+      const status = i.qty <= 0 ? `<span class="pill pill-danger">${t('status_out')}</span>`
+        : i.qty <= i.reorderLevel ? `<span class="pill pill-warn">${t('status_low')}</span>`
+          : `<span class="pill pill-ok">${t('status_ok')}</span>`;
+      return `
+        <tr>
+          <td>
+            <div style="width:36px; height:36px; border-radius:6px; overflow:hidden; background:var(--paper); display:flex; align-items:center; justify-content:center; border:1px solid var(--border);">
+              ${i.image ? `<img src="${i.image}" style="width:100%; height:100%; object-fit:cover;">` : `<i class="ph ph-package" style="font-size:18px;"></i>`}
+            </div>
+          </td>
+          <td>
+            <b>${escapeHTML(i.name)}</b>
+            ${i.barcode ? `<div style="font-size:11px; font-family:monospace; color:var(--primary); font-weight:700;"><i class="ph ph-barcode"></i> ${escapeHTML(i.barcode)}</div>` : ''}
+          </td>
+          <td>
+            <span class="cat-badge-click" data-cat-click="${escapeHTML(i.category || 'වෙනත්')}" title="මෙම කාණ්ඩය පමණක් බලන්න" style="cursor:pointer; display:inline-flex; align-items:center; gap:4px; font-weight:600; color:var(--primary);">
+              <i class="ph ph-folder" style="font-size:13px;"></i> ${escapeHTML(i.category || 'වෙනත්')}
+            </span>
+            ${i.subCategory ? `<div style="font-size:11px; color:var(--steel); margin-top:2px;">↳ ${escapeHTML(i.subCategory)}</div>` : ''}
+          </td>
+          <td class="num">${fmt(i.costPrice)}</td>
+          <td class="num"><b>${fmt(i.sellPrice)}</b></td>
+          <td class="num">${i.qty} ${escapeHTML(i.unit || '')}</td>
+          <td>${status}</td>
+          <td>
+            <button class="icon-btn" data-print-barcode="${i.id}" title="${t('barcode_print_label') || 'Print Barcode'}"><i class="ph ph-barcode"></i></button>
+            <button class="icon-btn" data-edit-item="${i.id}" title="${t('items_edit')}"><i class="ph ph-pencil-simple"></i></button>
+            <button class="icon-btn" data-del-item="${i.id}" title="${t('delete')}"><i class="ph ph-trash"></i></button>
+          </td>
+        </tr>
+      `;
+    };
+
+    // If Group by Category is active:
+    if (Views.stock.groupByCategory) {
+      const groups = {};
+      list.forEach(i => {
+        const cat = (i.category || '').trim() || 'වෙනත්';
+        if (!groups[cat]) groups[cat] = [];
+        groups[cat].push(i);
+      });
+
+      const catKeys = Object.keys(groups).sort();
+      return catKeys.map(cat => {
+        const catItems = groups[cat];
+        const catTotalQty = catItems.reduce((acc, it) => acc + (Number(it.qty) || 0), 0);
+        const catTotalVal = catItems.reduce((acc, it) => acc + ((Number(it.costPrice) || 0) * (Number(it.qty) || 0)), 0);
+
+        return `
+          <div class="category-group-card" style="margin-bottom:20px; background:var(--card); border:1px solid var(--border); border-radius:var(--radius); overflow:hidden; box-shadow:0 1px 3px rgba(0,0,0,0.05);">
+            <div style="background:var(--paper); padding:10px 16px; display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border); flex-wrap:wrap; gap:8px;">
+              <div style="display:flex; align-items:center; gap:8px;">
+                <i class="ph ph-folder-open" style="font-size:18px; color:var(--primary);"></i>
+                <h3 style="margin:0; font-size:15px; font-weight:700; color:var(--charcoal);">${escapeHTML(cat)}</h3>
+                <span class="pill pill-ok" style="font-size:11px; padding:1px 8px;">${catItems.length} items</span>
+              </div>
+              <div style="font-size:12px; color:var(--steel); display:flex; gap:14px;">
+                <span>තොග ප්‍රමාණය: <b style="color:var(--charcoal);">${catTotalQty}</b></span>
+                <span>තොග වටිනාකම: <b style="color:var(--primary);">${fmt(catTotalVal)}</b></span>
+              </div>
+            </div>
+            <div class="table-wrap" style="border:none; border-radius:0;">
+              <table>
+                <thead><tr>
+                  <th style="width:46px;">Photo</th><th>${t('items_name')}</th><th>${t('items_category')}</th><th class="num">${t('items_cost_price')}</th><th class="num">${t('items_sell_price')}</th>
+                  <th class="num">${t('word_qty')}</th><th>${t('items_status')}</th><th></th>
+                </tr></thead>
+                <tbody>
+                  ${catItems.map(renderRow).join('')}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    // Default single table view:
     return `
       <div class="table-wrap">
         <table>
@@ -2932,34 +3271,7 @@ Views.stock = {
             <th class="num">${t('word_qty')}</th><th>${t('items_status')}</th><th></th>
           </tr></thead>
           <tbody>
-            ${list.map(i => {
-      const status = i.qty <= 0 ? `<span class="pill pill-danger">${t('status_out')}</span>`
-        : i.qty <= i.reorderLevel ? `<span class="pill pill-warn">${t('status_low')}</span>`
-          : `<span class="pill pill-ok">${t('status_ok')}</span>`;
-      return `
-              <tr>
-                <td>
-                  <div style="width:36px; height:36px; border-radius:6px; overflow:hidden; background:var(--paper); display:flex; align-items:center; justify-content:center; border:1px solid var(--border);">
-                    ${i.image ? `<img src="${i.image}" style="width:100%; height:100%; object-fit:cover;">` : `<i class="ph ph-package" style="font-size:18px;"></i>`}
-                  </div>
-                </td>
-                <td>
-                  <b>${escapeHTML(i.name)}</b>
-                  ${i.barcode ? `<div style="font-size:11px; font-family:monospace; color:var(--primary); font-weight:700;"><i class="ph ph-barcode"></i> ${escapeHTML(i.barcode)}</div>` : ''}
-                </td>
-                <td>${escapeHTML(i.category || 'වෙනත්')}</td>
-                <td class="num">${fmt(i.costPrice)}</td>
-                <td class="num"><b>${fmt(i.sellPrice)}</b></td>
-                <td class="num">${i.qty} ${escapeHTML(i.unit || '')}</td>
-                <td>${status}</td>
-                <td>
-                  <button class="icon-btn" data-print-barcode="${i.id}" title="${t('barcode_print_label') || 'Print Barcode'}"><i class="ph ph-barcode"></i></button>
-                  <button class="icon-btn" data-edit-item="${i.id}" title="${t('items_edit')}"><i class="ph ph-pencil-simple"></i></button>
-                  <button class="icon-btn" data-del-item="${i.id}" title="${t('delete')}"><i class="ph ph-trash"></i></button>
-                </td>
-              </tr>
-            `;
-    }).join('')}
+            ${list.map(renderRow).join('')}
           </tbody>
         </table>
       </div>
@@ -2975,6 +3287,11 @@ Views.stock = {
 
     if (Views.stock.filterType === 'low') {
       list = list.filter(i => i.qty <= i.reorderLevel).sort((a, b) => a.qty - b.qty);
+    }
+
+    const currentRepCat = Views.stock.reportCategory || 'all';
+    if (currentRepCat !== 'all') {
+      list = list.filter(i => (i.category || '').trim() === currentRepCat);
     }
 
     if (!list.length) {
@@ -3037,6 +3354,39 @@ Views.stock = {
     `;
   },
 
+  refreshItemsView() {
+    const currentCat = Views.stock.selectedCategory || 'all';
+    
+    // Update select
+    const catSelect = document.getElementById('itemsCategorySelect');
+    if (catSelect) catSelect.value = currentCat;
+
+    // Update group toggle button text and style
+    const groupToggle = document.getElementById('itemsGroupByToggle');
+    if (groupToggle) {
+      groupToggle.className = `btn btn-sm ${Views.stock.groupByCategory ? 'btn-primary' : 'btn-outline'}`;
+      groupToggle.innerHTML = `<i class="ph ph-squares-four" style="font-size:16px;"></i> ${Views.stock.groupByCategory ? 'කාණ්ඩ අනුව (ක්‍රියාත්මකයි)' : 'කාණ්ඩ අනුව වෙන්කරන්න'}`;
+    }
+
+    // Re-render table wrap
+    const wrap = document.getElementById('itemsTableWrap');
+    if (wrap) {
+      wrap.innerHTML = Views.stock.itemsTableHTML();
+      Views.stock.bindRowActions();
+      Views.stock.bindCategoryRowClicks();
+    }
+  },
+
+  bindCategoryRowClicks() {
+    document.querySelectorAll('[data-cat-click]').forEach(el => {
+      el.addEventListener('click', (e) => {
+        e.stopPropagation();
+        Views.stock.selectedCategory = el.dataset.catClick;
+        Views.stock.refreshItemsView();
+      });
+    });
+  },
+
   bind() {
     const btnItems = document.getElementById('stockTabItemsBtn');
     const btnReport = document.getElementById('stockTabReportBtn');
@@ -3062,9 +3412,30 @@ Views.stock = {
           Views.stock.itemsSearchQ = search.value;
           document.getElementById('itemsTableWrap').innerHTML = Views.stock.itemsTableHTML();
           Views.stock.bindRowActions();
+          Views.stock.bindCategoryRowClicks();
         });
         setTimeout(() => search.focus(), 100);
       }
+
+      // Category select dropdown
+      const catSelect = document.getElementById('itemsCategorySelect');
+      if (catSelect) {
+        catSelect.addEventListener('change', (e) => {
+          Views.stock.selectedCategory = e.target.value;
+          Views.stock.refreshItemsView();
+        });
+      }
+
+      // Group by Category toggle
+      const groupToggle = document.getElementById('itemsGroupByToggle');
+      if (groupToggle) {
+        groupToggle.addEventListener('click', () => {
+          Views.stock.groupByCategory = !Views.stock.groupByCategory;
+          Views.stock.refreshItemsView();
+        });
+      }
+
+      Views.stock.bindCategoryRowClicks();
     } else {
       const search = document.getElementById('stockSearch');
       if (search) {
@@ -3080,6 +3451,15 @@ Views.stock = {
       if (filter) {
         filter.addEventListener('change', (e) => {
           Views.stock.filterType = e.target.value;
+          document.getElementById('stockTableWrap').innerHTML = Views.stock.reportTableHTML();
+          Views.stock.bindRowActions();
+        });
+      }
+
+      const catFilter = document.getElementById('stockCategoryFilter');
+      if (catFilter) {
+        catFilter.addEventListener('change', (e) => {
+          Views.stock.reportCategory = e.target.value;
           document.getElementById('stockTableWrap').innerHTML = Views.stock.reportTableHTML();
           Views.stock.bindRowActions();
         });
@@ -3874,7 +4254,7 @@ Views.settings = {
             </div>
 
             <div id="logoPreviewWrap" class="mt-14" style="display: ${hasLogo ? 'flex' : 'none'}; align-items: center; gap: 14px; background: var(--paper); padding: 12px; border-radius: 8px;">
-              <img id="settingsLogoPreview" src="${s.logo || ''}" alt="Logo Preview" style="height: ${logoSize}px; max-height: 80px; object-fit: contain; border-radius: 6px;">
+              <img id="settingsLogoPreview" src="${s.logo || ''}" alt="Logo Preview" style="height: ${logoSize}px; max-height: 100px; object-fit: contain; border-radius: 6px;">
               <button class="btn btn-danger" id="removeLogoBtn" style="font-size: 12px; padding: 6px 12px;">${t('settings_logo_remove')}</button>
             </div>
 
@@ -3883,7 +4263,7 @@ Views.settings = {
                 <label class="field-label" style="margin-bottom: 0;">${t('settings_logo_size')}</label>
                 <span id="logoSizeVal" class="pill" style="font-weight: 700;">${logoSize}px</span>
               </div>
-              <input type="range" id="logoSizeRange" min="20" max="100" step="2" value="${logoSize}" style="width: 100%; cursor: pointer;">
+              <input type="range" id="logoSizeRange" min="20" max="120" step="2" value="${logoSize}" style="width: 100%; cursor: pointer;">
             </div>
           </div>
 
