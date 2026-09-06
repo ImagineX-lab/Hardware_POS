@@ -2167,6 +2167,9 @@ Views.sale = {
           <div style="margin:4px 0; display:flex; flex-direction:column; align-items:center; justify-content:center;">
             ${typeof BarcodeSystem !== 'undefined' ? BarcodeSystem.generateCode128SVG(sale.barcode || ('BILL-' + sale.id), { width: 160, height: 38, fontSize: 9 }) : ''}
           </div>
+          <div style="font-size:9.5px; font-weight:700; color:#000; margin-top:5px; text-align:center; letter-spacing:0.2px;">
+            ImagineX Software Solution - 0761945587
+          </div>
         </div>
       </div>
     `;
