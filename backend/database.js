@@ -267,19 +267,18 @@ module.exports = {
             { name: 'Loose පොටි (Eagle)', barcode: 'EAGLE-POT-LOOSE', category: 'සායම් හා රසායනික', subCategory: 'සායම්', unit: 'kg', costPrice: 0, sellPrice: 75, loosePrice: 75, qty: 25, packSize: 1, packUnit: 'kg', description: 'Loose පොට් (Eagle / Egel) - 1 kg: රු. 75 | මුළු තොගය: 25 kg' }
         ];
 
-        for (const it of defaultItems) {
-            const existing = await get(`SELECT id FROM items WHERE name = ?`, [it.name]);
-            if (!existing) {
-                await run(
-                    `INSERT INTO items (name, barcode, category, subCategory, unit, costPrice, sellPrice, qty, reorderLevel, packSize, packUnit, loosePrice, description, image, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '', ?)`,
-                    [it.name, it.barcode || '', it.category, it.subCategory, it.unit, it.costPrice, it.sellPrice, it.qty || 0, it.reorderLevel || 5, it.packSize, it.packUnit, it.loosePrice, it.description, Date.now()]
-                );
-            } else {
-                await run(
-                    `UPDATE items SET barcode = COALESCE(NULLIF(?, ''), barcode), category = ?, subCategory = ?, sellPrice = ?, loosePrice = ?, packSize = ?, packUnit = ?, description = ? WHERE id = ?`,
-                    [it.barcode || '', it.category, it.subCategory, it.sellPrice, it.loosePrice, it.packSize, it.packUnit, it.description, existing.id]
-                );
+        const itemsSeeded = await get(`SELECT value FROM settings WHERE key = 'items_seeded'`);
+        if (!itemsSeeded) {
+            const countRow = await get(`SELECT COUNT(*) as count FROM items`);
+            if (!countRow || countRow.count === 0) {
+                for (const it of defaultItems) {
+                    await run(
+                        `INSERT INTO items (name, barcode, category, subCategory, unit, costPrice, sellPrice, qty, reorderLevel, packSize, packUnit, loosePrice, description, image, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '', ?)`,
+                        [it.name, it.barcode || '', it.category, it.subCategory, it.unit, it.costPrice, it.sellPrice, it.qty || 0, it.reorderLevel || 5, it.packSize, it.packUnit, it.loosePrice, it.description, Date.now()]
+                    );
+                }
             }
+            await run(`INSERT OR REPLACE INTO settings (key, value) VALUES ('items_seeded', '1')`);
         }
 
         try {
