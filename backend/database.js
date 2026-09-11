@@ -9,11 +9,15 @@ try {
     if (app && typeof app.getPath === 'function') {
         dataDir = app.getPath('userData');
     } else if (process.env.APPDATA) {
-        dataDir = path.join(process.env.APPDATA, 'Hardware POS');
+        const standardPath = path.join(process.env.APPDATA, 'hardware-pos');
+        const legacyPath = path.join(process.env.APPDATA, 'Hardware POS');
+        dataDir = (fs.existsSync(standardPath) || !fs.existsSync(legacyPath)) ? standardPath : legacyPath;
     }
 } catch (e) {
     if (process.env.APPDATA) {
-        dataDir = path.join(process.env.APPDATA, 'Hardware POS');
+        const standardPath = path.join(process.env.APPDATA, 'hardware-pos');
+        const legacyPath = path.join(process.env.APPDATA, 'Hardware POS');
+        dataDir = (fs.existsSync(standardPath) || !fs.existsSync(legacyPath)) ? standardPath : legacyPath;
     }
 }
 
@@ -269,11 +273,19 @@ module.exports = {
             { name: 'Loose පොටි (Eagle)', barcode: 'EAGLE-POT-LOOSE', category: 'සායම් හා රසායනික', subCategory: 'සායම්', unit: 'kg', costPrice: 0, sellPrice: 75, loosePrice: 75, qty: 25, packSize: 1, packUnit: 'kg', description: 'Loose පොට් (Eagle / Egel) - 1 kg: රු. 75 | මුළු තොගය: 25 kg' }
         ];
 
+        await run(`CREATE TABLE IF NOT EXISTS deleted_items (id INTEGER PRIMARY KEY, name TEXT, barcode TEXT, deletedAt INTEGER)`);
         const itemsSeeded = await get(`SELECT value FROM settings WHERE key = 'items_seeded'`);
         if (!itemsSeeded) {
             const countRow = await get(`SELECT COUNT(*) as count FROM items`);
             if (!countRow || countRow.count === 0) {
+                const deletedRows = await all(`SELECT name, barcode FROM deleted_items`);
+                const deletedNames = new Set(deletedRows.map(r => (r.name || '').trim()));
+                const deletedBarcodes = new Set(deletedRows.map(r => (r.barcode || '').trim()).filter(Boolean));
+
                 for (const it of defaultItems) {
+                    if (deletedNames.has(it.name.trim()) || (it.barcode && deletedBarcodes.has(it.barcode.trim()))) {
+                        continue;
+                    }
                     await run(
                         `INSERT INTO items (name, barcode, category, subCategory, unit, costPrice, sellPrice, qty, reorderLevel, packSize, packUnit, loosePrice, description, image, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '', ?)`,
                         [it.name, it.barcode || '', it.category, it.subCategory, it.unit, it.costPrice, it.sellPrice, it.qty || 0, it.reorderLevel || 5, it.packSize, it.packUnit, it.loosePrice, it.description, Date.now()]
@@ -327,7 +339,24 @@ module.exports = {
         return merged;
     },
     deleteItem: async (id) => {
-        await run(`DELETE FROM items WHERE id = ?`, [id]);
+        const numId = Number(id);
+        try {
+            await run(`CREATE TABLE IF NOT EXISTS deleted_items (id INTEGER PRIMARY KEY, name TEXT, barcode TEXT, deletedAt INTEGER)`);
+            const item = await get(`SELECT * FROM items WHERE id = ?`, [numId]);
+            if (item) {
+                await run(`INSERT OR REPLACE INTO deleted_items (id, name, barcode, deletedAt) VALUES (?, ?, ?, ?)`, [item.id, item.name, item.barcode || '', Date.now()]);
+            }
+        } catch(e) {}
+        await run(`DELETE FROM items WHERE id = ?`, [numId]);
+
+        if (bundledDbPath && fs.existsSync(bundledDbPath) && dataDir !== __dirname) {
+            try {
+                const bundledDb = new sqlite3.Database(bundledDbPath);
+                bundledDb.run(`DELETE FROM items WHERE id = ?`, [numId], () => {
+                    bundledDb.close();
+                });
+            } catch(e) {}
+        }
     },
 
     getAllCustomers: async () => {

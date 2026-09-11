@@ -304,8 +304,17 @@ Views.sale = {
             <input class="input" id="saleDiscount" type="number" min="0" step="any" value="0" style="height:36px; padding:6px 10px; font-size:15px;">
           </div>
 
-          <button class="btn btn-primary btn-block" id="completeSaleBtn" style="padding:10px; font-size:15px; height:42px;">${t('sale_complete_btn')}</button>
-          <button class="btn btn-outline btn-block" id="clearCartBtn" style="padding:6px; font-size:13px; margin-top:2px;">${t('sale_clear_cart')}</button>
+          <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 4px;">
+            <button type="button" class="btn btn-primary" id="saveSaleOnlyBtn" style="padding:6px 4px; font-size:13px; height:44px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px; line-height:1.2;" title="Single Enter: බිල Save කරන්න (මුද්‍රණය නොවේ)">
+              <span style="font-weight:700; display:inline-flex; align-items:center; gap:4px;"><i class="ph ph-floppy-disk" style="font-size:15px;"></i> Save පමණක්</span>
+              <span style="font-size:9.5px; opacity:0.85; font-weight:600;">[Enter 1x]</span>
+            </button>
+            <button type="button" class="btn btn-success" id="completeSaleBtn" style="padding:6px 4px; font-size:13px; height:44px; background:#16a34a; color:#fff; border:none; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px; line-height:1.2;" title="Double Enter: බිල Save කර Print කරන්න">
+              <span style="font-weight:700; display:inline-flex; align-items:center; gap:4px;"><i class="ph ph-printer" style="font-size:15px;"></i> Save + Print</span>
+              <span style="font-size:9.5px; opacity:0.85; font-weight:600;">[Enter 2x]</span>
+            </button>
+          </div>
+          <button class="btn btn-outline btn-block" id="clearCartBtn" style="padding:6px; font-size:13px; margin-top:4px;">${t('sale_clear_cart')}</button>
         </div>
       </div>
     `;
@@ -995,11 +1004,11 @@ Views.sale = {
       discEl.addEventListener('keydown', (e) => {
         if (e.key === 'Enter') {
           e.preventDefault();
-          document.getElementById('completeSaleBtn')?.click();
+          Views.sale.handleEnterCheckout();
         } else if (e.key === 'ArrowDown') {
           e.preventDefault();
-          const completeBtn = document.getElementById('completeSaleBtn');
-          if (completeBtn) completeBtn.focus();
+          const targetBtn = document.getElementById('saveSaleOnlyBtn') || document.getElementById('completeSaleBtn');
+          if (targetBtn) targetBtn.focus();
         } else if (e.key === 'ArrowUp') {
           e.preventDefault();
           const paidInp = document.getElementById('saleAmountPaid');
@@ -1044,7 +1053,7 @@ Views.sale = {
       deliveryFeeEl.addEventListener('keydown', (e) => {
         if (e.key === 'Enter') {
           e.preventDefault();
-          document.getElementById('completeSaleBtn')?.click();
+          Views.sale.handleEnterCheckout();
         }
       });
     }
@@ -1076,7 +1085,7 @@ Views.sale = {
       paidEl.addEventListener('keydown', (e) => {
         if (e.key === 'Enter') {
           e.preventDefault();
-          document.getElementById('completeSaleBtn')?.click();
+          Views.sale.handleEnterCheckout();
         } else if (e.key === 'ArrowDown') {
           e.preventDefault();
           const discEl = document.getElementById('saleDiscount');
@@ -1098,7 +1107,6 @@ Views.sale = {
       });
     }
 
-
     const clearCartBtn = document.getElementById('clearCartBtn');
     if (clearCartBtn) {
       clearCartBtn.addEventListener('click', () => {
@@ -1108,17 +1116,42 @@ Views.sale = {
       clearCartBtn.addEventListener('keydown', (e) => {
         if (e.key === 'ArrowUp') {
           e.preventDefault();
-          const completeBtn = document.getElementById('completeSaleBtn');
-          if (completeBtn) completeBtn.focus();
+          const targetBtn = document.getElementById('saveSaleOnlyBtn') || document.getElementById('completeSaleBtn');
+          if (targetBtn) targetBtn.focus();
+        }
+      });
+    }
+
+    const saveSaleOnlyBtn = document.getElementById('saveSaleOnlyBtn');
+    if (saveSaleOnlyBtn) {
+      saveSaleOnlyBtn.addEventListener('click', () => Views.sale.completeSale(false));
+      saveSaleOnlyBtn.addEventListener('keydown', (e) => {
+        if (e.key === 'ArrowRight') {
+          e.preventDefault();
+          document.getElementById('completeSaleBtn')?.focus();
+        } else if (e.key === 'ArrowUp') {
+          e.preventDefault();
+          const discEl = document.getElementById('saleDiscount');
+          if (discEl) {
+            discEl.focus();
+            if (typeof discEl.select === 'function') discEl.select();
+          }
+        } else if (e.key === 'ArrowDown') {
+          e.preventDefault();
+          const clearBtn = document.getElementById('clearCartBtn');
+          if (clearBtn) clearBtn.focus();
         }
       });
     }
 
     const completeSaleBtn = document.getElementById('completeSaleBtn');
     if (completeSaleBtn) {
-      completeSaleBtn.addEventListener('click', Views.sale.completeSale);
+      completeSaleBtn.addEventListener('click', () => Views.sale.completeSale(true));
       completeSaleBtn.addEventListener('keydown', (e) => {
-        if (e.key === 'ArrowUp') {
+        if (e.key === 'ArrowLeft') {
+          e.preventDefault();
+          document.getElementById('saveSaleOnlyBtn')?.focus();
+        } else if (e.key === 'ArrowUp') {
           e.preventDefault();
           const discEl = document.getElementById('saleDiscount');
           if (discEl) {
@@ -1540,6 +1573,7 @@ Views.sale = {
         unit: item.unit,
         originalPrice: item.sellPrice,
         unitPrice: item.sellPrice,
+        baseSellPrice: item.sellPrice,
         costPrice: item.costPrice || 0,
         qty: 1,
         maxQty: item.qty,
@@ -1892,7 +1926,8 @@ Views.sale = {
           const packSize = Math.max(0.0001, Number(initPackSize) || 1);
           const packUnit = initPackUnit || 'pcs';
           const looseUnit = looseUnitEl.value;
-          const unitPrice = item.unitPrice;
+          const dbItem = DB.getItem(item.itemId);
+          const unitPrice = (dbItem && Number(dbItem.sellPrice) > 0) ? Number(dbItem.sellPrice) : (item.baseSellPrice || item.originalPrice || item.unitPrice);
           let calcLooseQty = 0, stockQty = 0, linePrice = 0;
 
           // If custom loose unit price configured on item
@@ -1975,6 +2010,7 @@ Views.sale = {
 
           item.qty = res.stockQty;
           item.unitPrice = res.linePrice > 0 && res.stockQty > 0 ? (res.linePrice / res.stockQty) : item.unitPrice;
+          item.originalPrice = item.unitPrice;
           item.looseInfo = {
             isLoose: true,
             looseQty: res.calcLooseQty,
@@ -2106,7 +2142,11 @@ Views.sale = {
 
         if (resetBtn) {
           resetBtn.addEventListener('click', () => {
+            const dbItem = DB.getItem(item.itemId);
             item.qty = 1;
+            const originalSellPrice = (dbItem && Number(dbItem.sellPrice) > 0) ? Number(dbItem.sellPrice) : (item.baseSellPrice || item.originalPrice || item.unitPrice);
+            item.unitPrice = originalSellPrice;
+            item.originalPrice = originalSellPrice;
             item.looseInfo = null;
             closeModal();
             Views.sale.refreshCart();
@@ -2127,7 +2167,30 @@ Views.sale = {
     });
   },
 
-  async completeSale() {
+  enterTimer: null,
+  enterCount: 0,
+
+  handleEnterCheckout() {
+    if (Views.sale.isSubmitting) return;
+    Views.sale.enterCount = (Views.sale.enterCount || 0) + 1;
+    if (Views.sale.enterCount === 1) {
+      Views.sale.enterTimer = setTimeout(() => {
+        Views.sale.enterCount = 0;
+        Views.sale.enterTimer = null;
+        Views.sale.completeSale(false); // 1 Enter: Save without printing
+      }, 380);
+    } else if (Views.sale.enterCount >= 2) {
+      if (Views.sale.enterTimer) {
+        clearTimeout(Views.sale.enterTimer);
+        Views.sale.enterTimer = null;
+      }
+      Views.sale.enterCount = 0;
+      Views.sale.completeSale(true); // 2 Enters: Save and print
+    }
+  },
+
+  async completeSale(shouldPrint = true) {
+    if (Views.sale.isSubmitting) return;
     if (!cart.length) { toast(t('sale_empty_cart'), 'err'); return; }
     const payType = Views.sale.payType;
     let customerId = null;
@@ -2166,7 +2229,7 @@ Views.sale = {
 
         if (amountPaid < total) {
           const shortDiff = total - amountPaid;
-          toast(`ලැබුණු මුදල අඩුයි! බිල මුද්‍රණය කළ නොහැක. (තව රු. ${fmt(shortDiff)} ක් අවශ්‍යයි)`, 'err');
+          toast(`ලැබුණු මුදල අඩුයි! බිල සම්පූර්ණ කළ නොහැක. (තව රු. ${fmt(shortDiff)} ක් අවශ්‍යයි)`, 'err');
           if (paidInput) {
             paidInput.classList.add('input-error');
             paidInput.focus();
@@ -2193,26 +2256,33 @@ Views.sale = {
       looseInfo: l.looseInfo || null
     }));
 
-    const sale = await DB.createSale({ lines, paymentType: payType, customerId, customerName, discount, deliveryFee, amountPaid, changeAmount });
-    toast(`${t('sale_success')}#${sale.id}`, 'ok');
-    cart = [];
-    document.getElementById('saleDiscount').value = 0;
-    const delivFeeEl = document.getElementById('saleDeliveryFee');
-    if (delivFeeEl) delivFeeEl.value = 0;
-    Views.sale.sessions[Views.sale.activeIdx].deliveryFee = 0;
-    Views.sale.amountPaid = '';
-    Views.sale.selectedCustomer = null;
-    Views.sale.setPayType('cash');
-    Views.sale.refreshCart();
-    Views.sale.printReceiptDirect(sale);
-    App.updateSidebarCounts();
-    // If this was a Quick Sale tab (not primary), close it to return to the main bill
-    if (Views.sale.activeIdx > 0) {
-      const closedIdx = Views.sale.activeIdx;
-      Views.sale.sessions.splice(closedIdx, 1);
-      Views.sale.activeIdx = 0;
-      Views.sale.loadSession(0);
-      App.render();
+    try {
+      Views.sale.isSubmitting = true;
+      const sale = await DB.createSale({ lines, paymentType: payType, customerId, customerName, discount, deliveryFee, amountPaid, changeAmount });
+      toast(`${t('sale_success')}#${sale.id} ${shouldPrint ? '(මුද්‍රණය කෙරේ)' : '(Save විය)'}`, 'ok');
+      cart = [];
+      document.getElementById('saleDiscount').value = 0;
+      const delivFeeEl = document.getElementById('saleDeliveryFee');
+      if (delivFeeEl) delivFeeEl.value = 0;
+      Views.sale.sessions[Views.sale.activeIdx].deliveryFee = 0;
+      Views.sale.amountPaid = '';
+      Views.sale.selectedCustomer = null;
+      Views.sale.setPayType('cash');
+      Views.sale.refreshCart();
+      if (shouldPrint) {
+        Views.sale.printReceiptDirect(sale);
+      }
+      App.updateSidebarCounts();
+      // If this was a Quick Sale tab (not primary), close it to return to the main bill
+      if (Views.sale.activeIdx > 0) {
+        const closedIdx = Views.sale.activeIdx;
+        Views.sale.sessions.splice(closedIdx, 1);
+        Views.sale.activeIdx = 0;
+        Views.sale.loadSession(0);
+        App.render();
+      }
+    } finally {
+      Views.sale.isSubmitting = false;
     }
   },
 
@@ -2251,6 +2321,9 @@ Views.sale = {
               const origPrice = (l.originalPrice !== undefined && l.originalPrice > 0) ? l.originalPrice : l.unitPrice;
               const hasDisc = (l.unitPrice < origPrice);
               const lineTot = l.qty * l.unitPrice;
+              const displayUnitPrice = (l.looseInfo && l.looseInfo.looseQty > 0)
+                ? (l.looseInfo.customLooseUnitPrice ? Number(l.looseInfo.customLooseUnitPrice) : (lineTot / l.looseInfo.looseQty))
+                : l.unitPrice;
               return `
                 <tr>
                   <td colspan="4" style="padding-top:2px; font-weight:700; color:#000; font-size:10px; word-break:break-word;">${escapeHTML(l.name)}</td>
@@ -2264,7 +2337,7 @@ Views.sale = {
                     ${l.looseInfo ? `${l.looseInfo.looseQty} ${escapeHTML(l.looseInfo.looseUnit)}` : `${l.qty} ${escapeHTML(l.unit || '')}`}
                   </td>
                   <td style="text-align:right; padding-bottom:2px; font-size:9.5px; white-space:nowrap;">
-                    ${(l.unitPrice).toLocaleString('en-LK', {minimumFractionDigits:2, maximumFractionDigits:2})}
+                    ${(displayUnitPrice).toLocaleString('en-LK', {minimumFractionDigits:2, maximumFractionDigits:2})}
                   </td>
                   <td style="text-align:right; padding-bottom:2px; font-weight:700; font-size:9.5px; white-space:nowrap;">
                     ${(lineTot).toLocaleString('en-LK', {minimumFractionDigits:2, maximumFractionDigits:2})}
@@ -2298,7 +2371,7 @@ Views.sale = {
           <div style="font-size:8.5px; color:#222; margin-bottom:3px; line-height:1.25;">භාණ්ඩ ආපසු භාරදීමේදී මෙම බිල්පත ඉදිරිපත් කිරීම අනිවාර්ය වේ.</div>
           
           <div style="margin:3px 0; display:flex; flex-direction:column; align-items:center; justify-content:center;">
-            ${typeof BarcodeSystem !== 'undefined' ? BarcodeSystem.generateCode128SVG(sale.barcode || ('BILL-' + sale.id), { width: 140, height: 32, fontSize: 8 }) : ''}
+            ${typeof BarcodeSystem !== 'undefined' ? BarcodeSystem.generateCode128SVG(sale.barcode || ('BILL-' + sale.id), { width: 130, height: 30, fontSize: 8 }) : ''}
           </div>
           <div style="font-size:9.5px; font-weight:700; color:#000; margin-top:5px; text-align:center; letter-spacing:0.2px;">
             ImagineX Software Solution - 0761945587
@@ -3990,10 +4063,13 @@ Views.customers = {
                     ${sale.lines.map(line => {
                       const lineTotal = line.qty * line.unitPrice;
                       const qtyText = line.looseInfo ? `${line.looseInfo.looseQty} ${escapeHTML(line.looseInfo.looseUnit || '')}` : `${line.qty} ${escapeHTML(line.unit || '')}`;
+                      const unitPriceVal = (line.looseInfo && line.looseInfo.looseQty > 0)
+                        ? (line.looseInfo.customLooseUnitPrice ? Number(line.looseInfo.customLooseUnitPrice) : (lineTotal / line.looseInfo.looseQty))
+                        : line.unitPrice;
                       return `
                         <tr style="border-bottom:1px dashed var(--border);">
                           <td style="padding:3px 0; font-weight:600; color:var(--charcoal);">• ${escapeHTML(line.name)}</td>
-                          <td style="padding:3px 8px; text-align:center; color:var(--steel); font-size:11px; white-space:nowrap;">${qtyText} × ${fmt(line.unitPrice)}</td>
+                          <td style="padding:3px 8px; text-align:center; color:var(--steel); font-size:11px; white-space:nowrap;">${qtyText} × ${fmt(unitPriceVal)}</td>
                           <td style="padding:3px 0; text-align:right; font-weight:700; color:var(--charcoal); white-space:nowrap;">${fmt(lineTotal)}</td>
                         </tr>
                       `;

@@ -62,7 +62,8 @@ const DB = {
   },
   async deleteItem(id){
     await fetch(`/api/items/${id}`, { method: 'DELETE' });
-    this.data.items = this.data.items.filter(i => i.id !== id);
+    this.data.items = this.data.items.filter(i => Number(i.id) !== Number(id));
+    await this.reload();
   },
   getItem(id){ return this.data.items.find(i=>i.id===id); },
   getItemByBarcode(barcode){

@@ -1442,11 +1442,11 @@ th.num {
 .receipt {
   position: relative;
   width: 100%;
-  max-width: 275px;
-  /* ≈ 68mm-70mm printable area for 80mm paper */
+  max-width: 250px;
+  /* ≈ 60mm-62mm printable area for 80mm paper */
   margin: 0 auto;
   font-family: 'Noto Sans Sinhala', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, monospace;
-  font-size: 10.5px;
+  font-size: 10px;
   color: #000;
   line-height: 1.35;
   padding: 6px 4px;
@@ -1594,8 +1594,8 @@ th.num {
     box-shadow: none !important;
     padding: 0 !important;
     margin: 0 !important;
-    width: 68mm !important;
-    max-width: 68mm !important;
+    width: 60mm !important;
+    max-width: 60mm !important;
     overflow: visible !important;
   }
 
@@ -1612,13 +1612,13 @@ th.num {
     position: absolute !important;
     left: 0 !important;
     top: 0 !important;
-    width: 68mm !important;
-    max-width: 68mm !important;
+    width: 60mm !important;
+    max-width: 60mm !important;
     margin: 0 !important;
-    padding: 1mm 0 8mm 0 !important;
+    padding: 1mm 1.5mm 8mm 0.5mm !important;
     /* Bottom 8mm space for thermal auto-cutter */
     font-family: 'Noto Sans Sinhala', -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif !important;
-    font-size: 9.5px !important;
+    font-size: 9px !important;
     line-height: 1.3 !important;
     color: #000 !important;
     background: #fff !important;
@@ -1629,14 +1629,14 @@ th.num {
 
   #printArea .receipt-logo {
     display: block !important;
-    max-height: 140px !important;
+    max-height: 130px !important;
     max-width: 100% !important;
-    margin: 0 auto 6px auto !important;
+    margin: 0 auto 5px auto !important;
     object-fit: contain !important;
   }
 
   #printArea h2 {
-    font-size: 14px !important;
+    font-size: 13.5px !important;
     font-weight: 800 !important;
     color: #000 !important;
     margin: 0 0 2px 0 !important;
@@ -1646,7 +1646,7 @@ th.num {
   #printArea table {
     width: 100% !important;
     max-width: 100% !important;
-    font-size: 9.5px !important;
+    font-size: 9px !important;
     table-layout: fixed !important;
     box-sizing: border-box !important;
   }
@@ -1668,19 +1668,19 @@ th.num {
   }
 
   #printArea .r-center {
-    font-size: 9.5px !important;
+    font-size: 9px !important;
     color: #000 !important;
   }
 
   #printArea .receipt-totals-row {
-    font-size: 10px !important;
+    font-size: 9.5px !important;
     padding: 1px 0 !important;
     width: 100% !important;
     box-sizing: border-box !important;
   }
 
   #printArea .receipt-totals-row.grand {
-    font-size: 11.5px !important;
+    font-size: 11px !important;
     font-weight: 800 !important;
     padding: 2px 0 !important;
   }

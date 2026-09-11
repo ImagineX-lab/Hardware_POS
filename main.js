@@ -85,6 +85,7 @@ ipcMain.handle('print-receipt', (event, options) => {
                 silent: true,
                 printBackground: true,
                 margins: { marginType: 'none' },
+                scaleFactor: 110,
                 ...options
             },
             (success, errorType) => {
