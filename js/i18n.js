@@ -80,6 +80,8 @@ const i18n = {
 
     sale_subtotal: "එකතුව",
     sale_total: "මුළු එකතුව",
+    sale_delivery_fee: "ප්‍රවාහන ගාස්තු (රු.)",
+    sale_delivery_fee_label: "🚛 ලොරි/ප්‍රවාහනය",
     sale_payment: "ගෙවීම",
     sale_amount_paid: "ගෙවූ මුදල (රු.)",
     sale_change_due: "ඉතිරි මුදල (රු.)",
@@ -367,6 +369,8 @@ const i18n = {
 
     sale_subtotal: "Subtotal",
     sale_total: "Total",
+    sale_delivery_fee: "Delivery Fee (Rs.)",
+    sale_delivery_fee_label: "🚛 Delivery / Transport",
     sale_payment: "Payment",
     sale_amount_paid: "Amount Paid (Rs.)",
     sale_change_due: "Change Due (Rs.)",

@@ -149,17 +149,19 @@ Views.sale = {
   amountPaid: '',
 
   /* ===== MULTI-CART SESSION SYSTEM ===== */
-  sessions: [{ cart: [], payType: 'cash', selectedCustomer: null, amountPaid: '', discount: 0 }],
+  sessions: [{ cart: [], payType: 'cash', selectedCustomer: null, amountPaid: '', discount: 0, deliveryFee: 0 }],
   activeIdx: 0,
 
   saveSession() {
     const discEl = document.getElementById('saleDiscount');
+    const delivEl = document.getElementById('saleDeliveryFee');
     Views.sale.sessions[Views.sale.activeIdx] = {
       cart: cart.map(i => Object.assign({}, i)),
       payType: Views.sale.payType || 'cash',
       selectedCustomer: Views.sale.selectedCustomer,
       amountPaid: Views.sale.amountPaid,
-      discount: discEl ? Number(discEl.value) : 0
+      discount: discEl ? Number(discEl.value) : 0,
+      deliveryFee: delivEl ? Number(delivEl.value) : 0
     };
   },
 
@@ -181,7 +183,7 @@ Views.sale = {
   addTab() {
     if (Views.sale.sessions.length >= 3) { toast(t('sale_max_tabs'), 'err'); return; }
     Views.sale.saveSession();
-    Views.sale.sessions.push({ cart: [], payType: 'cash', selectedCustomer: null, amountPaid: '', discount: 0 });
+    Views.sale.sessions.push({ cart: [], payType: 'cash', selectedCustomer: null, amountPaid: '', discount: 0, deliveryFee: 0 });
     Views.sale.activeIdx = Views.sale.sessions.length - 1;
     Views.sale.loadSession(Views.sale.activeIdx);
     App.render();
@@ -284,6 +286,15 @@ Views.sale = {
                 <i class="ph ph-check-circle" style="font-size:15px;"></i> ${t('sale_change_due')}
               </span>
               <span id="changeDueAmount" style="font-size:14.5px; font-weight:700;">0.00</span>
+            </div>
+          </div>
+
+          <!-- Delivery Fee Field (Optional) -->
+          <div class="field" style="margin-bottom:6px;">
+            <label class="field-label" style="margin-bottom:2px; font-size:12px;">${t('sale_delivery_fee_label')} <small class="text-muted" style="font-size:10px;">(විකල්ප)</small></label>
+            <div style="position:relative; display:flex; align-items:center; gap:6px;">
+              <input class="input" id="saleDeliveryFee" type="number" min="0" step="any" value="${Views.sale.sessions[Views.sale.activeIdx].deliveryFee || 0}" style="height:36px; padding:6px 10px; font-size:15px; border-color:${(Views.sale.sessions[Views.sale.activeIdx].deliveryFee || 0) > 0 ? '#f59e0b' : 'var(--border)'}; background:${(Views.sale.sessions[Views.sale.activeIdx].deliveryFee || 0) > 0 ? '#fffbeb' : '#fff'};" placeholder="0.00">
+              <button type="button" id="clearDeliveryFeeBtn" title="ප්‍රවාහන ගාස්තු ඉවත් කරන්න" style="height:36px; padding:0 10px; font-size:12px; border:1px solid var(--border); border-radius:6px; background:#f8fafc; color:#64748b; cursor:pointer; white-space:nowrap;">ඉවත්</button>
             </div>
           </div>
 
@@ -458,7 +469,9 @@ Views.sale = {
     const itemDiscounts = Views.sale.calcItemDiscounts();
     const discountEl = document.getElementById('saleDiscount');
     const overallDiscount = discountEl ? Number(discountEl.value) || 0 : 0;
-    return Math.max(0, subtotal - (itemDiscounts + overallDiscount));
+    const deliveryEl = document.getElementById('saleDeliveryFee');
+    const deliveryFee = deliveryEl ? Number(deliveryEl.value) || 0 : 0;
+    return Math.max(0, subtotal - (itemDiscounts + overallDiscount) + deliveryFee);
   },
 
   totalsHTML() {
@@ -467,10 +480,13 @@ Views.sale = {
     const discountEl = document.getElementById('saleDiscount');
     const overallDiscount = discountEl ? Number(discountEl.value) || 0 : 0;
     const totalDiscount = itemDiscounts + overallDiscount;
-    const total = Math.max(0, subtotal - totalDiscount);
+    const deliveryEl = document.getElementById('saleDeliveryFee');
+    const deliveryFee = deliveryEl ? Number(deliveryEl.value) || 0 : 0;
+    const total = Math.max(0, subtotal - totalDiscount + deliveryFee);
     return `
       <div class="totals-line"><span>${t('sale_subtotal')}</span><span>${fmt(subtotal)}</span></div>
       <div class="totals-line"><span>${t('sale_discount')}</span><span>- ${fmt(totalDiscount)}</span></div>
+      ${deliveryFee > 0 ? `<div class="totals-line" style="color:#b45309; font-weight:600;"><span>${t('sale_delivery_fee_label')}</span><span>+ ${fmt(deliveryFee)}</span></div>` : ''}
       <div class="totals-line grand"><span>${t('sale_total')}</span><span>${fmt(total)}</span></div>
     `;
   },
@@ -1006,6 +1022,45 @@ Views.sale = {
             }
           }
         }
+      });
+    }
+
+    // Delivery Fee input binding
+    const deliveryFeeEl = document.getElementById('saleDeliveryFee');
+    if (deliveryFeeEl) {
+      deliveryFeeEl.addEventListener('focus', (e) => {
+        if (typeof e.target.select === 'function') e.target.select();
+      });
+      deliveryFeeEl.addEventListener('input', () => {
+        const fee = Number(deliveryFeeEl.value) || 0;
+        // Update visual style based on value
+        deliveryFeeEl.style.borderColor = fee > 0 ? '#f59e0b' : 'var(--border)';
+        deliveryFeeEl.style.background = fee > 0 ? '#fffbeb' : '#fff';
+        // Save to session
+        Views.sale.sessions[Views.sale.activeIdx].deliveryFee = fee;
+        document.getElementById('totalsBox').innerHTML = Views.sale.totalsHTML();
+        Views.sale.updateChangeDue();
+      });
+      deliveryFeeEl.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          document.getElementById('completeSaleBtn')?.click();
+        }
+      });
+    }
+
+    const clearDeliveryFeeBtn = document.getElementById('clearDeliveryFeeBtn');
+    if (clearDeliveryFeeBtn) {
+      clearDeliveryFeeBtn.addEventListener('click', () => {
+        const feeInp = document.getElementById('saleDeliveryFee');
+        if (feeInp) {
+          feeInp.value = 0;
+          feeInp.style.borderColor = 'var(--border)';
+          feeInp.style.background = '#fff';
+        }
+        Views.sale.sessions[Views.sale.activeIdx].deliveryFee = 0;
+        document.getElementById('totalsBox').innerHTML = Views.sale.totalsHTML();
+        Views.sale.updateChangeDue();
       });
     }
 
@@ -2090,6 +2145,7 @@ Views.sale = {
     const itemDiscounts = Views.sale.calcItemDiscounts();
     const overallDiscount = Number(document.getElementById('saleDiscount')?.value) || 0;
     const discount = overallDiscount + itemDiscounts;
+    const deliveryFee = Number(document.getElementById('saleDeliveryFee')?.value) || 0;
     const total = Views.sale.calcTotal();
     const paidInput = document.getElementById('saleAmountPaid');
     const paidVal = paidInput ? paidInput.value.trim() : (Views.sale.amountPaid !== undefined && Views.sale.amountPaid !== '' ? String(Views.sale.amountPaid).trim() : '');
@@ -2137,10 +2193,13 @@ Views.sale = {
       looseInfo: l.looseInfo || null
     }));
 
-    const sale = await DB.createSale({ lines, paymentType: payType, customerId, customerName, discount, amountPaid, changeAmount });
+    const sale = await DB.createSale({ lines, paymentType: payType, customerId, customerName, discount, deliveryFee, amountPaid, changeAmount });
     toast(`${t('sale_success')}#${sale.id}`, 'ok');
     cart = [];
     document.getElementById('saleDiscount').value = 0;
+    const delivFeeEl = document.getElementById('saleDeliveryFee');
+    if (delivFeeEl) delivFeeEl.value = 0;
+    Views.sale.sessions[Views.sale.activeIdx].deliveryFee = 0;
     Views.sale.amountPaid = '';
     Views.sale.selectedCustomer = null;
     Views.sale.setPayType('cash');
@@ -2219,6 +2278,7 @@ Views.sale = {
         <div style="border-top:1px dashed #000; padding-top:2px; margin-top:2px; width:100%; box-sizing:border-box;">
           <div class="receipt-totals-row"><span>${t('sale_subtotal')} (Subtotal):</span><span>${fmt(sale.subtotal)}</span></div>
           ${sale.discount > 0 ? `<div class="receipt-totals-row"><span>${t('sale_discount')} (Discount):</span><span>- ${fmt(sale.discount)}</span></div>` : ''}
+          ${(sale.deliveryFee > 0) ? `<div class="receipt-totals-row" style="color:#92400e; font-weight:700;"><span>\ud83d\ude9b ප්\u200dරවාහන ගාස්තු (Delivery):</span><span>+ ${fmt(sale.deliveryFee)}</span></div>` : ''}
           <div class="receipt-totals-row grand">
             <span style="font-size:11px; font-weight:800;">ශුද්ධ එකතුව (TOTAL):</span>
             <span style="font-size:12px; font-weight:800;">${fmt(sale.total)}</span>

@@ -154,6 +154,7 @@ module.exports = {
             lines TEXT, -- JSON string
             subtotal REAL,
             discount REAL,
+            deliveryFee REAL DEFAULT 0,
             total REAL,
             paymentType TEXT,
             customerId INTEGER,
@@ -167,6 +168,7 @@ module.exports = {
         try { await run(`ALTER TABLE sales ADD COLUMN amountPaid REAL DEFAULT 0`); } catch(e) {}
         try { await run(`ALTER TABLE sales ADD COLUMN changeAmount REAL DEFAULT 0`); } catch(e) {}
         try { await run(`ALTER TABLE sales ADD COLUMN barcode TEXT DEFAULT ''`); } catch(e) {}
+        try { await run(`ALTER TABLE sales ADD COLUMN deliveryFee REAL DEFAULT 0`); } catch(e) {}
         try { await run(`ALTER TABLE items ADD COLUMN barcode TEXT DEFAULT ''`); } catch(e) {}
         try { await run(`ALTER TABLE items ADD COLUMN description TEXT`); } catch(e) {}
         try { await run(`ALTER TABLE items ADD COLUMN image TEXT`); } catch(e) {}
@@ -399,7 +401,8 @@ module.exports = {
     createSale: async (sale) => {
         const subtotal = sale.lines.reduce((s,l) => s + l.qty * (l.originalPrice || l.unitPrice), 0);
         const discount = Number(sale.discount)||0;
-        const total = Math.max(0, subtotal - discount);
+        const deliveryFee = Number(sale.deliveryFee) || 0;
+        const total = Math.max(0, subtotal - discount + deliveryFee);
         const amountPaid = Number(sale.amountPaid) || 0;
         const changeAmount = Number(sale.changeAmount) || 0;
         const date = Date.now();
@@ -410,8 +413,8 @@ module.exports = {
             if(c) custName = c.name;
         }
 
-        const res = await run(`INSERT INTO sales (date, lines, subtotal, discount, total, paymentType, customerId, customerName, amountPaid, changeAmount) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-            [date, JSON.stringify(sale.lines), subtotal, discount, total, sale.paymentType, sale.customerId || null, custName, amountPaid, changeAmount]);
+        const res = await run(`INSERT INTO sales (date, lines, subtotal, discount, deliveryFee, total, paymentType, customerId, customerName, amountPaid, changeAmount) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [date, JSON.stringify(sale.lines), subtotal, discount, deliveryFee, total, sale.paymentType, sale.customerId || null, custName, amountPaid, changeAmount]);
         
         const saleId = res.lastID;
         const saleBarcode = 'BILL-' + saleId;
@@ -438,7 +441,7 @@ module.exports = {
             }
         }
 
-        return { id: saleId, barcode: saleBarcode, date, lines: sale.lines, subtotal, discount, total, paymentType: sale.paymentType, customerId: sale.customerId, customerName: custName, amountPaid, changeAmount };
+        return { id: saleId, barcode: saleBarcode, date, lines: sale.lines, subtotal, discount, deliveryFee, total, paymentType: sale.paymentType, customerId: sale.customerId, customerName: custName, amountPaid, changeAmount };
     },
     deleteSale: async (id) => {
         const s = await get(`SELECT * FROM sales WHERE id = ?`, [id]);
