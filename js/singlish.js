@@ -148,8 +148,13 @@ const Singlish = {
     return result;
   },
 
+  _memoPhonetic: new Map(),
+  _memoNormalize: new Map(),
+  _memoStripped: new Map(),
+
   toPhonetic(str) {
     if (!str) return '';
+    if (this._memoPhonetic.has(str)) return this._memoPhonetic.get(str);
     const cMap = {
       'ක': 'k', 'ඛ': 'k', 'ග': 'g', 'ඝ': 'g', 'ඞ': 'ng', 'ඟ': 'ng',
       'ච': 'ch', 'ඡ': 'ch', 'ජ': 'j', 'ඣ': 'j', 'ඤ': 'n', 'ඥ': 'gn', 'ඦ': 'nj',
@@ -192,12 +197,15 @@ const Singlish = {
         out += ch;
       }
     }
+    if (this._memoPhonetic.size > 2000) this._memoPhonetic.clear();
+    this._memoPhonetic.set(str, out);
     return out;
   },
 
   normalize(str) {
     if (!str) return '';
-    return str.toLowerCase()
+    if (this._memoNormalize.has(str)) return this._memoNormalize.get(str);
+    const res = str.toLowerCase()
       .replace(/[\s\-_.,/()"']/g, '')
       .replace(/wire|wayer|vayar|wayar/g, 'wair')
       .replace(/pipe|paip|payip|paippa/g, 'paip')
@@ -219,11 +227,15 @@ const Singlish = {
       .replace(/[ei]/g, 'i')
       .replace(/[ou]/g, 'u')
       .replace(/[aāäæ]/g, 'a');
+    if (this._memoNormalize.size > 2000) this._memoNormalize.clear();
+    this._memoNormalize.set(str, res);
+    return res;
   },
 
   stripSinhalaStrokes(str) {
     if (!str) return '';
-    return String(str)
+    if (this._memoStripped.has(str)) return this._memoStripped.get(str);
+    const res = String(str)
       .replace(/[්ාැෑිීුූෘෲෙේෛොෝෞං]/g, '')
       .replace(/ඇ|ඈ/g, 'අ')
       .replace(/ඊ/g, 'ඉ')
@@ -233,6 +245,9 @@ const Singlish = {
       .replace(/ණ/g, 'න')
       .replace(/ළ/g, 'ල')
       .replace(/ශ|ෂ/g, 'ස');
+    if (this._memoStripped.size > 2000) this._memoStripped.clear();
+    this._memoStripped.set(str, res);
+    return res;
   },
 
   matchSingleWord(target, word) {
@@ -271,6 +286,26 @@ const Singlish = {
     }
 
     return false;
+  },
+
+  matchItem(item, query) {
+    if (!query) return true;
+    if (!item) return false;
+    const q = String(query).trim().toLowerCase();
+    if (!q) return true;
+
+    // Fast-path: Direct lower-case match against name, category, barcode, description
+    const name = (item.name || '').toLowerCase();
+    const barcode = (item.barcode || '').toLowerCase();
+    const category = (item.category || '').toLowerCase();
+    const description = (item.description || '').toLowerCase();
+
+    if (name.includes(q) || barcode.includes(q) || category.includes(q) || description.includes(q)) {
+      return true;
+    }
+
+    // Fall back to Singlish transliteration & phonetic match
+    return this.match(item.name, q) || this.match(item.category || '', q) || this.match(item.description || '', q);
   },
 
   match(target, query) {

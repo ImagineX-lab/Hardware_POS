@@ -364,7 +364,7 @@ Views.sale = {
     }
     const q = (document.getElementById('saleSearch')?.value || '').trim();
     if (q) {
-      items = items.filter(i => Singlish.match(i.name, q) || Singlish.match(i.category || '', q) || Singlish.match(i.description || '', q) || (i.barcode && i.barcode.toLowerCase().includes(q.toLowerCase())));
+      items = items.filter(i => Singlish.matchItem(i, q)).slice(0, 60);
     }
     if (!items.length) {
       return `<div class="empty-state" style="grid-column:1/-1; padding:40px 20px;"><div class="em-ico"><i class="ph ph-package"></i></div><h3>${t('sale_no_matches') || 'No items'}</h3></div>`;
@@ -799,74 +799,78 @@ Views.sale = {
       });
     }
 
+    let searchDebounceTimer = null;
     if (searchInp) {
       searchInp.addEventListener('input', () => {
-        selectedIndex = -1;
-        const q = searchInp.value.trim();
-        const grid = document.getElementById('posItemGrid');
-        if (grid) {
-          grid.innerHTML = Views.sale.posGridHTML();
-          Views.sale.bindGrid();
-        }
-        if (!q) { suggestBox.innerHTML = ''; return; }
+        if (searchDebounceTimer) clearTimeout(searchDebounceTimer);
+        searchDebounceTimer = setTimeout(() => {
+          selectedIndex = -1;
+          const q = searchInp.value.trim();
+          const grid = document.getElementById('posItemGrid');
+          if (grid) {
+            grid.innerHTML = Views.sale.posGridHTML();
+            Views.sale.bindGrid();
+          }
+          if (!q) { suggestBox.innerHTML = ''; return; }
 
-        // Check if query matches a Bill Barcode
-        const billSale = DB.findSaleByBarcode ? DB.findSaleByBarcode(q) : null;
-        if (billSale) {
-          suggestBox.innerHTML = `
-            <div class="search-suggest">
-              <div class="suggest-row" data-open-bill="${billSale.id}" style="background:#f0fdf4; border-bottom:2px solid #bbf7d0; cursor:pointer;">
-                <div style="display:flex; align-items:center; gap:10px;">
-                  <div style="width:36px; height:36px; border-radius:6px; background:#dcfce7; color:#15803d; display:flex; align-items:center; justify-content:center; font-size:20px; flex-shrink:0;">
-                    <i class="ph ph-receipt"></i>
+          // Check if query matches a Bill Barcode
+          const billSale = DB.findSaleByBarcode ? DB.findSaleByBarcode(q) : null;
+          if (billSale) {
+            suggestBox.innerHTML = `
+              <div class="search-suggest">
+                <div class="suggest-row" data-open-bill="${billSale.id}" style="background:#f0fdf4; border-bottom:2px solid #bbf7d0; cursor:pointer;">
+                  <div style="display:flex; align-items:center; gap:10px;">
+                    <div style="width:36px; height:36px; border-radius:6px; background:#dcfce7; color:#15803d; display:flex; align-items:center; justify-content:center; font-size:20px; flex-shrink:0;">
+                      <i class="ph ph-receipt"></i>
+                    </div>
+                    <div>
+                      <div class="s-name" style="color:#15803d; font-weight:800;">🧾 බිල්පත (Bill) #${billSale.id} — <code style="font-size:11.5px; color:#166534;">${escapeHTML(billSale.barcode || ('BILL-' + billSale.id))}</code></div>
+                      <div class="s-meta" style="color:#166534;">${billSale.lines.length} items • ${fmtDate(billSale.date)} • ${billSale.paymentType === 'credit' ? `ණයට (${escapeHTML(billSale.customerName || '')})` : 'මුදල්'} • <b>${fmt(billSale.total)}</b></div>
+                    </div>
                   </div>
-                  <div>
-                    <div class="s-name" style="color:#15803d; font-weight:800;">🧾 බිල්පත (Bill) #${billSale.id} — <code style="font-size:11.5px; color:#166534;">${escapeHTML(billSale.barcode || ('BILL-' + billSale.id))}</code></div>
-                    <div class="s-meta" style="color:#166534;">${billSale.lines.length} items • ${fmtDate(billSale.date)} • ${billSale.paymentType === 'credit' ? `ණයට (${escapeHTML(billSale.customerName || '')})` : 'මුදල්'} • <b>${fmt(billSale.total)}</b></div>
-                  </div>
+                  <div style="font-weight:800; color:#15803d;">${fmt(billSale.total)}</div>
                 </div>
-                <div style="font-weight:800; color:#15803d;">${fmt(billSale.total)}</div>
-              </div>
-            </div>`;
-          suggestBox.querySelector('[data-open-bill]').addEventListener('click', () => {
-            searchInp.value = '';
-            suggestBox.innerHTML = '';
-            Views.sale.showReceipt(billSale);
-          });
-          return;
-        }
+              </div>`;
+            suggestBox.querySelector('[data-open-bill]').addEventListener('click', () => {
+              searchInp.value = '';
+              suggestBox.innerHTML = '';
+              Views.sale.showReceipt(billSale);
+            });
+            return;
+          }
 
-        const matches = DB.allItems().filter(i => Singlish.match(i.name, q) || Singlish.match(i.category || '', q) || Singlish.match(i.description || '', q) || (i.barcode && i.barcode.toLowerCase().includes(q.toLowerCase()))).slice(0, 8);
-        if (!matches.length) {
-          suggestBox.innerHTML = `<div class="search-suggest"><div class="suggest-row text-muted">${t('sale_no_matches')}</div></div>`;
-          return;
-        }
-        suggestBox.innerHTML = `<div class="search-suggest">${matches.map(i => `
-          <div class="suggest-row" data-add-item="${i.id}">
-            <div style="display:flex; align-items:center; gap:10px;">
-              <div style="width:36px; height:36px; border-radius:6px; overflow:hidden; background:var(--paper); display:flex; align-items:center; justify-content:center; flex-shrink:0;">
-                ${i.image ? `<img src="${i.image}" style="width:100%; height:100%; object-fit:cover;">` : `<i class="ph ph-package" style="font-size:18px;"></i>`}
+          const matches = DB.allItems().filter(i => Singlish.matchItem(i, q)).slice(0, 8);
+          if (!matches.length) {
+            suggestBox.innerHTML = `<div class="search-suggest"><div class="suggest-row text-muted">${t('sale_no_matches')}</div></div>`;
+            return;
+          }
+          suggestBox.innerHTML = `<div class="search-suggest">${matches.map(i => `
+            <div class="suggest-row" data-add-item="${i.id}">
+              <div style="display:flex; align-items:center; gap:10px;">
+                <div style="width:36px; height:36px; border-radius:6px; overflow:hidden; background:var(--paper); display:flex; align-items:center; justify-content:center; flex-shrink:0;">
+                  ${i.image ? `<img src="${i.image}" style="width:100%; height:100%; object-fit:cover;">` : `<i class="ph ph-package" style="font-size:18px;"></i>`}
+                </div>
+                <div>
+                  <div class="s-name">${escapeHTML(i.name)}</div>
+                  <div class="s-meta">${i.barcode ? `<b style="font-family:monospace; color:var(--primary);"><i class="ph ph-barcode"></i> ${escapeHTML(i.barcode)}</b> • ` : ''}${escapeHTML(i.category)} • ${t('word_qty')}: ${i.qty} ${escapeHTML(i.unit)} • ${t('items_cost_price')}: ${fmt(i.costPrice || 0)}</div>
+                </div>
               </div>
-              <div>
-                <div class="s-name">${escapeHTML(i.name)}</div>
-                <div class="s-meta">${i.barcode ? `<b style="font-family:monospace; color:var(--primary);"><i class="ph ph-barcode"></i> ${escapeHTML(i.barcode)}</b> • ` : ''}${escapeHTML(i.category)} • ${t('word_qty')}: ${i.qty} ${escapeHTML(i.unit)} • ${t('items_cost_price')}: ${fmt(i.costPrice || 0)}</div>
-              </div>
+              <div style="font-weight:700">${fmt(i.sellPrice)}</div>
             </div>
-            <div style="font-weight:700">${fmt(i.sellPrice)}</div>
-          </div>
-        `).join('')}</div>`;
-        suggestBox.querySelectorAll('[data-add-item]').forEach(row => {
-          row.addEventListener('click', () => {
-            const id = Number(row.dataset.addItem);
-            Views.sale.addToCart(id);
-            searchInp.value = ''; suggestBox.innerHTML = '';
-            if (grid) {
-              grid.innerHTML = Views.sale.posGridHTML();
-              Views.sale.bindGrid();
-            }
-            searchInp.blur();
+          `).join('')}</div>`;
+          suggestBox.querySelectorAll('[data-add-item]').forEach(row => {
+            row.addEventListener('click', () => {
+              const id = Number(row.dataset.addItem);
+              Views.sale.addToCart(id);
+              searchInp.value = ''; suggestBox.innerHTML = '';
+              if (grid) {
+                grid.innerHTML = Views.sale.posGridHTML();
+                Views.sale.bindGrid();
+              }
+              searchInp.blur();
+            });
           });
-        });
+        }, 50);
       });
 
       searchInp.addEventListener('keydown', (e) => {
@@ -1111,7 +1115,18 @@ Views.sale = {
     if (clearCartBtn) {
       clearCartBtn.addEventListener('click', () => {
         cart = [];
+        const paidInp = document.getElementById('saleAmountPaid');
+        if (paidInp) {
+          paidInp.value = '';
+          paidInp.classList.remove('input-error', 'input-success');
+        }
+        Views.sale.amountPaid = '';
+        if (Views.sale.sessions[Views.sale.activeIdx]) {
+          Views.sale.sessions[Views.sale.activeIdx].amountPaid = '';
+          Views.sale.sessions[Views.sale.activeIdx].cart = [];
+        }
         Views.sale.refreshCart();
+        Views.sale.updateChangeDue();
       });
       clearCartBtn.addEventListener('keydown', (e) => {
         if (e.key === 'ArrowUp') {
@@ -2261,14 +2276,27 @@ Views.sale = {
       const sale = await DB.createSale({ lines, paymentType: payType, customerId, customerName, discount, deliveryFee, amountPaid, changeAmount });
       toast(`${t('sale_success')}#${sale.id} ${shouldPrint ? '(මුද්‍රණය කෙරේ)' : '(Save විය)'}`, 'ok');
       cart = [];
-      document.getElementById('saleDiscount').value = 0;
+      const discEl = document.getElementById('saleDiscount');
+      if (discEl) discEl.value = 0;
       const delivFeeEl = document.getElementById('saleDeliveryFee');
       if (delivFeeEl) delivFeeEl.value = 0;
-      Views.sale.sessions[Views.sale.activeIdx].deliveryFee = 0;
+      const paidInp = document.getElementById('saleAmountPaid');
+      if (paidInp) {
+        paidInp.value = '';
+        paidInp.classList.remove('input-error', 'input-success');
+      }
+      if (Views.sale.sessions[Views.sale.activeIdx]) {
+        Views.sale.sessions[Views.sale.activeIdx].cart = [];
+        Views.sale.sessions[Views.sale.activeIdx].deliveryFee = 0;
+        Views.sale.sessions[Views.sale.activeIdx].discount = 0;
+        Views.sale.sessions[Views.sale.activeIdx].amountPaid = '';
+        Views.sale.sessions[Views.sale.activeIdx].selectedCustomer = null;
+      }
       Views.sale.amountPaid = '';
       Views.sale.selectedCustomer = null;
       Views.sale.setPayType('cash');
       Views.sale.refreshCart();
+      Views.sale.updateChangeDue();
       if (shouldPrint) {
         Views.sale.printReceiptDirect(sale);
       }
@@ -2479,7 +2507,7 @@ Views.items = {
   tableHTML() {
     let list = DB.allItems();
     const q = (Views.items.searchQ || '').trim();
-    if (q) list = list.filter(i => Singlish.match(i.name, q) || Singlish.match(i.category || '', q) || Singlish.match(i.subCategory || '', q) || Singlish.match(i.description || '', q) || (i.barcode && i.barcode.toLowerCase().includes(q.toLowerCase())));
+    if (q) list = list.filter(i => Singlish.matchItem(i, q));
 
     const currentCat = Views.items.selectedCategory || 'all';
     if (currentCat !== 'all') {

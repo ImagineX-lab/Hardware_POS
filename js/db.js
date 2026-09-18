@@ -25,10 +25,16 @@ const DB = {
       this.data.customers = await custRes.json();
       this.data.sales = await salesRes.json();
       this.data.purchases = await purchasesRes.json();
+      this.invalidateItemsCache();
     } catch(err) {
       console.error("Failed to load data", err);
     }
     return this.data;
+  },
+
+  _sortedItemsCache: null,
+  invalidateItemsCache() {
+    this._sortedItemsCache = null;
   },
 
   async reload() {
@@ -44,6 +50,7 @@ const DB = {
     });
     const newItem = await res.json();
     this.data.items.push(newItem);
+    this.invalidateItemsCache();
     return newItem;
   },
   async updateItem(id, patch){
@@ -56,6 +63,7 @@ const DB = {
       const updated = await res.json();
       const idx = this.data.items.findIndex(i => i.id === id);
       if(idx !== -1) this.data.items[idx] = updated;
+      this.invalidateItemsCache();
       return updated;
     }
     return null;
@@ -72,8 +80,13 @@ const DB = {
     if(!clean) return null;
     return this.data.items.find(i => (i.barcode || '').trim().toLowerCase() === clean);
   },
-  allItems(){ return this.data.items.slice().sort((a,b)=>a.name.localeCompare(b.name)); },
-  lowStockItems(){ return this.data.items.filter(i=>i.qty <= i.reorderLevel); },
+  allItems(){
+    if (!this._sortedItemsCache) {
+      this._sortedItemsCache = this.data.items.slice().sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+    }
+    return this._sortedItemsCache;
+  },
+  lowStockItems(){ return this.allItems().filter(i=>i.qty <= i.reorderLevel); },
 
   /* ---------------- CUSTOMERS (Credit / Nayata) ---------------- */
   async addCustomer(c){

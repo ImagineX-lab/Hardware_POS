@@ -260,7 +260,7 @@ const App = {
         if (e.key === 'F10') { e.preventDefault(); document.getElementById('clearCartBtn')?.click(); }
         if (e.altKey && e.code === 'KeyC') { e.preventDefault(); Views.sale.setPayType('cash'); }
         if (e.altKey && e.code === 'KeyR') { e.preventDefault(); Views.sale.setPayType('credit'); }
-        if (e.key === '/') { e.preventDefault(); document.getElementById('saleSearch')?.focus(); }
+        if (!isInput && e.key === '/') { e.preventDefault(); document.getElementById('saleSearch')?.focus(); }
       } else if (((App.currentView === 'stock' && Views.stock.activeTab === 'items') || App.currentView === 'customers') && !document.getElementById('activeModal')) {
         if (e.altKey && e.code === 'KeyN') {
           e.preventDefault();
