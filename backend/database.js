@@ -112,6 +112,12 @@ const validateNICBackend = (nic) => {
 
 module.exports = {
     init: async () => {
+        // --- PERFORMANCE: Enable WAL mode for faster concurrent reads/writes ---
+        await run(`PRAGMA journal_mode=WAL`);
+        await run(`PRAGMA cache_size=-8000`); // 8MB page cache
+        await run(`PRAGMA synchronous=NORMAL`);
+        await run(`PRAGMA temp_store=MEMORY`);
+
         await run(`CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT)`);
         await run(`CREATE TABLE IF NOT EXISTS items (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -274,6 +280,16 @@ module.exports = {
         ];
 
         await run(`CREATE TABLE IF NOT EXISTS deleted_items (id INTEGER PRIMARY KEY, name TEXT, barcode TEXT, deletedAt INTEGER)`);
+
+        // --- PERFORMANCE: Add indexes to speed up foreign key lookups ---
+        await run(`CREATE INDEX IF NOT EXISTS idx_ledger_customer ON customer_ledger(customerId)`);
+        await run(`CREATE INDEX IF NOT EXISTS idx_ledger_date ON customer_ledger(date DESC)`);
+        await run(`CREATE INDEX IF NOT EXISTS idx_sales_date ON sales(date DESC)`);
+        await run(`CREATE INDEX IF NOT EXISTS idx_sales_customer ON sales(customerId)`);
+        await run(`CREATE INDEX IF NOT EXISTS idx_items_name ON items(name)`);
+        await run(`CREATE INDEX IF NOT EXISTS idx_items_category ON items(category)`);
+        await run(`CREATE INDEX IF NOT EXISTS idx_items_barcode ON items(barcode)`);
+
         const itemsSeeded = await get(`SELECT value FROM settings WHERE key = 'items_seeded'`);
         if (!itemsSeeded) {
             const countRow = await get(`SELECT COUNT(*) as count FROM items`);
@@ -361,8 +377,17 @@ module.exports = {
 
     getAllCustomers: async () => {
         const customers = await all(`SELECT * FROM customers ORDER BY name ASC`);
-        for(let c of customers) {
-            c.ledger = await all(`SELECT * FROM customer_ledger WHERE customerId = ? ORDER BY date DESC`, [c.id]);
+        if (!customers.length) return customers;
+
+        // --- PERFORMANCE: Single bulk fetch instead of N+1 per-customer queries ---
+        const ledgerRows = await all(`SELECT * FROM customer_ledger ORDER BY date DESC`);
+        const ledgerMap = {};
+        for (const row of ledgerRows) {
+            if (!ledgerMap[row.customerId]) ledgerMap[row.customerId] = [];
+            ledgerMap[row.customerId].push(row);
+        }
+        for (const c of customers) {
+            c.ledger = ledgerMap[c.id] || [];
         }
         return customers;
     },
@@ -418,8 +443,19 @@ module.exports = {
         return c;
     },
 
-    getAllSales: async () => {
-        const sales = await all(`SELECT * FROM sales ORDER BY id DESC`);
+    getAllSales: async (limit, offset) => {
+        // --- PERFORMANCE: Support pagination to avoid loading all sales at once ---
+        let query = `SELECT * FROM sales ORDER BY id DESC`;
+        const params = [];
+        if (limit != null) {
+            query += ` LIMIT ?`;
+            params.push(Number(limit));
+            if (offset != null) {
+                query += ` OFFSET ?`;
+                params.push(Number(offset));
+            }
+        }
+        const sales = await all(query, params);
         sales.forEach(s => {
             try { s.lines = typeof s.lines === 'string' ? JSON.parse(s.lines) : s.lines; } catch(e) { s.lines = []; }
             s.barcode = s.barcode || ('BILL-' + s.id);
@@ -653,7 +689,7 @@ module.exports = {
             settings: await module.exports.getSettings(),
             items: await module.exports.getAllItems(),
             customers: await module.exports.getAllCustomers(),
-            sales: await module.exports.getAllSales()
+            sales: await module.exports.getAllSales() // no limit for backup — export everything
         };
     },
     importJSON: async (data) => {

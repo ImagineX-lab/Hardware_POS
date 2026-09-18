@@ -2,9 +2,13 @@ const express = require('express');
 const cors = require('cors');
 const path = require('path');
 const db = require('./backend/database');
+// compression may not be installed yet — safe fallback if missing
+let compression;
+try { compression = require('compression'); } catch(e) { compression = null; }
 
 const app = express();
 app.use(cors());
+if (compression) app.use(compression()); // --- PERFORMANCE: gzip API responses ---
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
@@ -81,7 +85,10 @@ app.post('/api/customers/:id/payment', async (req, res) => {
 
 // Sales
 app.get('/api/sales', async (req, res) => {
-    res.json(await db.getAllSales());
+    // --- PERFORMANCE: Support ?limit=N&offset=M for pagination ---
+    const limit = req.query.limit != null ? Number(req.query.limit) : 500;
+    const offset = req.query.offset != null ? Number(req.query.offset) : 0;
+    res.json(await db.getAllSales(limit, offset));
 });
 app.post('/api/sales', async (req, res) => {
     const newSale = await db.createSale(req.body);
