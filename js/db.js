@@ -63,7 +63,7 @@ const DB = {
   async deleteItem(id){
     await fetch(`/api/items/${id}`, { method: 'DELETE' });
     this.data.items = this.data.items.filter(i => Number(i.id) !== Number(id));
-    await this.reload();
+    // No full reload needed — item already removed from local cache
   },
   getItem(id){ return this.data.items.find(i=>i.id===id); },
   getItemByBarcode(barcode){
@@ -146,8 +146,20 @@ const DB = {
     });
     const newSale = await res.json();
     this.data.sales.unshift(newSale);
-    // Reload items and customers to get correct stock and balance
-    await this.reload();
+
+    // --- PERFORMANCE: Update stock + customer balance in memory, no full reload ---
+    for (const line of (sale.lines || [])) {
+      const item = this.data.items.find(i => i.id === line.itemId);
+      if (item) {
+        item.qty = Math.max(0, Math.round((item.qty - line.qty) * 10000) / 10000);
+      }
+    }
+    if (sale.paymentType === 'credit' && sale.customerId) {
+      const customer = this.data.customers.find(c => c.id === sale.customerId);
+      if (customer) {
+        customer.balance = (customer.balance || 0) + newSale.total;
+      }
+    }
     return newSale;
   },
   allSales(){ return this.data.sales; },
@@ -180,9 +192,24 @@ const DB = {
   },
   async deleteSale(id){
     await fetch(`/api/sales/${id}`, { method: 'DELETE' });
+    const deleted = this.data.sales.find(x => x.id === id);
     this.data.sales = this.data.sales.filter(x => x.id !== id);
-    // Reload to fix stock and customer balances
-    await this.reload();
+
+    // --- PERFORMANCE: Restore stock + customer balance in memory, no full reload ---
+    if (deleted) {
+      for (const line of (deleted.lines || [])) {
+        const item = this.data.items.find(i => i.id === line.itemId);
+        if (item) {
+          item.qty = Math.round((item.qty + line.qty) * 10000) / 10000;
+        }
+      }
+      if (deleted.paymentType === 'credit' && deleted.customerId) {
+        const customer = this.data.customers.find(c => c.id === deleted.customerId);
+        if (customer) {
+          customer.balance = Math.max(0, (customer.balance || 0) - deleted.total);
+        }
+      }
+    }
   },
   async clearAllSales(restoreStock = true){
     const res = await fetch('/api/sales/clear-all', {
@@ -194,8 +221,20 @@ const DB = {
       const err = await res.json();
       throw new Error(err.error || 'Failed to clear sales');
     }
+    // --- PERFORMANCE: Clear locally, restore stock in-memory if needed ---
+    if (restoreStock) {
+      for (const sale of this.data.sales) {
+        for (const line of (sale.lines || [])) {
+          const item = this.data.items.find(i => i.id === line.itemId);
+          if (item) item.qty = Math.round((item.qty + line.qty) * 10000) / 10000;
+        }
+        if (sale.paymentType === 'credit' && sale.customerId) {
+          const customer = this.data.customers.find(c => c.id === sale.customerId);
+          if (customer) customer.balance = Math.max(0, (customer.balance || 0) - sale.total);
+        }
+      }
+    }
     this.data.sales = [];
-    await this.reload();
     return true;
   },
 
@@ -219,7 +258,13 @@ const DB = {
       body: JSON.stringify(p)
     });
     const newP = await res.json();
-    await this.reload();
+    // --- PERFORMANCE: Push to local cache, no full reload ---
+    this.data.purchases.unshift(newP);
+    // If auto-update-stock was used, re-sync items from server once
+    if (p.autoUpdateStock) {
+      const itemsRes = await fetch('/api/items');
+      this.data.items = await itemsRes.json();
+    }
     return newP;
   },
   async updatePurchase(id, patch){
@@ -230,7 +275,9 @@ const DB = {
     });
     if(res.ok) {
       const updated = await res.json();
-      await this.reload();
+      // --- PERFORMANCE: Update local cache in-place, no full reload ---
+      const idx = this.data.purchases.findIndex(p => p.id === id);
+      if(idx !== -1) this.data.purchases[idx] = updated;
       return updated;
     }
     return null;

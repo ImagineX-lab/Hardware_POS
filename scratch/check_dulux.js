@@ -1,0 +1,13 @@
+const sqlite3 = require('sqlite3').verbose();
+const path = require('path');
+const dbPath = path.join(process.env.APPDATA, 'hardware-pos', 'pos.db');
+const db = new sqlite3.Database(dbPath);
+
+db.all("SELECT id, name, sellPrice, qty FROM items WHERE name LIKE '%Dulux%' OR name LIKE '%coral%' OR name LIKE '%sand%' OR name LIKE '%Sand%'", [], (err, rows) => {
+  if (err) console.error(err);
+  else {
+    console.log(`Found ${rows.length} rows:`);
+    rows.forEach(r => console.log(r.id, '|', r.name, '| Rs.', r.sellPrice, '| Qty:', r.qty));
+  }
+  db.close();
+});
