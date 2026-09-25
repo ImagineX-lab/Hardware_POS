@@ -1,0 +1,49 @@
+const sqlite3 = require('sqlite3').verbose();
+const fs = require('fs');
+
+const dbPaths = [
+  'D:\\Hadware_Pos_System\\Hardware_POS\\backend\\pos.db',
+  'C:\\Users\\Saluka\\AppData\\Roaming\\hardware-pos\\pos.db',
+  'C:\\Users\\Saluka\\AppData\\Roaming\\Hardware POS\\pos.db',
+];
+
+const itemNames = [
+  '1/2" S-lon බට',
+  '3/4" S-lon බට',
+  '1" S-lon බට',
+  '1 1/4" S-lon බට',
+  '1 1/2" S-lon බට',
+  '2" S-lon බට',
+  '3" ඩවුන් පයිප්ප බට',
+  '4" ගැනේජ් බට',
+  '6" Local බට',
+  '1/2" Local බට',
+  '1" Local බට',
+  '1 1/4" Local බට',
+  '1 1/2" Local බට',
+  '2" Local බට',
+  '3" Local බට',
+  '4" Local බට',
+  '1/2" Anton බට',
+  '3/4" Anton බට',
+  '1" Anton බට',
+  '1 1/2" Anton බට',
+  '2" Anton බට'
+];
+
+for (const p of dbPaths) {
+  if (!fs.existsSync(p)) continue;
+  const db = new sqlite3.Database(p);
+  const placeholders = itemNames.map(() => '?').join(',');
+  db.all(`SELECT id, name, category, subCategory, unit, qty, sellPrice, barcode FROM items WHERE name IN (${placeholders}) ORDER BY id`, itemNames, (err, rows) => {
+    if (err) console.error(err);
+    console.log(`\n======================================================`);
+    console.log(`DB: ${p}`);
+    console.log(`Total found: ${rows ? rows.length : 0} / ${itemNames.length}`);
+    console.log(`======================================================`);
+    rows.forEach(r => {
+      console.log(`ID: ${r.id.toString().padEnd(5)} | ${r.name.padEnd(20)} | SubCat: ${r.subCategory.padEnd(26)} | Unit: ${r.unit.padEnd(7)} | Price: Rs.${r.sellPrice.toString().padEnd(5)} | Barcode: ${r.barcode}`);
+    });
+    db.close();
+  });
+}

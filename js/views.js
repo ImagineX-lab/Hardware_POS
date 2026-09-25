@@ -2388,6 +2388,27 @@ Views.sale = {
             <span>ගෙවීම් ක්‍රමය (Payment):</span>
             <b>${sale.paymentType === 'credit' ? `ණයට (Credit) - ${escapeHTML(sale.customerName || '')}` : 'මුදල් (Cash)'}</b>
           </div>
+          ${sale.paymentType === 'credit' ? `
+            <div class="receipt-totals-row" style="color:#b91c1c; font-weight:700;">
+              <span>මෙම බිලෙන් ණය (Credit):</span>
+              <span>${fmt(sale.total)}</span>
+            </div>
+            ${sale.amountPaid > 0 ? `
+              <div class="receipt-totals-row"><span>ගෙවූ මුදල (Paid):</span><span>${fmt(sale.amountPaid)}</span></div>
+            ` : ''}
+            ${(()=>{
+              if (sale.customerId) {
+                const cust = DB.getCustomer(sale.customerId);
+                if (cust) {
+                  return `<div class="receipt-totals-row" style="border-top:1px dashed #000; margin-top:2px; padding-top:2px; font-weight:700;">
+                    <span>ගනුදෙනුකරුගේ මුළු හිඟය (Total Due):</span>
+                    <span>${fmt(cust.balance)}</span>
+                  </div>`;
+                }
+              }
+              return '';
+            })()}
+          ` : ''}
           ${sale.paymentType === 'cash' && sale.amountPaid > 0 ? `
             <div class="receipt-totals-row"><span>ගෙවූ මුදල (Paid):</span><span>${fmt(sale.amountPaid)}</span></div>
             <div class="receipt-totals-row" style="font-weight:700;"><span>ඉතිරි මුදල (Change):</span><span>${fmt(sale.changeAmount)}</span></div>
@@ -4040,9 +4061,137 @@ Views.customers = {
   },
 
 
+  getPaymentReceiptHTML({ customer, prevBalance, amountPaid, newBalance, date = Date.now(), note = '', paymentId = '' }) {
+    const shopName = (DB.data.settings && DB.data.settings.shopName) || 'HardwarePOS';
+    const shopDesc = (DB.data.settings && DB.data.settings.shopDescription) || '';
+    const logo = (DB.data.settings && DB.data.settings.logo) || '';
+    const rawLogoSize = Number(DB.data.settings && DB.data.settings.logoSize) || 50;
+    const logoSize = Math.min(Math.max(rawLogoSize * 1.8, 85), 150);
+    const d = new Date(date);
+    const formattedDate = d.toLocaleDateString('en-GB') + ' ' + d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+    const receiptNo = paymentId ? `REC-${paymentId}` : `REC-${Math.floor(d.getTime() / 1000).toString().slice(-6)}`;
+
+    return `
+      <div class="receipt" id="printArea" style="font-family:inherit;">
+        ${logo ? `<div style="text-align:center; margin-bottom:6px;"><img class="receipt-logo" src="${logo}" alt="Logo" style="height:${logoSize}px; max-height:140px; max-width:250px; object-fit:contain; margin:0 auto; display:block;"></div>` : ''}
+        <h2>${escapeHTML(shopName)}</h2>
+        ${shopDesc ? `<div class="r-center" style="font-size:9.5px; color:#222; margin-bottom:3px; white-space:pre-line;">${escapeHTML(shopDesc)}</div>` : ''}
+        
+        <div style="border-top:1px dashed #000; border-bottom:1px dashed #000; padding:4px 0; margin:4px 0; font-size:10px; text-align:center;">
+          <div style="font-weight:800; font-size:12px; letter-spacing:0.5px;">ණය ගෙවීම් රිසිට්පත</div>
+          <div style="font-size:9px; color:#333; text-transform:uppercase;">CREDIT PAYMENT RECEIPT</div>
+        </div>
+
+        <div style="font-size:9.5px; margin-bottom:4px; line-height:1.4;">
+          <div style="display:flex; justify-content:space-between;">
+            <span><b>රිසිට් අංකය:</b> ${receiptNo}</span>
+            <span>${formattedDate}</span>
+          </div>
+          <div><b>ගනුදෙනුකරු:</b> ${escapeHTML(customer.name)}</div>
+          ${customer.phone ? `<div><b>දුරකථන:</b> ${escapeHTML(customer.phone)}</div>` : ''}
+          ${customer.nic ? `<div><b>ජා.හැ. අංකය:</b> ${escapeHTML(customer.nic)}</div>` : ''}
+        </div>
+
+        <div style="border-top:1px dashed #000; border-bottom:1px dashed #000; padding:6px 0; margin:6px 0; font-size:10px;">
+          <div class="receipt-totals-row" style="font-size:10px;">
+            <span>කලින් තිබූ හිඟ මුදල (Previous Due):</span>
+            <span style="font-weight:700;">${fmt(prevBalance)}</span>
+          </div>
+          <div class="receipt-totals-row grand" style="background:#f0fdf4; border:1px dashed #16a34a; padding:4px 6px; margin:4px 0; border-radius:4px;">
+            <span style="font-size:12px; font-weight:800; color:#166534;">ගෙවූ මුදල (PAID AMOUNT):</span>
+            <span style="font-size:14px; font-weight:900; color:#166534;">${fmt(amountPaid)}</span>
+          </div>
+          <div class="receipt-totals-row" style="font-size:11px; font-weight:800; margin-top:4px;">
+            <span>ඉතිරි හිඟ මුදල (Remaining Due):</span>
+            <span style="color:${newBalance > 0 ? '#b91c1c' : '#15803d'}; font-size:12px;">${fmt(newBalance)}</span>
+          </div>
+          ${note ? `<div style="font-size:9px; color:#555; margin-top:4px; border-top:1px dotted #ccc; padding-top:2px;"><b>සටහන:</b> ${escapeHTML(note)}</div>` : ''}
+        </div>
+
+        <div style="text-align:center; margin-top:6px; border-top:1px dashed #000; padding-top:4px;">
+          <div style="font-weight:700; font-size:10px; margin-bottom:1px;">ගෙවීමට ස්තූතියි!</div>
+          <div style="font-size:8.5px; color:#222; margin-bottom:3px; line-height:1.25;">නැවත විමසීම් සඳහා මෙම රිසිට්පත තබාගන්න.</div>
+          <div style="font-size:9.5px; font-weight:700; color:#000; margin-top:4px; text-align:center;">
+            ImagineX Software Solution - 0761945587
+          </div>
+        </div>
+      </div>
+    `;
+  },
+
+  async printPaymentReceiptDirect(params) {
+    const html = Views.customers.getPaymentReceiptHTML(params);
+    let hiddenContainer = document.getElementById('directPrintContainer');
+    if (!hiddenContainer) {
+      hiddenContainer = document.createElement('div');
+      hiddenContainer.id = 'directPrintContainer';
+      document.body.appendChild(hiddenContainer);
+    }
+    hiddenContainer.innerHTML = html;
+
+    if (window.electronAPI && typeof window.electronAPI.printReceipt === 'function') {
+      try {
+        await window.electronAPI.printReceipt({ silent: true });
+      } catch (err) {
+        console.error('Print error:', err);
+        window.print();
+      }
+    } else {
+      window.print();
+    }
+
+    setTimeout(() => {
+      if (hiddenContainer && hiddenContainer.parentNode) {
+        hiddenContainer.parentNode.removeChild(hiddenContainer);
+      }
+    }, 1500);
+  },
+
+  showPaymentReceiptModal(params) {
+    const html = Views.customers.getPaymentReceiptHTML(params);
+    openModal({
+      title: `ණය ගෙවීම් රිසිට්පත - ${escapeHTML(params.customer.name)}`,
+      bodyHTML: `
+        <div style="margin-bottom:12px; padding:10px 14px; background:#dcfce7; border:1px solid #86efac; border-radius:8px; display:flex; align-items:center; justify-content:space-between;">
+          <div style="display:flex; align-items:center; gap:8px;">
+            <i class="ph ph-check-circle" style="font-size:22px; color:#15803d;"></i>
+            <div>
+              <div style="font-weight:700; color:#166534; font-size:13px;">ගෙවීම සාර්ථකයි!</div>
+              <div style="font-size:11px; color:#15803d;">ගෙවූ මුදල: <b>${fmt(params.amountPaid)}</b> | ඉතිරි හිඟය: <b>${fmt(params.newBalance)}</b></div>
+            </div>
+          </div>
+          <button class="btn btn-sm btn-success" id="quickPrintPayBtn" style="font-weight:700;">
+            <i class="ph ph-printer"></i> Print Slip
+          </button>
+        </div>
+        ${html}
+      `,
+      footHTML: `
+        ${params.returnCustId ? `<button class="btn btn-outline" id="backToCustBtn"><i class="ph ph-arrow-left"></i> ගනුදෙනුකරුගේ විස්තර</button>` : `<button class="btn btn-outline" data-close>${t('close')}</button>`}
+        <button class="btn btn-primary" id="modalPrintPayBtn"><i class="ph ph-printer"></i> ${t('receipt_print') || 'Print කරන්න'}</button>
+      `,
+      wide: false,
+      onMount: (wrap) => {
+        const doPrint = () => {
+          Views.customers.printPaymentReceiptDirect(params);
+        };
+        wrap.querySelector('#quickPrintPayBtn')?.addEventListener('click', doPrint);
+        wrap.querySelector('#modalPrintPayBtn')?.addEventListener('click', doPrint);
+        wrap.querySelector('#backToCustBtn')?.addEventListener('click', () => {
+          Views.customers.openDetailModal(params.returnCustId);
+        });
+      }
+    });
+  },
+
   openDetailModal(id) {
     const c = DB.getCustomer(id);
     if (!c) return;
+
+    const totalCredit = (c.ledger || []).filter(l => l.type === 'sale').reduce((sum, l) => sum + (Number(l.amount) || 0), 0);
+    const totalPaid = (c.ledger || []).filter(l => l.type === 'payment').reduce((sum, l) => sum + (Number(l.amount) || 0), 0);
+    const currentDue = c.balance;
+
     openModal({
       title: c.name,
       wide: true,
@@ -4060,15 +4209,47 @@ Views.customers = {
           </div>
           <div>
             <div class="small text-muted">${t('cust_curr_due')}</div>
-            <div style="font-size:22px; font-weight:700; color:${c.balance > 0 ? 'var(--danger)' : 'var(--success)'}">${fmt(c.balance)}</div>
+            <div style="font-size:24px; font-weight:800; color:${currentDue > 0 ? 'var(--danger)' : 'var(--success)'}; margin-top:2px;">${fmt(currentDue)}</div>
+            ${currentDue <= 0 ? `<div class="pill pill-ok" style="margin-top:6px; font-weight:700;"><i class="ph ph-check"></i> කිසිදු හිඟ මුදලක් නොමැත</div>` : ''}
           </div>
         </div>
 
-        <div class="card" style="background:var(--paper); margin-top:16px; box-shadow:none;">
-          <div class="card-title">${t('cust_record_payment_title')}</div>
-          <div class="flex gap-8" style="align-items:flex-end;">
-            <div class="field" style="flex:1; margin-bottom:0;"><label class="field-label">${t('cust_payment_amount')}</label><input class="input" id="paymentAmt" type="number" min="1"></div>
-            <button class="btn btn-success" id="recordPaymentBtn">${t('cust_record_payment_btn')}</button>
+        <!-- Summary Stat Badges -->
+        <div class="grid grid-3" style="gap:12px; margin-top:14px; margin-bottom:14px;">
+          <div class="card" style="padding:10px 14px; background:var(--paper); border-left:4px solid var(--orange); box-shadow:none; margin:0;">
+            <div class="small text-muted" style="font-size:11px;">මුළු ණයට ගත් මුදල (Total Credit)</div>
+            <div style="font-size:16px; font-weight:700; color:var(--orange-dark); margin-top:2px;">${fmt(totalCredit)}</div>
+          </div>
+          <div class="card" style="padding:10px 14px; background:var(--paper); border-left:4px solid #16a34a; box-shadow:none; margin:0;">
+            <div class="small text-muted" style="font-size:11px;">මුළු ගෙවූ මුදල (Total Paid)</div>
+            <div style="font-size:16px; font-weight:700; color:#16a34a; margin-top:2px;">${fmt(totalPaid)}</div>
+          </div>
+          <div class="card" style="padding:10px 14px; background:var(--paper); border-left:4px solid ${currentDue > 0 ? 'var(--danger)' : 'var(--success)'}; box-shadow:none; margin:0;">
+            <div class="small text-muted" style="font-size:11px;">දැනට හිඟ මුදල (Balance Due)</div>
+            <div style="font-size:16px; font-weight:700; color:${currentDue > 0 ? 'var(--danger)' : 'var(--success)'}; margin-top:2px;">${fmt(currentDue)}</div>
+          </div>
+        </div>
+
+        <!-- Record Payment Section -->
+        <div class="card" style="background:var(--paper); margin-top:12px; box-shadow:none; border:1px solid var(--border);">
+          <div class="card-title" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+            <span><i class="ph ph-money"></i> ${t('cust_record_payment_title')}</span>
+            ${currentDue > 0 ? `<button type="button" class="btn btn-xs btn-outline" id="payFullDueBtn" style="font-size:11px; padding:3px 8px;"><i class="ph ph-arrows-down-up"></i> සම්පූර්ණ හිඟය (${fmt(currentDue)})</button>` : ''}
+          </div>
+          <div class="grid grid-3 gap-8" style="align-items:flex-end;">
+            <div class="field" style="margin-bottom:0;">
+              <label class="field-label" style="font-size:12px;">${t('cust_payment_amount')} *</label>
+              <input class="input" id="paymentAmt" type="number" min="1" placeholder="උදා: 5000">
+            </div>
+            <div class="field" style="margin-bottom:0;">
+              <label class="field-label" style="font-size:12px;">ගෙවීම් සටහන / ක්‍රමය</label>
+              <input class="input" id="paymentNote" placeholder="මුදල් / බැංකු / චෙක්පත්...">
+            </div>
+            <div>
+              <button class="btn btn-success" id="recordPaymentBtn" style="width:100%; height:40px; font-weight:700;">
+                <i class="ph ph-check-circle"></i> ${t('cust_record_payment_btn')}
+              </button>
+            </div>
           </div>
         </div>
 
@@ -4077,7 +4258,14 @@ Views.customers = {
           ${c.ledger.length ? `
             <div class="table-wrap">
               <table>
-                <thead><tr><th>${t('dash_date')}</th><th>${t('word_type')}</th><th class="num">${t('sale_payment')}</th></tr></thead>
+                <thead>
+                  <tr>
+                    <th>${t('dash_date')}</th>
+                    <th>${t('word_type')}</th>
+                    <th class="num">${t('sale_payment')}</th>
+                    <th style="width:90px; text-align:center;">රිසිට්පත</th>
+                  </tr>
+                </thead>
                 <tbody>
                   ${c.ledger.map(l => {
         let itemsHtml = '';
@@ -4114,15 +4302,30 @@ Views.customers = {
             `;
           }
         }
+        const isPayment = l.type === 'payment';
         return `
                     <tr>
                       <td style="vertical-align:top; padding-top:12px;">${fmtDate(l.date)}</td>
                       <td style="vertical-align:top; padding-top:12px;">
-                        ${l.type === 'sale' ? `<span class="pill pill-warn">${t('cust_type_sale')}</span>` : `<span class="pill pill-ok">${t('cust_type_pay')}</span>`} 
+                        ${isPayment
+                          ? `<span class="pill pill-ok" style="background:#dcfce7; color:#15803d; font-weight:700;"><i class="ph ph-arrow-down-left"></i> ${t('cust_type_pay')}</span>`
+                          : `<span class="pill pill-warn"><i class="ph ph-shopping-cart"></i> ${t('cust_type_sale')}</span>`
+                        } 
                         <span class="small text-muted" style="display:inline-block; margin-left:6px;">${escapeHTML(l.note || '')}</span>
                         ${itemsHtml}
                       </td>
-                      <td class="num" style="vertical-align:top; padding-top:12px;">${l.type === 'sale' ? '+' : '-'} ${fmt(l.amount)}</td>
+                      <td class="num" style="vertical-align:top; padding-top:12px;">
+                        ${isPayment
+                          ? `<span style="color:#16a34a; font-weight:800; font-size:13.5px;">- ${fmt(l.amount)}</span>`
+                          : `<span style="color:var(--danger); font-weight:700;">+ ${fmt(l.amount)}</span>`
+                        }
+                      </td>
+                      <td style="vertical-align:top; padding-top:12px; text-align:center;">
+                        ${isPayment
+                          ? `<button class="btn btn-xs btn-outline" data-print-pay-slip="${l.id || l.date}" data-pay-amt="${l.amount}" data-pay-date="${l.date}" data-pay-note="${escapeHTML(l.note || '')}" style="padding:3px 8px; font-size:11px;" title="රිසිට්පත බලන්න / Print"><i class="ph ph-printer"></i> රිසිට්පත</button>`
+                          : (l.saleId ? `<button class="btn btn-xs btn-outline" data-view-cust-sale="${l.saleId}" style="padding:3px 8px; font-size:11px;" title="බිල්පත බලන්න"><i class="ph ph-receipt"></i> බිල</button>` : '-')
+                        }
+                      </td>
                     </tr>
                     `;
       }).join('')}
@@ -4133,14 +4336,78 @@ Views.customers = {
         </div>
       `,
       footHTML: `<button class="btn btn-outline" data-close>${t('close')}</button>`,
-      onMount: () => {
-        document.getElementById('recordPaymentBtn').addEventListener('click', async () => {
-          const amt = Number(document.getElementById('paymentAmt').value) || 0;
-          if (amt <= 0) { toast(t('cust_err_amt'), 'err'); return; }
-          await DB.recordPayment(id, amt);
-          toast(t('cust_pay_recorded'), 'ok');
+      onMount: (wrap) => {
+        // Quick Pay Full Due Button
+        wrap.querySelector('#payFullDueBtn')?.addEventListener('click', () => {
+          const amtInp = wrap.querySelector('#paymentAmt');
+          if (amtInp) {
+            amtInp.value = Math.max(0, currentDue);
+            amtInp.focus();
+          }
+        });
+
+        // Record Payment button
+        wrap.querySelector('#recordPaymentBtn')?.addEventListener('click', async () => {
+          const amtInp = wrap.querySelector('#paymentAmt');
+          const amt = Number(amtInp?.value) || 0;
+          const noteInp = wrap.querySelector('#paymentNote');
+          const note = (noteInp?.value || '').trim() || 'මුදල් ගෙවීම';
+
+          if (amt <= 0) {
+            toast(t('cust_err_amt'), 'err');
+            if (amtInp) amtInp.focus();
+            return;
+          }
+
+          const prevBalance = c.balance;
+          const newBalance = Math.max(0, prevBalance - amt);
+
+          const updatedCustomer = await DB.recordPayment(id, amt, note);
+          toast('ගෙවීම සාර්ථකව සටහන් විය!', 'ok');
           closeModal();
           App.render();
+
+          // Open Payment Receipt Modal showing exactly what was paid!
+          Views.customers.showPaymentReceiptModal({
+            customer: updatedCustomer || c,
+            prevBalance,
+            amountPaid: amt,
+            newBalance,
+            date: Date.now(),
+            note,
+            paymentId: Date.now().toString().slice(-6),
+            returnCustId: id
+          });
+        });
+
+        // Ledger print payment slips
+        wrap.querySelectorAll('[data-print-pay-slip]').forEach(btn => {
+          btn.addEventListener('click', () => {
+            const amt = Number(btn.dataset.payAmt) || 0;
+            const date = Number(btn.dataset.payDate) || Date.now();
+            const note = btn.dataset.payNote || '';
+            const paymentId = btn.dataset.printPaySlip;
+
+            Views.customers.showPaymentReceiptModal({
+              customer: c,
+              prevBalance: c.balance + amt,
+              amountPaid: amt,
+              newBalance: c.balance,
+              date,
+              note,
+              paymentId,
+              returnCustId: id
+            });
+          });
+        });
+
+        // Ledger view sale bills
+        wrap.querySelectorAll('[data-view-cust-sale]').forEach(btn => {
+          btn.addEventListener('click', () => {
+            const saleId = Number(btn.dataset.viewCustSale);
+            const sale = DB.allSales().find(s => s.id === saleId);
+            if (sale) Views.sale.showReceipt(sale);
+          });
         });
       }
     });
