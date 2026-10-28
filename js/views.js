@@ -45,13 +45,11 @@ Views.dashboard = {
   render() {
     const items = DB.allItems();
     const low = DB.lowStockItems();
-    const today = DB.todaySales();
-    const todayTotal = today.reduce((s, x) => s + x.total, 0);
     const credit = DB.totalCreditOutstanding();
     const recent = DB.allSales().slice(0, 6);
 
     return `
-      <div class="grid grid-4">
+      <div class="grid grid-3">
         <div class="card stat-card">
           <div class="stat-label">${t('dash_total_items')}</div>
           <div class="stat-value">${items.length}</div>
@@ -61,11 +59,6 @@ Views.dashboard = {
           <div class="stat-label">${t('dash_low_stock')}</div>
           <div class="stat-value">${low.length}</div>
           <div class="stat-sub">${t('dash_below_reorder')}</div>
-        </div>
-        <div class="card stat-card accent-success">
-          <div class="stat-label">${t('dash_today_sales')}</div>
-          <div class="stat-value" style="font-size:24px">${fmt(todayTotal)}</div>
-          <div class="stat-sub">${today.length} ${t('dash_bills')}</div>
         </div>
         <div class="card stat-card accent-orange">
           <div class="stat-label">${t('dash_credit_due')}</div>
@@ -136,6 +129,14 @@ Views.dashboard = {
         const id = Number(b.dataset.viewSale);
         const sale = DB.allSales().find(s => s.id === id);
         if (sale) Views.sale.showReceipt(sale);
+      });
+    });
+
+    document.querySelectorAll('[data-return-sale]').forEach(b => {
+      b.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const id = Number(b.dataset.returnSale);
+        Views.returns.openAddReturnModal(id);
       });
     });
   }
@@ -364,7 +365,7 @@ Views.sale = {
     }
     const q = (document.getElementById('saleSearch')?.value || '').trim();
     if (q) {
-      items = items.filter(i => Singlish.matchItem(i, q)).slice(0, 60);
+      items = DB.searchItems(q, Views.sale.currentCategory).slice(0, 60);
     }
     if (!items.length) {
       return `<div class="empty-state" style="grid-column:1/-1; padding:40px 20px;"><div class="em-ico"><i class="ph ph-package"></i></div><h3>${t('sale_no_matches') || 'No items'}</h3></div>`;
@@ -799,20 +800,16 @@ Views.sale = {
       });
     }
 
-    let searchDebounceTimer = null;
+    let gridDebounceTimer = null;
     if (searchInp) {
       searchInp.addEventListener('input', () => {
-        if (searchDebounceTimer) clearTimeout(searchDebounceTimer);
-        searchDebounceTimer = setTimeout(() => {
-          selectedIndex = -1;
-          const q = searchInp.value.trim();
-          const grid = document.getElementById('posItemGrid');
-          if (grid) {
-            grid.innerHTML = Views.sale.posGridHTML();
-            Views.sale.bindGrid();
-          }
-          if (!q) { suggestBox.innerHTML = ''; return; }
+        selectedIndex = -1;
+        const q = searchInp.value.trim();
 
+        // 1. Instantly render suggestions dropdown (0ms latency!)
+        if (!q) {
+          suggestBox.innerHTML = '';
+        } else {
           // Check if query matches a Bill Barcode
           const billSale = DB.findSaleByBarcode ? DB.findSaleByBarcode(q) : null;
           if (billSale) {
@@ -836,41 +833,51 @@ Views.sale = {
               suggestBox.innerHTML = '';
               Views.sale.showReceipt(billSale);
             });
-            return;
+          } else {
+            const matches = DB.searchItems(q, Views.sale.currentCategory).slice(0, 8);
+            if (!matches.length) {
+              suggestBox.innerHTML = `<div class="search-suggest"><div class="suggest-row text-muted">${t('sale_no_matches')}</div></div>`;
+            } else {
+              suggestBox.innerHTML = `<div class="search-suggest">${matches.map(i => `
+                <div class="suggest-row" data-add-item="${i.id}">
+                  <div style="display:flex; align-items:center; gap:10px;">
+                    <div style="width:36px; height:36px; border-radius:6px; overflow:hidden; background:var(--paper); display:flex; align-items:center; justify-content:center; flex-shrink:0;">
+                      ${i.image ? `<img src="${i.image}" style="width:100%; height:100%; object-fit:cover;">` : `<i class="ph ph-package" style="font-size:18px;"></i>`}
+                    </div>
+                    <div>
+                      <div class="s-name">${escapeHTML(i.name)}</div>
+                      <div class="s-meta">${i.barcode ? `<b style="font-family:monospace; color:var(--primary);"><i class="ph ph-barcode"></i> ${escapeHTML(i.barcode)}</b> • ` : ''}${escapeHTML(i.category)} • ${t('word_qty')}: ${i.qty} ${escapeHTML(i.unit)} • ${t('items_cost_price')}: ${fmt(i.costPrice || 0)}</div>
+                    </div>
+                  </div>
+                  <div style="font-weight:700">${fmt(i.sellPrice)}</div>
+                </div>
+              `).join('')}</div>`;
+              suggestBox.querySelectorAll('[data-add-item]').forEach(row => {
+                row.addEventListener('click', () => {
+                  const id = Number(row.dataset.addItem);
+                  Views.sale.addToCart(id);
+                  searchInp.value = ''; suggestBox.innerHTML = '';
+                  const grid = document.getElementById('posItemGrid');
+                  if (grid) {
+                    grid.innerHTML = Views.sale.posGridHTML();
+                    Views.sale.bindGrid();
+                  }
+                  searchInp.blur();
+                });
+              });
+            }
           }
+        }
 
-          const matches = DB.allItems().filter(i => Singlish.matchItem(i, q)).slice(0, 8);
-          if (!matches.length) {
-            suggestBox.innerHTML = `<div class="search-suggest"><div class="suggest-row text-muted">${t('sale_no_matches')}</div></div>`;
-            return;
+        // 2. Debounce background grid rendering (80ms) so typing never stutters
+        clearTimeout(gridDebounceTimer);
+        gridDebounceTimer = setTimeout(() => {
+          const grid = document.getElementById('posItemGrid');
+          if (grid) {
+            grid.innerHTML = Views.sale.posGridHTML();
+            Views.sale.bindGrid();
           }
-          suggestBox.innerHTML = `<div class="search-suggest">${matches.map(i => `
-            <div class="suggest-row" data-add-item="${i.id}">
-              <div style="display:flex; align-items:center; gap:10px;">
-                <div style="width:36px; height:36px; border-radius:6px; overflow:hidden; background:var(--paper); display:flex; align-items:center; justify-content:center; flex-shrink:0;">
-                  ${i.image ? `<img src="${i.image}" style="width:100%; height:100%; object-fit:cover;">` : `<i class="ph ph-package" style="font-size:18px;"></i>`}
-                </div>
-                <div>
-                  <div class="s-name">${escapeHTML(i.name)}</div>
-                  <div class="s-meta">${i.barcode ? `<b style="font-family:monospace; color:var(--primary);"><i class="ph ph-barcode"></i> ${escapeHTML(i.barcode)}</b> • ` : ''}${escapeHTML(i.category)} • ${t('word_qty')}: ${i.qty} ${escapeHTML(i.unit)} • ${t('items_cost_price')}: ${fmt(i.costPrice || 0)}</div>
-                </div>
-              </div>
-              <div style="font-weight:700">${fmt(i.sellPrice)}</div>
-            </div>
-          `).join('')}</div>`;
-          suggestBox.querySelectorAll('[data-add-item]').forEach(row => {
-            row.addEventListener('click', () => {
-              const id = Number(row.dataset.addItem);
-              Views.sale.addToCart(id);
-              searchInp.value = ''; suggestBox.innerHTML = '';
-              if (grid) {
-                grid.innerHTML = Views.sale.posGridHTML();
-                Views.sale.bindGrid();
-              }
-              searchInp.blur();
-            });
-          });
-        }, 50);
+        }, 80);
       });
 
       searchInp.addEventListener('keydown', (e) => {
@@ -2301,14 +2308,8 @@ Views.sale = {
         Views.sale.printReceiptDirect(sale);
       }
       App.updateSidebarCounts();
-      // If this was a Quick Sale tab (not primary), close it to return to the main bill
-      if (Views.sale.activeIdx > 0) {
-        const closedIdx = Views.sale.activeIdx;
-        Views.sale.sessions.splice(closedIdx, 1);
-        Views.sale.activeIdx = 0;
-        Views.sale.loadSession(0);
-        App.render();
-      }
+      // Tab stays open after completing bill - user must manually close it
+      App.render();
     } finally {
       Views.sale.isSubmitting = false;
     }
@@ -3186,12 +3187,16 @@ Views.items = {
   bind() {
     document.getElementById('addItemBtn')?.addEventListener('click', Views.items.openAddModal);
     const search = document.getElementById('itemsSearch');
+    let itemsDebounceTimer = null;
     if (search) {
       search.addEventListener('input', () => {
         Views.items.searchQ = search.value;
-        document.getElementById('itemsTableWrap').innerHTML = Views.items.tableHTML();
-        Views.items.bindRowActions();
-        Views.items.bindCategoryRowClicks();
+        clearTimeout(itemsDebounceTimer);
+        itemsDebounceTimer = setTimeout(() => {
+          document.getElementById('itemsTableWrap').innerHTML = Views.items.tableHTML();
+          Views.items.bindRowActions();
+          Views.items.bindCategoryRowClicks();
+        }, 40);
       });
       setTimeout(() => search.focus(), 100);
     }
@@ -3350,7 +3355,7 @@ Views.stock = {
     let list = DB.allItems();
     const q = (Views.stock.itemsSearchQ || '').trim();
     if (q) {
-      list = list.filter(i => Singlish.match(i.name, q) || Singlish.match(i.category || '', q) || Singlish.match(i.subCategory || '', q) || Singlish.match(i.description || '', q) || (i.barcode && i.barcode.toLowerCase().includes(q.toLowerCase())));
+      list = list.filter(i => Singlish.matchItem(i, q));
     }
 
     const currentCat = Views.stock.selectedCategory || 'all';
@@ -3464,7 +3469,7 @@ Views.stock = {
     let list = DB.allItems();
     const q = (Views.stock.reportSearchQ || '').trim();
     if (q) {
-      list = list.filter(i => Singlish.match(i.name || '', q) || Singlish.match(i.category || '', q) || (i.barcode && i.barcode.toLowerCase().includes(q.toLowerCase())));
+      list = list.filter(i => Singlish.matchItem(i, q));
     }
 
     if (Views.stock.filterType === 'low') {
@@ -3589,12 +3594,16 @@ Views.stock = {
     if (Views.stock.activeTab === 'items') {
       document.getElementById('addItemBtn')?.addEventListener('click', Views.items.openAddModal);
       const search = document.getElementById('itemsSearch');
+      let stockItemsDebounce = null;
       if (search) {
         search.addEventListener('input', () => {
           Views.stock.itemsSearchQ = search.value;
-          document.getElementById('itemsTableWrap').innerHTML = Views.stock.itemsTableHTML();
-          Views.stock.bindRowActions();
-          Views.stock.bindCategoryRowClicks();
+          clearTimeout(stockItemsDebounce);
+          stockItemsDebounce = setTimeout(() => {
+            document.getElementById('itemsTableWrap').innerHTML = Views.stock.itemsTableHTML();
+            Views.stock.bindRowActions();
+            Views.stock.bindCategoryRowClicks();
+          }, 40);
         });
         setTimeout(() => search.focus(), 100);
       }
@@ -3620,11 +3629,15 @@ Views.stock = {
       Views.stock.bindCategoryRowClicks();
     } else {
       const search = document.getElementById('stockSearch');
+      let stockRepDebounce = null;
       if (search) {
         search.addEventListener('input', () => {
           Views.stock.reportSearchQ = search.value;
-          document.getElementById('stockTableWrap').innerHTML = Views.stock.reportTableHTML();
-          Views.stock.bindRowActions();
+          clearTimeout(stockRepDebounce);
+          stockRepDebounce = setTimeout(() => {
+            document.getElementById('stockTableWrap').innerHTML = Views.stock.reportTableHTML();
+            Views.stock.bindRowActions();
+          }, 40);
         });
         setTimeout(() => search.focus(), 100);
       }
@@ -4196,74 +4209,83 @@ Views.customers = {
       title: c.name,
       wide: true,
       bodyHTML: `
-        <div class="grid grid-2">
-          <div>
-            <div class="small text-muted">${t('cust_phone')}</div>
-            <div style="font-weight:600; margin-bottom:8px;">${escapeHTML(c.phone) || '-'}</div>
-            <div class="small text-muted">${t('cust_form_nic')}</div>
-            <div style="font-weight:600; margin-bottom:8px;">${escapeHTML(c.nic) || '-'}</div>
-            <div class="small text-muted">${t('cust_address')}</div>
-            <div style="font-weight:600; margin-bottom:8px;">${escapeHTML(c.address) || '-'}</div>
-            <div class="small text-muted">${t('cust_form_type')}</div>
-            <div style="font-weight:600;">${c.customerType === 'hardware' ? `${t('cust_type_hardware')} (${c.discountPercent || 0}% discount)` : t('cust_type_retail')}</div>
-          </div>
-          <div>
-            <div class="small text-muted">${t('cust_curr_due')}</div>
-            <div style="font-size:24px; font-weight:800; color:${currentDue > 0 ? 'var(--danger)' : 'var(--success)'}; margin-top:2px;">${fmt(currentDue)}</div>
-            ${currentDue <= 0 ? `<div class="pill pill-ok" style="margin-top:6px; font-weight:700;"><i class="ph ph-check"></i> කිසිදු හිඟ මුදලක් නොමැත</div>` : ''}
-          </div>
-        </div>
+        <!-- Compact Customer Info & Financial Stats -->
+        <div style="background:var(--paper); border:1px solid var(--border); border-radius:10px; padding:12px 16px; margin-bottom:12px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; gap:16px; flex-wrap:wrap;">
+            <!-- Left: Contact Details -->
+            <div style="display:flex; flex-direction:column; gap:4px; min-width:240px;">
+              <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap; font-size:13px;">
+                <span style="font-weight:700; color:var(--charcoal); display:inline-flex; align-items:center; gap:5px;">
+                  <i class="ph ph-phone" style="color:var(--steel);"></i> ${escapeHTML(c.phone) || '-'}
+                </span>
+                ${c.nic ? `<span style="color:var(--border-dark, #cbd5e1);">|</span><span style="display:inline-flex; align-items:center; gap:4px; color:var(--charcoal); font-weight:500;"><i class="ph ph-identification-card" style="color:var(--steel);"></i> ${escapeHTML(c.nic)}</span>` : ''}
+              </div>
+              ${c.address ? `<div style="font-size:12px; color:var(--steel); display:inline-flex; align-items:center; gap:4px;"><i class="ph ph-map-pin"></i> ${escapeHTML(c.address)}</div>` : ''}
+              <div style="margin-top:2px;">
+                <span class="pill ${c.customerType === 'hardware' ? 'pill-warn' : 'pill-ok'}" style="font-size:11px; padding:2px 8px;">
+                  <i class="ph ${c.customerType === 'hardware' ? 'ph-wrench' : 'ph-user'}"></i>
+                  ${c.customerType === 'hardware' ? `${t('cust_type_hardware')} (${c.discountPercent || 0}% discount)` : t('cust_type_retail')}
+                </span>
+              </div>
+            </div>
 
-        <!-- Summary Stat Badges -->
-        <div class="grid grid-3" style="gap:12px; margin-top:14px; margin-bottom:14px;">
-          <div class="card" style="padding:10px 14px; background:var(--paper); border-left:4px solid var(--orange); box-shadow:none; margin:0;">
-            <div class="small text-muted" style="font-size:11px;">මුළු ණයට ගත් මුදල (Total Credit)</div>
-            <div style="font-size:16px; font-weight:700; color:var(--orange-dark); margin-top:2px;">${fmt(totalCredit)}</div>
-          </div>
-          <div class="card" style="padding:10px 14px; background:var(--paper); border-left:4px solid #16a34a; box-shadow:none; margin:0;">
-            <div class="small text-muted" style="font-size:11px;">මුළු ගෙවූ මුදල (Total Paid)</div>
-            <div style="font-size:16px; font-weight:700; color:#16a34a; margin-top:2px;">${fmt(totalPaid)}</div>
-          </div>
-          <div class="card" style="padding:10px 14px; background:var(--paper); border-left:4px solid ${currentDue > 0 ? 'var(--danger)' : 'var(--success)'}; box-shadow:none; margin:0;">
-            <div class="small text-muted" style="font-size:11px;">දැනට හිඟ මුදල (Balance Due)</div>
-            <div style="font-size:16px; font-weight:700; color:${currentDue > 0 ? 'var(--danger)' : 'var(--success)'}; margin-top:2px;">${fmt(currentDue)}</div>
+            <!-- Right: 3 Financial Badges -->
+            <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
+              <div style="padding:6px 12px; background:#fff; border-radius:8px; border:1px solid var(--border); border-left:4px solid var(--orange); min-width:110px;">
+                <div class="small text-muted" style="font-size:10.5px;">මුළු ණය (Credit)</div>
+                <div style="font-size:14.5px; font-weight:700; color:var(--orange-dark); margin-top:1px;">${fmt(totalCredit)}</div>
+              </div>
+              <div style="padding:6px 12px; background:#fff; border-radius:8px; border:1px solid var(--border); border-left:4px solid #16a34a; min-width:110px;">
+                <div class="small text-muted" style="font-size:10.5px;">මුළු ගෙවූ (Paid)</div>
+                <div style="font-size:14.5px; font-weight:700; color:#16a34a; margin-top:1px;">${fmt(totalPaid)}</div>
+              </div>
+              <div style="padding:6px 14px; background:#fff; border-radius:8px; border:1px solid var(--border); border-left:4px solid ${currentDue > 0 ? 'var(--danger)' : 'var(--success)'}; min-width:130px;">
+                <div class="small text-muted" style="font-size:10.5px;">හිඟ මුදල (Due)</div>
+                <div style="font-size:16.5px; font-weight:800; color:${currentDue > 0 ? 'var(--danger)' : 'var(--success)'}; margin-top:1px;">${fmt(currentDue)}</div>
+              </div>
+            </div>
           </div>
         </div>
 
         <!-- Record Payment Section -->
-        <div class="card" style="background:var(--paper); margin-top:12px; box-shadow:none; border:1px solid var(--border);">
-          <div class="card-title" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
-            <span><i class="ph ph-money"></i> ${t('cust_record_payment_title')}</span>
-            ${currentDue > 0 ? `<button type="button" class="btn btn-xs btn-outline" id="payFullDueBtn" style="font-size:11px; padding:3px 8px;"><i class="ph ph-arrows-down-up"></i> සම්පූර්ණ හිඟය (${fmt(currentDue)})</button>` : ''}
+        <div class="card" style="background:#fff; margin-bottom:14px; padding:10px 14px; box-shadow:none; border:1px solid var(--border);">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+            <span style="font-size:12.5px; font-weight:700; color:var(--charcoal); display:inline-flex; align-items:center; gap:5px;">
+              <i class="ph ph-money" style="color:var(--primary-dark);"></i> ${t('cust_record_payment_title')}
+            </span>
+            ${currentDue > 0 ? `<button type="button" class="btn btn-xs btn-outline" id="payFullDueBtn" style="font-size:11px; padding:2px 8px;"><i class="ph ph-arrows-down-up"></i> සම්පූර්ණ හිඟය (${fmt(currentDue)})</button>` : ''}
           </div>
-          <div class="grid grid-3 gap-8" style="align-items:flex-end;">
+          <div class="grid grid-3 gap-8" style="align-items:center;">
             <div class="field" style="margin-bottom:0;">
-              <label class="field-label" style="font-size:12px;">${t('cust_payment_amount')} *</label>
-              <input class="input" id="paymentAmt" type="number" min="1" placeholder="උදා: 5000">
+              <input class="input" id="paymentAmt" type="number" min="1" placeholder="${t('cust_payment_amount')} (රු.)" style="height:36px; font-size:13px;">
             </div>
             <div class="field" style="margin-bottom:0;">
-              <label class="field-label" style="font-size:12px;">ගෙවීම් සටහන / ක්‍රමය</label>
-              <input class="input" id="paymentNote" placeholder="මුදල් / බැංකු / චෙක්පත්...">
+              <input class="input" id="paymentNote" placeholder="සටහන (මුදල් / බැංකු / චෙක්පත්...)" style="height:36px; font-size:13px;">
             </div>
             <div>
-              <button class="btn btn-success" id="recordPaymentBtn" style="width:100%; height:40px; font-weight:700;">
+              <button class="btn btn-success" id="recordPaymentBtn" style="width:100%; height:36px; font-size:13px; font-weight:700; display:inline-flex; align-items:center; justify-content:center; gap:5px;">
                 <i class="ph ph-check-circle"></i> ${t('cust_record_payment_btn')}
               </button>
             </div>
           </div>
         </div>
 
-        <div class="mt-20">
-          <div class="card-title">${t('cust_history')}</div>
+        <div>
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+            <div class="card-title" style="margin-bottom:0; display:inline-flex; align-items:center; gap:6px;">
+              <i class="ph ph-clock-counter-clockwise"></i> ${t('cust_history')}
+              <span class="pill pill-muted" style="font-size:11px; padding:1px 6px;">${c.ledger.length}</span>
+            </div>
+          </div>
           ${c.ledger.length ? `
-            <div class="table-wrap">
-              <table>
+            <div class="table-wrap cust-ledger-wrap" style="width:100%; overflow-x:auto;">
+              <table class="cust-ledger-table" style="width:100%; min-width:100%; border-collapse:collapse; table-layout:auto;">
                 <thead>
-                  <tr>
-                    <th>${t('dash_date')}</th>
-                    <th>${t('word_type')}</th>
-                    <th class="num">${t('sale_payment')}</th>
-                    <th style="width:90px; text-align:center;">රිසිට්පත</th>
+                  <tr style="background:var(--paper); border-bottom:2px solid var(--border);">
+                    <th style="width:115px; padding:9px 10px; font-size:12px;">${t('dash_date')}</th>
+                    <th style="padding:9px 10px; font-size:12px;">${t('word_type')} / විස්තර</th>
+                    <th class="num" style="width:110px; padding:9px 10px; font-size:12px; text-align:right;">${t('sale_payment')}</th>
+                    <th style="width:80px; padding:9px 6px; font-size:12px; text-align:center; ">ක්‍රියා</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -4274,26 +4296,22 @@ Views.customers = {
           if (sale && sale.lines && sale.lines.length) {
             itemsHtml = `
               <div style="margin-top:6px; padding:6px 10px; background:var(--bg-card, #f8fafc); border:1px solid var(--border); border-radius:6px; font-size:12px;">
-                <table style="width:100%; border-collapse:collapse; margin:0;">
-                  <tbody>
-                    ${sale.lines.map(line => {
-                      const lineTotal = line.qty * line.unitPrice;
-                      const qtyText = line.looseInfo ? `${line.looseInfo.looseQty} ${escapeHTML(line.looseInfo.looseUnit || '')}` : `${line.qty} ${escapeHTML(line.unit || '')}`;
-                      const unitPriceVal = (line.looseInfo && line.looseInfo.looseQty > 0)
-                        ? (line.looseInfo.customLooseUnitPrice ? Number(line.looseInfo.customLooseUnitPrice) : (lineTotal / line.looseInfo.looseQty))
-                        : line.unitPrice;
-                      return `
-                        <tr style="border-bottom:1px dashed var(--border);">
-                          <td style="padding:3px 0; font-weight:600; color:var(--charcoal);">• ${escapeHTML(line.name)}</td>
-                          <td style="padding:3px 8px; text-align:center; color:var(--steel); font-size:11px; white-space:nowrap;">${qtyText} × ${fmt(unitPriceVal)}</td>
-                          <td style="padding:3px 0; text-align:right; font-weight:700; color:var(--charcoal); white-space:nowrap;">${fmt(lineTotal)}</td>
-                        </tr>
-                      `;
-                    }).join('')}
-                  </tbody>
-                </table>
+                ${sale.lines.map(line => {
+                  const lineTotal = line.qty * line.unitPrice;
+                  const qtyText = line.looseInfo ? `${line.looseInfo.looseQty} ${escapeHTML(line.looseInfo.looseUnit || '')}` : `${line.qty} ${escapeHTML(line.unit || '')}`;
+                  const unitPriceVal = (line.looseInfo && line.looseInfo.looseQty > 0)
+                    ? (line.looseInfo.customLooseUnitPrice ? Number(line.looseInfo.customLooseUnitPrice) : (lineTotal / line.looseInfo.looseQty))
+                    : line.unitPrice;
+                  return `
+                    <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; padding:3px 0; border-bottom:1px dashed var(--border);">
+                      <div style="font-weight:600; color:var(--charcoal); flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis;" title="${escapeHTML(line.name)}">• ${escapeHTML(line.name)}</div>
+                      <div style="color:var(--steel); font-size:11px; white-space:nowrap; padding:0 6px;">${qtyText} × ${fmt(unitPriceVal)}</div>
+                      <div style="font-weight:700; color:var(--charcoal); white-space:nowrap; text-align:right; min-width:75px;">${fmt(lineTotal)}</div>
+                    </div>
+                  `;
+                }).join('')}
                 ${(sale.discount > 0) ? `
-                  <div style="display:flex; justify-content:space-between; margin-top:4px; font-size:11px; color:var(--steel); border-top:1px solid var(--border); padding-top:4px;">
+                  <div style="display:flex; justify-content:space-between; align-items:center; margin-top:4px; font-size:11px; color:var(--steel); border-top:1px solid var(--border); padding-top:4px;">
                     <span>Subtotal: ${fmt(sale.subtotal)} | Disc: -${fmt(sale.discount)}</span>
                     <span style="font-weight:700; color:var(--primary-dark);">Total: ${fmt(sale.total)}</span>
                   </div>
@@ -4304,35 +4322,39 @@ Views.customers = {
         }
         const isPayment = l.type === 'payment';
         return `
-                    <tr>
-                      <td style="vertical-align:top; padding-top:12px;">${fmtDate(l.date)}</td>
-                      <td style="vertical-align:top; padding-top:12px;">
-                        ${isPayment
-                          ? `<span class="pill pill-ok" style="background:#dcfce7; color:#15803d; font-weight:700;"><i class="ph ph-arrow-down-left"></i> ${t('cust_type_pay')}</span>`
-                          : `<span class="pill pill-warn"><i class="ph ph-shopping-cart"></i> ${t('cust_type_sale')}</span>`
-                        } 
-                        <span class="small text-muted" style="display:inline-block; margin-left:6px;">${escapeHTML(l.note || '')}</span>
-                        ${itemsHtml}
-                      </td>
-                      <td class="num" style="vertical-align:top; padding-top:12px;">
-                        ${isPayment
-                          ? `<span style="color:#16a34a; font-weight:800; font-size:13.5px;">- ${fmt(l.amount)}</span>`
-                          : `<span style="color:var(--danger); font-weight:700;">+ ${fmt(l.amount)}</span>`
-                        }
-                      </td>
-                      <td style="vertical-align:top; padding-top:12px; text-align:center;">
-                        ${isPayment
-                          ? `<button class="btn btn-xs btn-outline" data-print-pay-slip="${l.id || l.date}" data-pay-amt="${l.amount}" data-pay-date="${l.date}" data-pay-note="${escapeHTML(l.note || '')}" style="padding:3px 8px; font-size:11px;" title="රිසිට්පත බලන්න / Print"><i class="ph ph-printer"></i> රිසිට්පත</button>`
-                          : (l.saleId ? `<button class="btn btn-xs btn-outline" data-view-cust-sale="${l.saleId}" style="padding:3px 8px; font-size:11px;" title="බිල්පත බලන්න"><i class="ph ph-receipt"></i> බිල</button>` : '-')
-                        }
-                      </td>
-                    </tr>
-                    `;
+          <tr style="border-bottom:1px solid var(--border);">
+            <td style="vertical-align:top; padding:10px; font-size:12px; color:var(--charcoal);">
+              ${fmtDate(l.date)}
+            </td>
+            <td style="vertical-align:top; padding:10px;">
+              <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
+                ${isPayment
+                  ? `<span class="pill pill-ok" style="background:#dcfce7; color:#15803d; font-weight:700;"><i class="ph ph-arrow-down-left"></i> ${t('cust_type_pay')}</span>`
+                  : `<span class="pill pill-warn" style="font-weight:700;"><i class="ph ph-shopping-cart"></i> ${t('cust_type_sale')}</span>`
+                }
+                ${l.note ? `<span class="small" style="color:var(--charcoal); font-weight:600;">${escapeHTML(l.note)}</span>` : ''}
+              </div>
+              ${itemsHtml}
+            </td>
+            <td class="num" style="vertical-align:top; padding:10px; text-align:right;">
+              ${isPayment
+                ? `<span style="color:#16a34a; font-weight:800; font-size:13.5px;">- ${fmt(l.amount)}</span>`
+                : `<span style="color:var(--danger); font-weight:700; font-size:13.5px;">+ ${fmt(l.amount)}</span>`
+              }
+            </td>
+            <td style="vertical-align:top; padding:10px 6px; text-align:center;">
+              ${isPayment
+                ? `<button class="btn btn-xs btn-outline" data-print-pay-slip="${l.id || l.date}" data-pay-amt="${l.amount}" data-pay-date="${l.date}" data-pay-note="${escapeHTML(l.note || '')}" style="padding:3px 8px; font-size:11px;" title="රිසිට්පත බලන්න / Print"><i class="ph ph-printer"></i> රිසිට්පත</button>`
+                : (l.saleId ? `<button class="btn btn-xs btn-outline" data-view-cust-sale="${l.saleId}" style="padding:3px 8px; font-size:11px;" title="බිල්පත බලන්න"><i class="ph ph-receipt"></i> බිල</button>` : '-')
+              }
+            </td>
+          </tr>
+        `;
       }).join('')}
                 </tbody>
               </table>
             </div>
-          ` : `<div class="text-muted small">${t('cust_history_empty')}</div>`}
+          ` : `<div class="text-muted small" style="padding:16px 0; text-align:center;">${t('cust_history_empty')}</div>`}
         </div>
       `,
       footHTML: `<button class="btn btn-outline" data-close>${t('close')}</button>`,
@@ -4546,6 +4568,7 @@ Views.history = {
                 <td class="num" style="font-weight:700">${fmt(s.total)}</td>
                 <td style="white-space:nowrap;">
                   <button class="icon-btn" data-view-sale="${s.id}" title="${t('hist_preview')}" style="color:var(--primary); margin-right:4px;"><i class="ph ph-eye" style="font-size:18px;"></i></button>
+                  <button class="icon-btn" data-return-sale="${s.id}" title="භාණ්ඩ Return කරන්න" style="color:var(--orange-dark); margin-right:4px;"><i class="ph ph-arrow-u-down-left" style="font-size:18px;"></i></button>
                   <button class="icon-btn" data-del-sale="${s.id}" title="${t('hist_del_title')}"><i class="ph ph-trash" style="font-size:18px;"></i></button>
                 </td>
               </tr>
@@ -4651,17 +4674,161 @@ Views.history = {
 
 /* ================= SETTINGS ================= */
 Views.settings = {
+  salesUnlocked: false,
+
+  openChangePasswordModal() {
+    const s = DB.data.settings || {};
+    const currentPass = s.salesPassword || '1234';
+
+    openModal({
+      title: 'විකුණුම් මුරපදය වෙනස් කිරීම (Change Sales Password)',
+      wide: false,
+      bodyHTML: `
+        <div style="margin-bottom:14px; font-size:13px; color:var(--steel);">
+          අද දවසේ විකුණුම් (Today's Sales) ආරක්ෂිතව බැලීම සඳහා මුරපදය සකසන්න.
+        </div>
+        <div class="field">
+          <label class="field-label">දැනට පවතින මුරපදය (Current Password) *</label>
+          <input type="password" id="curSalesPassInput" class="input" placeholder="දැනට පවතින මුරපදය...">
+        </div>
+        <div class="field">
+          <label class="field-label">නව මුරපදය (New Password) *</label>
+          <input type="password" id="newSalesPassInput" class="input" placeholder="නව මුරපදය ඇතුළත් කරන්න...">
+        </div>
+        <div class="field">
+          <label class="field-label">නව මුරපදය තහවුරු කරන්න (Confirm New Password) *</label>
+          <input type="password" id="confirmSalesPassInput" class="input" placeholder="නැවත නව මුරපදය ඇතුළත් කරන්න...">
+        </div>
+      `,
+      footHTML: `
+        <button class="btn btn-outline" data-close>${t('close')}</button>
+        <button class="btn btn-primary" id="saveSalesPassBtn"><i class="ph ph-check"></i> සුරකින්න</button>
+      `,
+      onMount: (wrap) => {
+        wrap.querySelector('#saveSalesPassBtn')?.addEventListener('click', async () => {
+          const curVal = wrap.querySelector('#curSalesPassInput')?.value.trim() || '';
+          const newVal = wrap.querySelector('#newSalesPassInput')?.value.trim() || '';
+          const confirmVal = wrap.querySelector('#confirmSalesPassInput')?.value.trim() || '';
+
+          if (curVal !== currentPass) {
+            toast('දැනට පවතින මුරපදය වැරදියි! (Current password incorrect)', 'err');
+            wrap.querySelector('#curSalesPassInput')?.focus();
+            return;
+          }
+          if (!newVal) {
+            toast('නව මුරපදයක් ඇතුළත් කරන්න! (Enter a new password)', 'err');
+            wrap.querySelector('#newSalesPassInput')?.focus();
+            return;
+          }
+          if (newVal !== confirmVal) {
+            toast('මුරපද දෙක නොගැළපේ! (Passwords do not match)', 'err');
+            wrap.querySelector('#confirmSalesPassInput')?.focus();
+            return;
+          }
+
+          await DB.updateSettings({ salesPassword: newVal });
+          toast('මුරපදය සාර්ථකව වෙනස් කරන ලදී! (Password updated)', 'ok');
+          closeModal();
+          App.render();
+        });
+      }
+    });
+  },
+
   render() {
     const s = DB.data.settings || {};
     const logoSize = Number(s.logoSize) || 38;
     const fontSize = Number(s.fontSize) || 15;
     const hasLogo = Boolean(s.logo);
 
+    const today = DB.todaySales();
+    const todayTotal = today.reduce((s, x) => s + x.total, 0);
+    const todayCash = today.filter(s => s.paymentType === 'cash').reduce((s, x) => s + x.total, 0);
+    const todayCredit = today.filter(s => s.paymentType === 'credit').reduce((s, x) => s + x.total, 0);
+    const todayDiscounts = today.reduce((s, x) => s + (x.discount || 0), 0);
+
+    let salesCardHtml = '';
+    if (!Views.settings.salesUnlocked) {
+      salesCardHtml = `
+        <!-- Locked Sales Card -->
+        <div class="card" style="border-left: 4px solid var(--orange); margin-bottom: 20px; background: #fff;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; flex-wrap: wrap; gap: 8px;">
+            <div>
+              <div class="card-title" style="margin-bottom: 2px; display: inline-flex; align-items: center; gap: 6px; color: var(--charcoal);">
+                <i class="ph ph-lock-key" style="color: var(--orange); font-size: 18px;"></i> ${t('dash_today_sales')} (Today's Sales)
+              </div>
+              <div class="card-sub" style="font-size: 12px; margin-bottom: 0;">අද දවසේ විකුණුම් විස්තර බැලීමට මුරපදය (Password) ඇතුළත් කරන්න</div>
+            </div>
+            <button class="btn btn-xs btn-outline" id="settingsChangePassBtn" style="font-size: 11px; padding: 4px 10px;">
+              <i class="ph ph-key"></i> මුරපදය වෙනස් කරන්න
+            </button>
+          </div>
+
+          <div style="display: flex; align-items: center; gap: 10px; max-width: 440px; margin-top: 12px;">
+            <input type="password" id="salesPasswordInput" class="input" placeholder="මුරපදය ඇතුළත් කරන්න..." style="height: 38px; font-size: 14px; flex: 1;">
+            <button class="btn btn-primary" id="unlockSalesBtn" style="height: 38px; padding: 0 16px; font-size: 13px; font-weight: 700; display: inline-flex; align-items: center; gap: 6px;">
+              <i class="ph ph-lock-open"></i> Unlock
+            </button>
+          </div>
+          <div class="small text-muted" style="margin-top: 8px; font-size: 11px;">
+            <i class="ph ph-info"></i> මුරපදය සකසා නොමැති නම් සාමාන්‍ය මුරපදය (Default): <b>1234</b>
+          </div>
+        </div>
+      `;
+    } else {
+      salesCardHtml = `
+        <!-- Unlocked Sales Card -->
+        <div class="card" style="border-left: 4px solid var(--success); margin-bottom: 20px; background: #fff;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 8px;">
+            <div>
+              <div class="card-title" style="margin-bottom: 2px; display: inline-flex; align-items: center; gap: 6px;">
+                <i class="ph ph-trend-up" style="color: var(--success); font-size: 18px;"></i> ${t('dash_today_sales')} (Today's Sales)
+              </div>
+              <div class="card-sub" style="font-size: 11.5px; margin-bottom: 0;">${new Date().toLocaleDateString('en-GB')} දිනට අදාල ගනුදෙනු සාරාංශය</div>
+            </div>
+            <div style="display: flex; gap: 6px; align-items: center; flex-wrap: wrap;">
+              <button class="btn btn-xs btn-outline" id="settingsChangePassBtn" style="font-size: 11px; padding: 4px 8px;">
+                <i class="ph ph-key"></i> මුරපදය වෙනස් කරන්න
+              </button>
+              <button class="btn btn-xs btn-outline" id="settingsViewTodaySalesBtn" style="font-size: 11px; padding: 4px 8px;" title="${t('hist_title')}">
+                <i class="ph ph-receipt"></i> බිල්පත් බලන්න
+              </button>
+              <button class="btn btn-xs btn-danger" id="lockSalesBtn" style="font-size: 11px; padding: 4px 8px;" title="නැවත අගුළුලන්න">
+                <i class="ph ph-lock"></i> Lock
+              </button>
+            </div>
+          </div>
+
+          <div style="display: flex; align-items: baseline; gap: 8px; margin-bottom: 14px;">
+            <div style="font-size: 28px; font-weight: 800; color: var(--success);">${fmt(todayTotal)}</div>
+            <div style="font-size: 13px; font-weight: 600; color: var(--steel);">(${today.length} ${t('dash_bills')})</div>
+          </div>
+
+          <div class="grid grid-3 gap-8">
+            <div style="padding: 10px 12px; background: var(--paper); border-radius: 8px; border: 1px solid var(--border); border-left: 3px solid #16a34a;">
+              <div class="small text-muted" style="font-size: 11px;">💵 මුදල් (Cash)</div>
+              <div style="font-size: 15px; font-weight: 700; color: #16a34a; margin-top: 2px;">${fmt(todayCash)}</div>
+            </div>
+            <div style="padding: 10px 12px; background: var(--paper); border-radius: 8px; border: 1px solid var(--border); border-left: 3px solid var(--orange);">
+              <div class="small text-muted" style="font-size: 11px;">💳 ණයට (Credit)</div>
+              <div style="font-size: 15px; font-weight: 700; color: var(--orange-dark); margin-top: 2px;">${fmt(todayCredit)}</div>
+            </div>
+            <div style="padding: 10px 12px; background: var(--paper); border-radius: 8px; border: 1px solid var(--border); border-left: 3px solid var(--steel);">
+              <div class="small text-muted" style="font-size: 11px;">🏷️ වට්ටම් (Discounts)</div>
+              <div style="font-size: 15px; font-weight: 700; color: var(--charcoal); margin-top: 2px;">${fmt(todayDiscounts)}</div>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
     return `
       ${Views.renderPageHeader({
         icon: 'ph-gear',
         title: t('settings_title')
       })}
+
+      ${salesCardHtml}
 
       <div class="grid grid-2">
         <div class="card">
@@ -4753,6 +4920,51 @@ Views.settings = {
     `;
   },
   bind() {
+    // Unlock button & Enter key
+    const unlockBtn = document.getElementById('unlockSalesBtn');
+    const passInput = document.getElementById('salesPasswordInput');
+    const doUnlock = () => {
+      const s = DB.data.settings || {};
+      const expectedPass = s.salesPassword || '1234';
+      const enteredPass = passInput ? passInput.value.trim() : '';
+
+      if (enteredPass === expectedPass) {
+        Views.settings.salesUnlocked = true;
+        toast('මුරපදය නිවැරදියි! (Unlocked)', 'ok');
+        App.render();
+      } else {
+        toast('මුරපදය වැරදියි! (Incorrect Password)', 'err');
+        if (passInput) {
+          passInput.value = '';
+          passInput.focus();
+        }
+      }
+    };
+
+    unlockBtn?.addEventListener('click', doUnlock);
+    passInput?.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') doUnlock();
+    });
+
+    // Lock button
+    document.getElementById('lockSalesBtn')?.addEventListener('click', () => {
+      Views.settings.salesUnlocked = false;
+      toast('නැවත අගුළුලන ලදී (Locked)', 'ok');
+      App.render();
+    });
+
+    // Change Password buttons
+    document.querySelectorAll('#settingsChangePassBtn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        Views.settings.openChangePasswordModal();
+      });
+    });
+
+    // Navigate to sales history from today's sales button
+    document.getElementById('settingsViewTodaySalesBtn')?.addEventListener('click', () => {
+      App.navigate('history');
+    });
+
     let currentLogoBase64 = DB.data.settings.logo || '';
 
     // Logo Upload
@@ -5592,6 +5804,1199 @@ Views.purchases = {
           }
         });
       });
+    });
+  }
+};
+
+
+/* =========================================================
+   RETURNS MODULE (රිටන් බඩු කළමනාකරණය)
+   Auto stock restoration + customer balance update
+   ========================================================= */
+Views.returns = {
+  searchQ: '',
+  filterDate: '',
+
+  render() {
+    const returns = DB.allReturns();
+    const todayRets = DB.todayReturns();
+    const todayTotal = todayRets.reduce((s, r) => s + (Number(r.refundAmount) || 0), 0);
+    const allTotal = returns.reduce((s, r) => s + (Number(r.refundAmount) || 0), 0);
+
+    return `
+      <div class="page-header">
+        <div class="page-header-left">
+          <i class="ph ph-arrow-u-down-left page-header-icon"></i>
+          <h2 class="page-header-title">රිටන් සහ මාරුකිරීම් (Returns & Exchanges)</h2>
+        </div>
+        <div class="page-header-right" style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+          <input class="input" id="returnsSearch" placeholder="🔍 බිල් No / භාණ්ඩය / පාරිභෝගිකයා..." style="width:230px" value="${escapeHTML(Views.returns.searchQ || '')}">
+          <input class="input" id="returnsDateFilter" type="date" style="width:150px" value="${escapeHTML(Views.returns.filterDate || '')}" title="දිනයෙන් පෙරන්න">
+          <button class="btn btn-primary" id="openAddReturnBtn" style="display:inline-flex; align-items:center; gap:6px; font-weight:700;">
+            <i class="ph ph-plus-circle" style="font-size:18px;"></i> + අලුත් රිටන් / මාරුකිරීමක්
+          </button>
+        </div>
+      </div>
+
+      <!-- Stat Badges -->
+      <div class="grid grid-3" style="margin-bottom:20px;">
+        <div class="card stat-card accent-orange">
+          <div class="stat-label">අද රිටන් කළ මුදල (Today Refunded)</div>
+          <div class="stat-value" style="font-size:24px; color:var(--orange-dark);">${fmt(todayTotal)}</div>
+          <div class="stat-sub">${todayRets.length} වාරයක් (Today)</div>
+        </div>
+        <div class="card stat-card">
+          <div class="stat-label">අද රිටන් / මාරුකිරීම් ගණන</div>
+          <div class="stat-value">${todayRets.length}</div>
+          <div class="stat-sub">වාර්තා වූ රිටන්</div>
+        </div>
+        <div class="card stat-card accent-danger">
+          <div class="stat-label">මුළු රිටන් මුදල (All Time Refunded)</div>
+          <div class="stat-value" style="font-size:24px; color:var(--danger);">${fmt(allTotal)}</div>
+          <div class="stat-sub">${returns.length} වාරයක් (Total)</div>
+        </div>
+      </div>
+
+      <!-- Returns Table Container -->
+      <div class="card">
+        <div id="returnsTableWrap">
+          ${Views.returns.tableHTML()}
+        </div>
+      </div>
+    `;
+  },
+
+  tableHTML() {
+    let returns = DB.allReturns();
+
+    // Date filter
+    if (Views.returns.filterDate) {
+      const selected = new Date(Views.returns.filterDate);
+      const start = new Date(selected.getFullYear(), selected.getMonth(), selected.getDate(), 0, 0, 0).getTime();
+      const end = new Date(selected.getFullYear(), selected.getMonth(), selected.getDate(), 23, 59, 59, 999).getTime();
+      returns = returns.filter(r => r.date >= start && r.date <= end);
+    }
+
+    // Search query filter
+    const q = (Views.returns.searchQ || '').trim().toLowerCase();
+    if (q) {
+      returns = returns.filter(r => {
+        const no = (r.returnNo || '').toLowerCase();
+        const saleId = String(r.saleId || '');
+        const cust = (r.customerName || '').toLowerCase();
+        const reason = (r.reason || '').toLowerCase();
+        const itemsNames = (r.items || []).map(i => (i.name || '').toLowerCase()).join(' ');
+        const excNames = (r.exchangeItems || []).map(i => (i.name || '').toLowerCase()).join(' ');
+        return no.includes(q) || saleId.includes(q) || cust.includes(q) || reason.includes(q) || itemsNames.includes(q) || excNames.includes(q);
+      });
+    }
+
+    if (!returns.length) {
+      return `
+        <div class="card">
+          <div class="empty-state">
+            <div class="em-ico"><i class="ph ph-arrow-u-down-left"></i></div>
+            <h3>රිටන් / මාරුකිරීම් වාර්තා නැත</h3>
+            <div class="small">පාරිභෝගිකයින් ආපසු ගෙනෙන හෝ මාරු කරන භාණ්ඩ ඇතුළත් කිරීමට ඉහළ ඇති <b>"+ අලුත් රිටන් / මාරුකිරීමක්"</b> ක්ලික් කරන්න.</div>
+          </div>
+        </div>
+      `;
+    }
+
+    return `
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th style="width:95px;">අංකය</th>
+              <th style="width:120px;">දිනය</th>
+              <th style="width:95px;">මුල් බිල</th>
+              <th>පාරිභෝගිකයා</th>
+              <th style="min-width:180px;">🔴 රිටන් ආ භාණ්ඩ</th>
+              <th style="min-width:180px;">🟢 ඒ වෙනුවට ගත් භාණ්ඩ</th>
+              <th style="min-width:170px;">ගිණුම් බේරුම්කරණය (Settlement)</th>
+              <th style="width:100px; text-align:center;">ක්‍රියා</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${returns.map(r => {
+              const itemsList = r.items || [];
+              const excList = r.exchangeItems || [];
+
+              const itemsSummary = itemsList.map(it => {
+                const qtyText = it.looseInfo ? `${it.looseInfo.looseQty} ${escapeHTML(it.looseInfo.looseUnit || '')}` : `${it.qty || it.returnQty} ${escapeHTML(it.unit || '')}`;
+                return `• <b>${escapeHTML(it.name)}</b> (${qtyText} × ${fmt(it.unitPrice)})`;
+              }).join('<br>');
+
+              const excSummary = excList.length ? excList.map(it => {
+                const qtyText = `${it.qty} ${escapeHTML(it.unit || 'pcs')}`;
+                return `• <b>${escapeHTML(it.name)}</b> (${qtyText} × ${fmt(it.unitPrice)})`;
+              }).join('<br>') : '<span class="text-muted small">කිසිවක් ගෙන නැත</span>';
+
+              const retTotal = Number(r.returnTotal) || (itemsList.reduce((s, it) => s + (it.lineTotal || ((it.qty || it.returnQty) * it.unitPrice)), 0));
+              const excTotal = Number(r.exchangeTotal) || (excList.reduce((s, it) => s + (it.lineTotal || (it.qty * it.unitPrice)), 0));
+
+              // Settlement Pill
+              let settlementHTML = '';
+              if (r.settlementType === 'cash_paid') {
+                settlementHTML = `<span class="pill pill-ok" style="font-size:11px; white-space:nowrap;"><i class="ph ph-hand-coins"></i> පාරිභෝගිකයා ගෙව්වා: <b>${fmt(r.extraPaid || r.netAmount)}</b> (මුදල්)</span>`;
+              } else if (r.settlementType === 'credit_added') {
+                settlementHTML = `<span class="pill pill-warn" style="font-size:11px; white-space:nowrap;"><i class="ph ph-credit-card"></i> අමතර ණයට: <b>${fmt(r.extraPaid || r.netAmount)}</b></span>`;
+              } else if (r.settlementType === 'cash_refund') {
+                settlementHTML = `<span class="pill pill-danger" style="font-size:11px; white-space:nowrap;"><i class="ph ph-money"></i> ආපසු දුන්නා: <b>${fmt(r.refundAmount || Math.abs(r.netAmount))}</b> (මුදල්)</span>`;
+              } else if (r.settlementType === 'credit_deduct') {
+                settlementHTML = `<span class="pill pill-warn" style="font-size:11px; white-space:nowrap;"><i class="ph ph-credit-card"></i> ණයෙන් අඩු කළා: <b>${fmt(r.refundAmount || Math.abs(r.netAmount))}</b></span>`;
+              } else {
+                settlementHTML = `<span class="pill pill-muted" style="font-size:11px; white-space:nowrap;"><i class="ph ph-arrows-left-right"></i> සම සමව මාරු විය</span>`;
+              }
+
+              return `
+                <tr>
+                  <td><b>${escapeHTML(r.returnNo || ('RET-' + r.id))}</b></td>
+                  <td style="font-size:12px; white-space:nowrap;">${fmtDate(r.date)}</td>
+                  <td>${r.saleId ? `<span class="pill pill-muted" style="font-weight:700;">බිල් #${r.saleId}</span>` : '<span class="text-muted">-</span>'}</td>
+                  <td>
+                    <div style="font-weight:600;">${escapeHTML(r.customerName || 'සාමාන්‍ය පාරිභෝගිකයා')}</div>
+                    ${r.reason ? `<div class="small text-muted">${escapeHTML(r.reason)}</div>` : ''}
+                  </td>
+                  <td style="font-size:12px; line-height:1.4;">
+                    ${itemsSummary || '-'}
+                    <div style="font-size:11px; font-weight:700; color:var(--danger); margin-top:2px;">එකතුව: ${fmt(retTotal)}</div>
+                  </td>
+                  <td style="font-size:12px; line-height:1.4;">
+                    ${excSummary}
+                    ${excList.length ? `<div style="font-size:11px; font-weight:700; color:var(--success); margin-top:2px;">එකතුව: ${fmt(excTotal)}</div>` : ''}
+                  </td>
+                  <td style="vertical-align:middle;">
+                    ${settlementHTML}
+                  </td>
+                  <td style="text-align:center; white-space:nowrap;">
+                    <button class="icon-btn" data-print-return="${r.id}" title="රිසිට්පත බලන්න / Print" style="color:var(--primary); margin-right:4px;"><i class="ph ph-printer" style="font-size:18px;"></i></button>
+                    <button class="icon-btn" data-del-return="${r.id}" title="මකන්න" style="color:var(--danger);"><i class="ph ph-trash" style="font-size:18px;"></i></button>
+                  </td>
+                </tr>
+              `;
+            }).join('')}
+          </tbody>
+        </table>
+      </div>
+    `;
+  },
+
+  bind() {
+    const search = document.getElementById('returnsSearch');
+    if (search) {
+      search.addEventListener('input', () => {
+        Views.returns.searchQ = search.value;
+        document.getElementById('returnsTableWrap').innerHTML = Views.returns.tableHTML();
+        Views.returns.bindRowActions();
+      });
+    }
+
+    const dateFilter = document.getElementById('returnsDateFilter');
+    if (dateFilter) {
+      dateFilter.addEventListener('input', () => {
+        Views.returns.filterDate = dateFilter.value;
+        document.getElementById('returnsTableWrap').innerHTML = Views.returns.tableHTML();
+        Views.returns.bindRowActions();
+      });
+    }
+
+    document.getElementById('openAddReturnBtn')?.addEventListener('click', () => {
+      Views.returns.openAddReturnModal();
+    });
+
+    Views.returns.bindRowActions();
+  },
+
+  bindRowActions() {
+    document.querySelectorAll('[data-print-return]').forEach(b => {
+      b.addEventListener('click', () => {
+        const id = Number(b.dataset.printReturn);
+        const ret = DB.getReturn(id);
+        if (ret) Views.returns.showReceipt(ret);
+      });
+    });
+
+    document.querySelectorAll('[data-del-return]').forEach(b => {
+      b.addEventListener('click', () => {
+        const id = Number(b.dataset.delReturn);
+        confirmAction('මෙම රිටන් / මාරුකිරීම් වාර්තාව ඉවත් කිරීමට තහවුරු කරන්නද?\n(එවිට තොගය සහ ගිණුම් පෙර තිබූ තත්ත්වයට පත්වේ)', async () => {
+          try {
+            await DB.deleteReturn(id);
+            toast('වාර්තාව ඉවත් කරන ලදී', 'ok');
+            App.render();
+          } catch(err) {
+            console.error('Failed to delete return:', err);
+            toast('ඉවත් කිරීමට නොහැකි විය', 'err');
+          }
+        });
+      });
+    });
+  },
+
+  openAddReturnModal(preselectedSaleId = null) {
+    let currentSale = preselectedSaleId ? DB.allSales().find(s => s.id === Number(preselectedSaleId)) : null;
+    let exchangeItems = []; // Replacement / new items taken
+    let returnAmountPaid = '';
+
+    openModal({
+      title: 'භාණ්ඩ රිටන් කිරීම සහ මාරු කිරීම (Returns & Exchanges)',
+      wide: true,
+      bodyHTML: `
+
+        <!-- SECTION 1: RETURN ITEMS (MODE 1: BY BILL) -->
+        <div id="returnByBillWrap" style="display:block;">
+          <div style="display:flex; align-items:center; gap:8px; margin-bottom:10px; background:var(--paper); padding:8px 12px; border-radius:8px; border:1px solid var(--border);">
+            <div style="flex:1;">
+              <label class="field-label" style="font-size:12px; margin-bottom:4px; font-weight:700;">මුල් බිල්පත් අංකය (Bill Number / Barcode) *</label>
+              <div style="display:flex; gap:8px;">
+                <input class="input" id="searchBillInput" placeholder="උදා: 215 හෝ Barcode scan කරන්න..." value="${currentSale ? currentSale.id : ''}" style="font-size:14px; font-weight:700;">
+                <button type="button" class="btn btn-outline" id="loadBillBtn" style="font-weight:700; white-space:nowrap;">
+                  <i class="ph ph-magnifying-glass"></i> බිල සොයන්න
+                </button>
+              </div>
+            </div>
+          </div>
+          <div id="billDetailsContainer"></div>
+        </div>
+
+        <!-- Return Total Indicator Banner -->
+        <div style="display:flex; justify-content:space-between; align-items:center; background:#fee2e2; border:1.5px solid #fca5a5; padding:10px 14px; border-radius:8px; margin:12px 0;">
+          <div style="font-weight:800; color:#991b1b; font-size:13.5px; display:flex; align-items:center; gap:8px;">
+            <i class="ph ph-arrow-down-left" style="font-size:20px;"></i> රිටන් ආ භාණ්ඩවල මුළු වටිනාකම (Total Return Value):
+          </div>
+          <div style="font-size:20px; font-weight:900; color:#b91c1c;" id="liveReturnTotalBanner">රු. 0.00</div>
+        </div>
+
+        <!-- ============================================================== -->
+        <!-- SECTION 2: EXCHANGE / REPLACEMENT ITEMS (ඒ වෙනුවට ගත් භාණ්ඩ) -->
+        <!-- ============================================================== -->
+        <div style="background:#f0fdf4; border:1.5px solid #bbf7d0; border-radius:8px; padding:12px; margin-top:14px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+            <div style="font-size:13px; font-weight:800; color:#166534; display:flex; align-items:center; gap:6px;">
+              <i class="ph ph-arrows-left-right" style="font-size:18px;"></i> 🔄 ඒ වෙනුවට අලුතින් භාණ්ඩ ලබාගන්නේ නම් (Exchange Items - විකල්පයි):
+            </div>
+            <span class="pill pill-ok" style="font-size:10.5px;">Optional</span>
+          </div>
+
+          <div style="position:relative; margin-bottom:10px;">
+            <input class="input" id="exchangeItemSearchInput" placeholder="ලබාගන්නා නව භාණ්ඩයේ නම හෝ Barcode ගසන්න..." autocomplete="off" style="background:#fff;">
+            <div id="exchangeItemSuggest" class="combo-dropdown" style="position:absolute; top:100%; left:0; right:0; z-index:100; max-height:200px; overflow-y:auto; background:#fff; border:1px solid var(--border); border-radius:6px; box-shadow:0 8px 24px rgba(0,0,0,0.15);"></div>
+          </div>
+
+          <div id="exchangeItemsTableWrap">
+            <div class="text-muted small" style="text-align:center; padding:8px 0; color:#166534;">අලුතින් භාණ්ඩ ලබාගන්නේ නම් ඉහතින් සොයා එකතු කරන්න. (භාණ්ඩ නොගන්නේ නම් හිස්ව තබන්න)</div>
+          </div>
+
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-top:8px; padding-top:8px; border-top:1px dashed #bbf7d0;">
+            <div style="font-weight:700; color:#166534; font-size:13px;">
+              ඒ වෙනුවට ලබාගත් භාණ්ඩවල එකතුව (Exchange Items Total):
+            </div>
+            <div style="font-size:18px; font-weight:800; color:#15803d;" id="liveExchangeTotalBanner">රු. 0.00</div>
+          </div>
+        </div>
+
+        <!-- ============================================================== -->
+        <!-- SECTION 3: BALANCE CALCULATION & SETTLEMENT -->
+        <!-- ============================================================== -->
+        <div id="settlementBoxWrap" style="margin-top:14px; border-radius:8px; border:2px solid var(--border); padding:14px; background:#fff;">
+          <div style="font-size:14px; font-weight:800; margin-bottom:10px; color:var(--charcoal); display:flex; justify-content:space-between; align-items:center;">
+            <span>⚖️ ගිණුම් බේරුම්කරණය (Balance Settlement):</span>
+          </div>
+
+
+          <div style="display:none;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+              <label class="field-label" style="font-size:12.5px; font-weight:800; color:var(--charcoal); margin:0; display:flex; align-items:center; gap:6px;">
+                <i class="ph ph-user-circle" style="font-size:18px; color:var(--primary);"></i> පාරිභෝගිකයා තෝරන්න (Select / Change Customer):
+              </label>
+              <div id="selectedCustInfoBadge"></div>
+            </div>
+            <div style="display:flex; gap:8px;">
+              <div style="position:relative; width:180px;">
+                <input class="input" id="custQuickFilter" placeholder="නම / Phone සොයන්න..." style="height:36px; font-size:12px; padding-left:28px;" autocomplete="off">
+                <i class="ph ph-magnifying-glass" style="position:absolute; left:8px; top:50%; transform:translateY(-50%); font-size:14px; color:var(--steel);"></i>
+              </div>
+              <select class="input" id="returnCustSelect" style="flex:1; height:36px; font-size:13px; font-weight:700; background:#fff;">
+                <option value="">-- සාමාන්‍ය පාරිභෝගිකයා (Cash Customer) --</option>
+                ${DB.allCustomers().map(c => `<option value="${c.id}">${escapeHTML(c.name)} ${c.phone ? '• ' + escapeHTML(c.phone) : ''} (ණය: ${fmt(c.balance)})</option>` ).join('')}
+              </select>
+            </div>
+          </div>
+
+          <div id="settlementCalculationContent">
+            <!-- Dynamically populated by recalcAll -->
+          </div>
+
+          <div class="grid grid-2 gap-8" style="margin-top:12px; padding-top:10px; border-top:1px solid var(--border);">
+            <div class="field" style="margin-bottom:0;">
+              <label class="field-label" style="font-size:12px;">රිටන් කිරීමට හේතුව (Reason)</label>
+              <select class="input" id="returnReasonSelect">
+                <option value="භාණ්ඩ ඉතිරි වීම (Leftover)">භාණ්ඩ ඉතිරි වීම (Leftover)</option>
+                <option value="වැරදි භාණ්ඩයක් මිලදී ගැනීම (Wrong Item)">වැරදි භාණ්ඩයක් මිලදී ගැනීම (Wrong Item)</option>
+                <option value="වෙනත් භාණ්ඩයක් මාරු කර ගැනීම (Exchange)">වෙනත් භාණ්ඩයක් මාරු කර ගැනීම (Exchange)</option>
+                <option value="දෝෂ සහිත / කැඩී බිඳී යාම (Damaged)">දෝෂ සහිත / කැඩී බිඳී යාම (Damaged / Defective)</option>
+                <option value="වෙනත් (Other)">වෙනත් (Other)</option>
+              </select>
+            </div>
+            <div class="field" style="margin-bottom:0;">
+              <label class="field-label" style="font-size:12px;">විශේෂ සටහන (Note / Remark)</label>
+              <input class="input" id="returnNoteInput" placeholder="සටහනක් ඇත්නම් මෙහි සටහන් කරන්න...">
+            </div>
+          </div>
+        </div>
+      `,
+      footHTML: `
+        <button class="btn btn-outline" data-close>${t('close')}</button>
+        <button class="btn btn-success" id="confirmReturnBtn" style="font-weight:700; display:inline-flex; align-items:center; gap:6px;">
+          <i class="ph ph-check-circle" style="font-size:18px;"></i> රිටන් / මාරුකිරීම තහවුරු කරන්න
+        </button>
+      `,
+      onMount: (wrap) => {
+        const custSelect = wrap.querySelector('#returnCustSelect');
+
+        // ==============================================================
+        // MASTER RECALCULATION FUNCTION (Defined first to prevent TDZ errors)
+        // ==============================================================
+        function recalcAll() {
+          // 1. Calculate return total
+          let returnTotal = 0;
+          if (currentSale) {
+            wrap.querySelectorAll('.bill-return-qty').forEach(inp => {
+              const idx = Number(inp.dataset.billLineIdx);
+              const val = Number(inp.value) || 0;
+              const line = (currentSale.lines && currentSale.lines[idx]) ? currentSale.lines[idx] : null;
+              if (line && val > 0) {
+                returnTotal += (val * Number(line.unitPrice || 0));
+              }
+            });
+          }
+          returnTotal = Math.round(returnTotal * 100) / 100;
+
+          // 2. Calculate exchange total
+          let exchangeTotal = exchangeItems.reduce((s, it) => s + ((Number(it.qty) || 0) * (Number(it.unitPrice) || 0)), 0);
+          exchangeTotal = Math.round(exchangeTotal * 100) / 100;
+
+          // 3. Update banners and table footer totals
+          const liveReturnBanner = wrap.querySelector('#liveReturnTotalBanner');
+          if (liveReturnBanner) liveReturnBanner.textContent = fmt(returnTotal);
+
+          const tableFooterReturnTotal = wrap.querySelector('#billReturnTableFooterTotal');
+          if (tableFooterReturnTotal) tableFooterReturnTotal.textContent = fmt(returnTotal);
+
+          const liveExchangeBanner = wrap.querySelector('#liveExchangeTotalBanner');
+          if (liveExchangeBanner) liveExchangeBanner.textContent = fmt(exchangeTotal);
+
+          // 4. Update settlement card
+          const settlementContent = wrap.querySelector('#settlementCalculationContent');
+          if (!settlementContent) return;
+
+          const diff = Math.round((exchangeTotal - returnTotal) * 100) / 100;
+          const selectedCustId = custSelect && custSelect.value ? Number(custSelect.value) : null;
+          const selectedCust = selectedCustId ? DB.getCustomer(selectedCustId) : null;
+          const isCreditCust = Boolean(selectedCust);
+          const origBillTotal = currentSale ? Number(currentSale.total || 0) : null;
+
+          // Update Customer badge above
+          const custBadge = wrap.querySelector('#selectedCustInfoBadge');
+          if (custBadge) {
+            if (selectedCust) {
+              const bal = Number(selectedCust.balance) || 0;
+              custBadge.innerHTML = `<span class="pill ${bal > 0 ? 'pill-warn' : 'pill-ok'}" style="font-size:11.5px; font-weight:700;">
+                <i class="ph ph-wallet"></i> වත්මන් ණය: ${fmt(bal)}
+              </span>`;
+            } else {
+              custBadge.innerHTML = `<span class="pill pill-steel" style="font-size:11px;">සාමාන්‍ය පාරිභෝගිකයා (Cash)</span>`;
+            }
+          }
+
+          const currentExtraMethod = wrap.querySelector('#extraPayMethod')?.value || (isCreditCust ? 'credit_added' : 'cash_paid');
+          const currentRefundMethod = wrap.querySelector('#refundPayMethod')?.value || (isCreditCust ? 'credit_deduct' : 'cash_refund');
+          const existingPaidInp = wrap.querySelector('#returnAmountPaidInput');
+          if (existingPaidInp) returnAmountPaid = existingPaidInp.value;
+
+          if (diff > 0) {
+            // Customer owes extra!
+            settlementContent.innerHTML = `
+              <div style="background:#fffbeb; border:1.5px solid #fde68a; border-radius:8px; padding:12px; margin-bottom:8px;">
+                ${origBillTotal !== null ? `
+                  <div style="display:flex; justify-content:space-between; margin-bottom:4px; font-size:12.5px; color:var(--steel);">
+                    <span>පාරිභෝගිකයා මිලදී ගත් මුළු එකතුව (Original Bill):</span>
+                    <span style="font-weight:700; color:var(--primary-dark);">${fmt(origBillTotal)}</span>
+                  </div>
+                ` : ''}
+                <div style="display:flex; justify-content:space-between; margin-bottom:4px; font-size:12.5px; color:#92400e;">
+                  <span>රිටන් ආ භාණ්ඩවල වටිනාකම:</span>
+                  <span style="font-weight:700;">- ${fmt(returnTotal)}</span>
+                </div>
+                <div style="display:flex; justify-content:space-between; margin-bottom:6px; font-size:12.5px; color:#166534;">
+                  <span>ඒ වෙනුවට ලබාගත් භාණ්ඩවල එකතුව:</span>
+                  <span style="font-weight:700;">+ ${fmt(exchangeTotal)}</span>
+                </div>
+                <div style="display:flex; justify-content:space-between; align-items:center; border-top:1px dashed #fde68a; padding-top:8px;">
+                  <span style="font-size:14px; font-weight:800; color:#b45309;">
+                    ⚠️ පාරිභෝගිකයා තව ගෙවිය යුතු මුදල (Customer Extra Due):
+                  </span>
+                  <span style="font-size:22px; font-weight:900; color:#b45309;" id="calculatedDiffAmt">
+                    ${fmt(diff)}
+                  </span>
+                </div>
+                <div style="margin-top:10px; display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+                  <label style="font-size:12px; font-weight:700; color:#92400e; margin:0;">අමතර මුදල බේරුම් කිරීමේ ක්‍රමය:</label>
+                  <select class="input" id="extraPayMethod" style="width:240px; height:32px; font-size:12.5px; font-weight:700;">
+                    <option value="cash_paid" ${currentExtraMethod === 'cash_paid' || !isCreditCust ? 'selected' : ''}>💵 මුදලින් ගෙවීම (Paid by Cash)</option>
+                    <option value="credit_added" ${!isCreditCust ? 'disabled' : ''} ${currentExtraMethod === 'credit_added' && isCreditCust ? 'selected' : ''}>💳 ණයට ගැනීම (Add to Customer Credit)${!isCreditCust ? ' - ඉහතින් පාරිභෝගිකයා තෝරන්න' : ''}</option>
+                  </select>
+                  ${isCreditCust ? `
+                    <div style="font-size:12px; font-weight:700; color:#92400e; background:#fffbeb; padding:4px 8px; border-radius:6px; border:1px solid #fde68a;">
+                      👤 ${escapeHTML(selectedCust.name)}: ණය ${fmt(selectedCust.balance)} → <span style="color:#b45309; font-weight:800;">${fmt((selectedCust.balance || 0) + diff)}</span>
+                    </div>
+                  ` : ''}
+                </div>
+
+                <!-- Customer Paid & Change Box -->
+                <div id="returnAmountPaidWrap" style="display:${currentExtraMethod === 'cash_paid' ? 'block' : 'none'}; margin-top:10px; padding:10px 14px; background:#fff; border:1.5px solid #fde68a; border-radius:8px;">
+                  <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+                    <div style="display:flex; align-items:center; gap:8px;">
+                      <label style="font-size:13px; font-weight:800; color:#92400e; margin:0;">
+                        💵 පාරිභෝගිකයා දුන් මුදල (Customer Paid):
+                      </label>
+                      <div style="position:relative; width:170px;">
+                        <span style="position:absolute; left:10px; top:50%; transform:translateY(-50%); font-weight:700; color:var(--steel); font-size:13px;">රු.</span>
+                        <input class="input" id="returnAmountPaidInput" type="number" min="0" step="any" placeholder="උදා: 10000" value="${returnAmountPaid || ''}" style="padding-left:34px; height:36px; font-size:15px; font-weight:800; color:#15803d; border-color:#f59e0b;" autocomplete="off">
+                      </div>
+                    </div>
+                    <div id="returnChangeBox" style="display:none; align-items:center; gap:6px; background:#dcfce7; border:1.5px solid #86efac; border-radius:6px; padding:6px 14px; color:#166534;">
+                      <span style="font-size:13px; font-weight:700;">ඉතිරි මුදල (Change):</span>
+                      <span style="font-size:18px; font-weight:900; color:#15803d;" id="returnChangeDisplay">රු. 0.00</span>
+                    </div>
+                    <div id="returnShortBox" style="display:none; align-items:center; gap:6px; background:#fee2e2; border:1.5px solid #fca5a5; border-radius:6px; padding:6px 14px; color:#991b1b; font-weight:700; font-size:13px;">
+                      <i class="ph ph-warning-circle" style="font-size:16px;"></i>
+                      <span>තව රු. <b id="returnShortDisplay">0.00</b> ක් මදි</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            `;
+          } else if (diff < 0) {
+            // Shop refunds customer!
+            const refundAmt = Math.abs(diff);
+            settlementContent.innerHTML = `
+              <div style="background:#fef2f2; border:1.5px solid #fecaca; border-radius:8px; padding:12px; margin-bottom:8px;">
+                ${origBillTotal !== null ? `
+                  <div style="display:flex; justify-content:space-between; margin-bottom:4px; font-size:12.5px; color:var(--steel);">
+                    <span>පාරිභෝගිකයා මිලදී ගත් මුළු එකතුව (Original Bill):</span>
+                    <span style="font-weight:700; color:var(--primary-dark);">${fmt(origBillTotal)}</span>
+                  </div>
+                ` : ''}
+                <div style="display:flex; justify-content:space-between; margin-bottom:4px; font-size:12.5px; color:#991b1b;">
+                  <span>රිටන් ආ භාණ්ඩවල වටිනාකම:</span>
+                  <span style="font-weight:700;">${fmt(returnTotal)}</span>
+                </div>
+                <div style="display:flex; justify-content:space-between; margin-bottom:6px; font-size:12.5px; color:#166534;">
+                  <span>ඒ වෙනුවට ලබාගත් භාණ්ඩවල එකතුව:</span>
+                  <span style="font-weight:700;">- ${fmt(exchangeTotal)}</span>
+                </div>
+                <div style="display:flex; justify-content:space-between; align-items:center; border-top:1px dashed #fecaca; padding-top:8px;">
+                  <span style="font-size:14px; font-weight:800; color:#dc2626;">
+                    💰 පාරිභෝගිකයාට ආපසු දිය යුතු මුදල (Refund to Customer):
+                  </span>
+                  <span style="font-size:22px; font-weight:900; color:#dc2626;" id="calculatedDiffAmt">
+                    ${fmt(refundAmt)}
+                  </span>
+                </div>
+                <div style="margin-top:10px; display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+                  <label style="font-size:12px; font-weight:700; color:#991b1b; margin:0;">ආපසු දෙන ක්‍රමය:</label>
+                  <select class="input" id="refundPayMethod" style="width:240px; height:32px; font-size:12.5px; font-weight:700;">
+                    <option value="cash_refund" ${currentRefundMethod === 'cash_refund' || !isCreditCust ? 'selected' : ''}>💵 මුදල් ආපසු දීම (Cash Refund)</option>
+                    <option value="credit_deduct" ${!isCreditCust ? 'disabled' : ''} ${currentRefundMethod === 'credit_deduct' && isCreditCust ? 'selected' : ''}>💳 ණයෙන් අඩු කිරීම (Deduct Credit)${!isCreditCust ? ' - ඉහතින් පාරිභෝගිකයා තෝරන්න' : ''}</option>
+                  </select>
+                  ${isCreditCust ? `
+                    <div style="font-size:12px; font-weight:700; color:#1e3a8a; background:#eff6ff; padding:4px 8px; border-radius:6px; border:1px solid #bfdbfe;">
+                      👤 ${escapeHTML(selectedCust.name)}: ණය ${fmt(selectedCust.balance)} → <span style="color:#15803d; font-weight:800;">${fmt(Math.max(0, (selectedCust.balance || 0) - refundAmt))}</span>
+                    </div>
+                  ` : ''}
+                </div>
+
+                <!-- Customer Paid / Handed & Change Box -->
+                <div id="returnAmountPaidWrap" style="display:${currentRefundMethod === 'cash_refund' ? 'block' : 'none'}; margin-top:10px; padding:10px 14px; background:#fff; border:1.5px solid #fecaca; border-radius:8px;">
+                  <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+                    <div style="display:flex; align-items:center; gap:8px;">
+                      <label style="font-size:13px; font-weight:800; color:#991b1b; margin:0;">
+                        💵 පාරිභෝගිකයා දුන් මුදල (Customer Paid / Handed):
+                      </label>
+                      <div style="position:relative; width:170px;">
+                        <span style="position:absolute; left:10px; top:50%; transform:translateY(-50%); font-weight:700; color:var(--steel); font-size:13px;">රු.</span>
+                        <input class="input" id="returnAmountPaidInput" type="number" min="0" step="any" placeholder="උදා: 10000" value="${returnAmountPaid || ''}" style="padding-left:34px; height:36px; font-size:15px; font-weight:800; color:#15803d; border-color:#f87171;" autocomplete="off">
+                      </div>
+                    </div>
+                    <div id="returnChangeBox" style="display:none; align-items:center; gap:6px; background:#dcfce7; border:1.5px solid #86efac; border-radius:6px; padding:6px 14px; color:#166534;">
+                      <span style="font-size:13px; font-weight:700;">ඉතිරි මුදල (Change):</span>
+                      <span style="font-size:18px; font-weight:900; color:#15803d;" id="returnChangeDisplay">රු. 0.00</span>
+                    </div>
+                    <div id="returnShortBox" style="display:none; align-items:center; gap:6px; background:#fee2e2; border:1.5px solid #fca5a5; border-radius:6px; padding:6px 14px; color:#991b1b; font-weight:700; font-size:13px;">
+                      <i class="ph ph-warning-circle" style="font-size:16px;"></i>
+                      <span>තව රු. <b id="returnShortDisplay">0.00</b> ක් මදි</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            `;
+          } else {
+            // Even exchange or zero
+            settlementContent.innerHTML = `
+              <div style="background:#f8fafc; border:1.5px solid #cbd5e1; border-radius:8px; padding:12px; text-align:center;">
+                ${origBillTotal !== null ? `
+                  <div style="display:flex; justify-content:space-between; margin-bottom:8px; padding-bottom:6px; border-bottom:1px dashed #cbd5e1; font-size:12.5px; color:var(--steel);">
+                    <span>පාරිභෝගිකයා මිලදී ගත් මුළු එකතුව (Original Bill):</span>
+                    <span style="font-weight:700; color:var(--primary-dark);">${fmt(origBillTotal)}</span>
+                  </div>
+                ` : ''}
+                <div style="font-size:14.5px; font-weight:800; color:#334155;">
+                  ${returnTotal > 0 ? '✅ සම සමව මාරු විය (වෙනස: රු. 0.00 - Even Exchange)' : 'රිටන් කිරීමට භාණ්ඩවල රිටන් ගණන ඇතුළත් කරන්න.'}
+                </div>
+                ${returnTotal > 0 ? `
+                  <div style="font-size:12px; color:#64748b; margin-top:2px;">
+                    රිටන් කළ භාණ්ඩවල සහ ලබාගත් නව භාණ්ඩවල වටිනාකම (${fmt(returnTotal)}) සමාන බැවින් අමතර ගෙවීමක් හෝ ආපසු දීමක් නැත.
+                  </div>
+                ` : ''}
+              </div>
+            `;
+          }
+
+          // Live change calculation logic for return amount paid
+          const updateChangeCalculation = (targetAmt) => {
+            const paidInp = wrap.querySelector('#returnAmountPaidInput');
+            const changeBox = wrap.querySelector('#returnChangeBox');
+            const shortBox = wrap.querySelector('#returnShortBox');
+            const changeDisp = wrap.querySelector('#returnChangeDisplay');
+            const shortDisp = wrap.querySelector('#returnShortDisplay');
+            if (!paidInp) return;
+
+            const valStr = paidInp.value.trim();
+            const paid = Number(valStr);
+
+            if (!valStr || isNaN(paid) || paid <= 0) {
+              if (changeBox) changeBox.style.display = 'none';
+              if (shortBox) shortBox.style.display = 'none';
+              return;
+            }
+
+            if (targetAmt > 0 && paid < targetAmt) {
+              if (changeBox) changeBox.style.display = 'none';
+              if (shortBox) {
+                shortBox.style.display = 'flex';
+                if (shortDisp) shortDisp.textContent = fmt(targetAmt - paid);
+              }
+            } else {
+              if (shortBox) shortBox.style.display = 'none';
+              if (changeBox) {
+                changeBox.style.display = 'flex';
+                if (changeDisp) changeDisp.textContent = fmt(Math.max(0, paid - targetAmt));
+              }
+            }
+          };
+
+          const targetAmount = (diff > 0 ? diff : Math.abs(diff));
+          const paidInputEl = wrap.querySelector('#returnAmountPaidInput');
+          if (paidInputEl) {
+            paidInputEl.addEventListener('input', (e) => {
+              returnAmountPaid = e.target.value;
+              updateChangeCalculation(targetAmount);
+            });
+            updateChangeCalculation(targetAmount);
+          }
+
+          // Extra Pay Method change
+          wrap.querySelector('#extraPayMethod')?.addEventListener('change', (e) => {
+            const pWrap = wrap.querySelector('#returnAmountPaidWrap');
+            if (pWrap) pWrap.style.display = e.target.value === 'cash_paid' ? 'block' : 'none';
+          });
+
+          // Refund Pay Method change
+          wrap.querySelector('#refundPayMethod')?.addEventListener('change', (e) => {
+            const pWrap = wrap.querySelector('#returnAmountPaidWrap');
+            if (pWrap) pWrap.style.display = e.target.value === 'cash_refund' ? 'block' : 'none';
+          });
+        }
+
+
+        // ===================================
+        // MODE 1: Load Bill
+        // ===================================
+        const billContainer = wrap.querySelector('#billDetailsContainer');
+        const searchInput = wrap.querySelector('#searchBillInput');
+
+        const renderBillLines = (sale) => {
+          if (!sale) {
+            billContainer.innerHTML = '<div class="text-muted small" style="text-align:center; padding:14px;">බිල්පත් අංකය ඇතුළත් කර "බිල සොයන්න" ක්ලික් කරන්න.</div>';
+            recalcAll();
+            return;
+          }
+
+          const isCredit = sale.paymentType === 'credit';
+          if (custSelect) {
+            if (sale.customerId) {
+              custSelect.value = String(sale.customerId);
+            } else if (sale.customerName && sale.customerName !== 'Cash Customer' && sale.customerName !== 'සාමාන්‍ය පාරිභෝගිකයා') {
+              const matched = DB.allCustomers().find(c => c.name.toLowerCase() === sale.customerName.toLowerCase());
+              if (matched) custSelect.value = String(matched.id);
+            }
+          }
+
+          billContainer.innerHTML = `
+            <div style="background:#fff; border:1px solid var(--border); border-radius:8px; padding:12px; margin-bottom:8px;">
+              <!-- BILL HEADER WITH CUSTOMER PURCHASE TOTAL PROMINENTLY DISPLAYED -->
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; flex-wrap:wrap; gap:8px; padding-bottom:8px; border-bottom:1px solid var(--border);">
+                <div>
+                  <div style="display:flex; align-items:center; gap:8px;">
+                    <span style="font-size:16px; font-weight:800; color:var(--primary-dark);">බිල් #${sale.id}</span>
+                    <span style="font-size:12px; color:var(--steel);">${fmtDate(sale.date)}</span>
+                    <span class="pill ${isCredit ? 'pill-warn' : 'pill-ok'}" style="font-size:11px;">${isCredit ? 'ණයට (Credit)' : 'මුදල් (Cash)'}</span>
+                  </div>
+                  <div style="font-weight:700; color:var(--charcoal); margin-top:3px; font-size:13px;">
+                    <i class="ph ph-user"></i> ${escapeHTML(sale.customerName || 'සාමාන්‍ය පාරිභෝගිකයා')}
+                  </div>
+                </div>
+
+                <!-- ORIGINAL PURCHASED TOTAL CARD -->
+                <div style="background:var(--paper); border:1.5px solid var(--border); border-radius:8px; padding:6px 14px; text-align:right;">
+                  <div style="font-size:11px; font-weight:700; color:var(--steel); text-transform:uppercase;">
+                    පාරිභෝගිකයා මිලදී ගත් මුළු එකතුව (Total Bill):
+                  </div>
+                  <div style="font-size:18px; font-weight:900; color:var(--primary-dark);" id="origBillTotalLabel">
+                    ${fmt(sale.total)}
+                  </div>
+                  ${sale.discount > 0 ? `<div style="font-size:10.5px; color:var(--danger); font-weight:600;">(වට්ටම: - ${fmt(sale.discount)})</div>` : ''}
+                </div>
+              </div>
+
+              <!-- ITEMS IN THIS BILL -->
+              <div class="table-wrap">
+                <table style="width:100%; border-collapse:collapse;">
+                  <thead>
+                    <tr style="background:var(--paper); border-bottom:1px solid var(--border);">
+                      <th style="padding:7px 8px; font-size:12px;">භාණ්ඩය</th>
+                      <th class="num" style="padding:7px 8px; font-size:12px; width:95px;">මිල (Price)</th>
+                      <th class="num" style="padding:7px 8px; font-size:12px; width:85px;">ගත් ගණන</th>
+                      <th class="num" style="padding:7px 8px; font-size:12px; width:100px;">ගත් මුදල</th>
+                      <th style="padding:7px 8px; font-size:12px; width:100px; text-align:center;">රිටන් ගණන</th>
+                      <th class="num" style="padding:7px 8px; font-size:12px; width:110px;">රිටන් මුදල</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    ${sale.lines.map((l, idx) => {
+                      const qtyText = l.looseInfo ? `${l.looseInfo.looseQty} ${escapeHTML(l.looseInfo.looseUnit || '')}` : `${l.qty} ${escapeHTML(l.unit || '')}`;
+                      const purchasedLineTotal = Number(l.qty) * Number(l.unitPrice);
+                      return `
+                        <tr style="border-bottom:1px solid var(--border);">
+                          <td style="padding:7px 8px; font-weight:600; font-size:12.5px;">${escapeHTML(l.name)}</td>
+                          <td class="num" style="padding:7px 8px; font-size:12.5px;">${fmt(l.unitPrice)}</td>
+                          <td class="num" style="padding:7px 8px; color:var(--steel); font-size:12.5px;">${qtyText}</td>
+                          <td class="num" style="padding:7px 8px; font-weight:700; color:var(--charcoal); font-size:12.5px;">${fmt(purchasedLineTotal)}</td>
+                          <td style="padding:7px 8px; text-align:center;">
+                            <input type="number" min="0" max="${l.qty}" step="any" value="0" data-bill-line-idx="${idx}" class="input bill-return-qty" style="width:75px; height:30px; font-size:13px; font-weight:700; text-align:center; padding:2px 4px;">
+                          </td>
+                          <td class="num" style="padding:7px 8px; font-weight:700; color:var(--danger); font-size:12.5px;" id="billLineRefund_${idx}">
+                            රු. 0.00
+                          </td>
+                        </tr>
+                      `;
+                    }).join('')}
+                  </tbody>
+                  <tfoot>
+                    <tr style="background:var(--paper); border-top:1.5px solid var(--border); font-weight:800; font-size:12.5px;">
+                      <td colspan="3" style="padding:8px; text-align:right;">මුළු එකතුව:</td>
+                      <td class="num" style="padding:8px; color:var(--primary-dark);">${fmt(sale.total)}</td>
+                      <td style="padding:8px; text-align:center; font-size:11px; color:var(--steel);">රිටන් එකතුව:</td>
+                      <td class="num" style="padding:8px; color:var(--danger); font-size:13px;" id="billReturnTableFooterTotal">රු. 0.00</td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+            </div>
+          `;
+
+          wrap.querySelectorAll('.bill-return-qty').forEach(inp => {
+            ['input', 'change', 'keyup', 'paste'].forEach(evtType => {
+              inp.addEventListener(evtType, () => {
+                const idx = Number(inp.dataset.billLineIdx);
+                const max = Number(inp.max) || 0;
+                let val = Number(inp.value) || 0;
+                if (val < 0) { val = 0; inp.value = 0; }
+                if (val > max) { val = max; inp.value = max; }
+                const line = sale.lines[idx];
+                const lineRefund = val * Number(line.unitPrice || 0);
+                const lbl = wrap.querySelector(`#billLineRefund_${idx}`);
+                if (lbl) lbl.textContent = fmt(lineRefund);
+                recalcAll();
+              });
+            });
+          });
+
+          recalcAll();
+        };
+
+        const loadBill = () => {
+          const q = (searchInput?.value || '').trim();
+          if (!q) {
+            toast('කරුණාකර බිල්පත් අංකය ඇතුළත් කරන්න', 'err');
+            return;
+          }
+          const num = Number(q.replace(/[^0-9]/g, ''));
+          const sale = DB.allSales().find(s => s.id === num || (s.barcode && s.barcode.toLowerCase() === q.toLowerCase()));
+          if (!sale) {
+            toast('එම අංකය සහිත බිල්පතක් සොයාගත නොහැකි විය!', 'err');
+            currentSale = null;
+            renderBillLines(null);
+            return;
+          }
+          currentSale = sale;
+          renderBillLines(sale);
+        };
+
+        wrap.querySelector('#loadBillBtn')?.addEventListener('click', loadBill);
+        searchInput?.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter') { e.preventDefault(); loadBill(); }
+        });
+
+        if (currentSale) renderBillLines(currentSale);
+        else renderBillLines(null);
+
+        // ===================================
+        // SECTION 2: Exchange Items Search
+        // ===================================
+        const exchangeTableWrap = wrap.querySelector('#exchangeItemsTableWrap');
+        const exchangeSearch = wrap.querySelector('#exchangeItemSearchInput');
+        const exchangeSuggest = wrap.querySelector('#exchangeItemSuggest');
+
+        const renderExchangeTable = () => {
+          if (!exchangeItems.length) {
+            exchangeTableWrap.innerHTML = '<div class="text-muted small" style="text-align:center; padding:8px 0; color:#166534;">අලුතින් භාණ්ඩ ලබාගන්නේ නම් ඉහතින් සොයා එකතු කරන්න. (භාණ්ඩ නොගන්නේ නම් හිස්ව තබන්න)</div>';
+            recalcAll();
+            return;
+          }
+
+          exchangeTableWrap.innerHTML = `
+            <div class="table-wrap" style="background:#fff; border-radius:6px; border:1px solid #bbf7d0;">
+              <table style="width:100%; border-collapse:collapse;">
+                <thead>
+                  <tr style="background:#f0fdf4; border-bottom:1px solid #bbf7d0;">
+                    <th style="padding:6px 8px; font-size:12px; color:#166534;">ලබාගත් නව භාණ්ඩය</th>
+                    <th class="num" style="padding:6px 8px; font-size:12px; width:100px; color:#166534;">මිල (Price)</th>
+                    <th style="padding:6px 8px; font-size:12px; width:85px; text-align:center; color:#166534;">ප්‍රමාණය</th>
+                    <th class="num" style="padding:6px 8px; font-size:12px; width:105px; color:#166534;">මුදල</th>
+                    <th style="width:36px;"></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${exchangeItems.map((item, idx) => `
+                    <tr style="border-bottom:1px solid #dcfce7;">
+                      <td style="padding:6px 8px; font-weight:600; font-size:12.5px;">${escapeHTML(item.name)}</td>
+                      <td class="num" style="padding:6px 8px;">
+                        <input type="number" min="0" step="any" value="${item.unitPrice}" data-exc-price-idx="${idx}" class="input" style="width:80px; height:28px; font-size:12.5px; text-align:right; padding:2px 4px;">
+                      </td>
+                      <td style="padding:6px 8px; text-align:center;">
+                        <input type="number" min="0.01" step="any" value="${item.qty}" data-exc-qty-idx="${idx}" class="input" style="width:70px; height:28px; font-size:12.5px; text-align:center; font-weight:700; padding:2px 4px;">
+                      </td>
+                      <td class="num" style="padding:6px 8px; font-weight:700; color:#15803d; font-size:12.5px;">
+                        ${fmt(item.qty * item.unitPrice)}
+                      </td>
+                      <td style="padding:6px 4px; text-align:center;">
+                        <button type="button" class="icon-btn" data-exc-del-idx="${idx}" style="color:var(--steel); font-size:15px;">✕</button>
+                      </td>
+                    </tr>
+                  `).join('')}
+                </tbody>
+              </table>
+            </div>
+          `;
+
+          wrap.querySelectorAll('[data-exc-price-idx]').forEach(inp => {
+            ['input', 'change', 'keyup'].forEach(evtType => {
+              inp.addEventListener(evtType, () => {
+                const idx = Number(inp.dataset.excPriceIdx);
+                exchangeItems[idx].unitPrice = Number(inp.value) || 0;
+                renderExchangeTable();
+              });
+            });
+          });
+
+          wrap.querySelectorAll('[data-exc-qty-idx]').forEach(inp => {
+            ['input', 'change', 'keyup'].forEach(evtType => {
+              inp.addEventListener(evtType, () => {
+                const idx = Number(inp.dataset.excQtyIdx);
+                exchangeItems[idx].qty = Number(inp.value) || 0;
+                renderExchangeTable();
+              });
+            });
+          });
+
+          wrap.querySelectorAll('[data-exc-del-idx]').forEach(btn => {
+            btn.addEventListener('click', () => {
+              const idx = Number(btn.dataset.excDelIdx);
+              exchangeItems.splice(idx, 1);
+              renderExchangeTable();
+            });
+          });
+
+          recalcAll();
+        };
+
+        if (exchangeSearch && exchangeSuggest) {
+          exchangeSearch.addEventListener('input', () => {
+            const q = exchangeSearch.value.trim();
+            if (!q) { exchangeSuggest.classList.remove('open'); return; }
+            const items = DB.searchItems(q).slice(0, 8);
+            if (!items.length) {
+              exchangeSuggest.innerHTML = '<div style="padding:8px 12px; font-size:12px; color:var(--steel);">භාණ්ඩ හමු නොවීය</div>';
+              exchangeSuggest.classList.add('open');
+              return;
+            }
+            exchangeSuggest.innerHTML = items.map(i => `
+              <div class="exc-item-opt" data-opt-id="${i.id}" style="padding:8px 12px; cursor:pointer; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:center;">
+                <div>
+                  <div style="font-weight:600; font-size:13px; color:var(--charcoal);">${escapeHTML(i.name)}</div>
+                  <div style="font-size:11px; color:var(--steel);">Stock: ${i.qty} ${escapeHTML(i.unit)} | Barcode: ${escapeHTML(i.barcode || '-')}</div>
+                </div>
+                <div style="font-weight:700; color:var(--success); font-size:13px;">${fmt(i.sellPrice)}</div>
+              </div>
+            `).join('');
+            exchangeSuggest.classList.add('open');
+
+            exchangeSuggest.querySelectorAll('.exc-item-opt').forEach(opt => {
+              opt.addEventListener('click', () => {
+                const id = Number(opt.dataset.optId);
+                const it = DB.getItem(id);
+                if (it) {
+                  const existingIdx = exchangeItems.findIndex(x => x.itemId === it.id);
+                  if (existingIdx !== -1) exchangeItems[existingIdx].qty += 1;
+                  else exchangeItems.push({ itemId: it.id, name: it.name, unit: it.unit || 'pcs', unitPrice: it.sellPrice || 0, qty: 1 });
+                  exchangeSearch.value = '';
+                  exchangeSuggest.classList.remove('open');
+                  renderExchangeTable();
+                }
+              });
+            });
+          });
+
+          document.addEventListener('click', (e) => {
+            if (!exchangeSearch.contains(e.target) && !exchangeSuggest.contains(e.target)) {
+              exchangeSuggest.classList.remove('open');
+            }
+          });
+        }
+
+        custSelect?.addEventListener('change', recalcAll);
+
+        const custFilter = wrap.querySelector('#custQuickFilter');
+        if (custFilter && custSelect) {
+          custFilter.addEventListener('input', () => {
+            const q = custFilter.value.trim().toLowerCase();
+            const allCust = DB.allCustomers();
+            const filtered = q ? allCust.filter(c => (c.name || '').toLowerCase().includes(q) || (c.phone || '').includes(q)) : allCust;
+            const currentVal = custSelect.value;
+            
+            custSelect.innerHTML = `<option value="">-- සාමාන්‍ය පාරිභෝගිකයා (Cash Customer) --</option>` +
+              filtered.map(c => `<option value="${c.id}" ${String(c.id) === currentVal ? 'selected' : ''}>${escapeHTML(c.name)} ${c.phone ? '• ' + escapeHTML(c.phone) : ''} (ණය: ${fmt(c.balance)})</option>`).join('');
+            
+            if (q && filtered.length === 1 && !currentVal) {
+              custSelect.value = String(filtered[0].id);
+              recalcAll();
+            }
+          });
+        }
+
+        // ===================================
+        // SUBMIT RETURN & EXCHANGE
+        // ===================================
+        wrap.querySelector('#confirmReturnBtn')?.addEventListener('click', async () => {
+          let returnItemsList = [];
+          let saleId = null;
+          let customerId = null;
+          let customerName = 'සාමාන්‍ය පාරිභෝගිකයා';
+
+          if (custSelect && custSelect.value) {
+            customerId = Number(custSelect.value);
+            const c = DB.getCustomer(customerId);
+            if (c) customerName = c.name;
+          }
+
+          if (!currentSale) {
+            toast('කරුණාකර පළමුව බිල්පතක් සොයා තෝරන්න!', 'err');
+            return;
+          }
+          saleId = currentSale.id;
+          if (!customerId && currentSale.customerId) {
+            customerId = currentSale.customerId;
+            customerName = currentSale.customerName || 'සාමාන්‍ය පාරිභෝගිකයා';
+          }
+
+          wrap.querySelectorAll('.bill-return-qty').forEach(inp => {
+            const idx = Number(inp.dataset.billLineIdx);
+            const val = Number(inp.value) || 0;
+            const line = currentSale.lines[idx];
+            if (line && val > 0) {
+              returnItemsList.push({
+                itemId: line.itemId,
+                name: line.name,
+                unit: line.unit || 'pcs',
+                unitPrice: line.unitPrice,
+                qty: val,
+                returnQty: val,
+                lineTotal: val * line.unitPrice,
+                looseInfo: line.looseInfo || null
+              });
+            }
+          });
+
+          if (!returnItemsList.length) {
+            toast('කරුණාකර රිටන් කිරීමට අවම වශයෙන් එක් භාණ්ඩයක්වත් තෝරන්න (Qty > 0)', 'err');
+            return;
+          }
+
+          const exchangeList = exchangeItems.map(it => ({
+            itemId: it.itemId,
+            name: it.name,
+            unit: it.unit || 'pcs',
+            unitPrice: it.unitPrice,
+            qty: it.qty,
+            lineTotal: it.qty * it.unitPrice
+          })).filter(x => x.qty > 0);
+
+          const returnTotal = returnItemsList.reduce((s, it) => s + it.lineTotal, 0);
+          const exchangeTotal = exchangeList.reduce((s, it) => s + it.lineTotal, 0);
+          const diff = Math.round((exchangeTotal - returnTotal) * 100) / 100;
+
+          let settlementType = 'even';
+          if (diff > 0) {
+            settlementType = wrap.querySelector('#extraPayMethod')?.value || 'cash_paid';
+          } else if (diff < 0) {
+            settlementType = wrap.querySelector('#refundPayMethod')?.value || 'cash_refund';
+          }
+
+          const reason = wrap.querySelector('#returnReasonSelect')?.value || 'සාමාන්‍ය රිටන් / මාරුකිරීම';
+          const note = wrap.querySelector('#returnNoteInput')?.value.trim() || '';
+
+          const paidVal = wrap.querySelector('#returnAmountPaidInput')?.value;
+          const amountPaid = Number(paidVal) || 0;
+          const targetAmt = diff > 0 ? diff : Math.abs(diff);
+          const changeAmount = amountPaid >= targetAmt ? Math.round((amountPaid - targetAmt) * 100) / 100 : 0;
+
+          try {
+            const newRet = await DB.createReturn({
+              saleId,
+              customerId,
+              customerName,
+              items: returnItemsList,
+              exchangeItems: exchangeList,
+              returnTotal,
+              exchangeTotal,
+              netAmount: diff,
+              settlementType,
+              amountPaid,
+              changeAmount,
+              reason,
+              note,
+              date: Date.now()
+            });
+
+            closeModal();
+            toast('රිටන් සහ මාරුකිරීම සාර්ථකව සටහන් විය! තොගය සහ ගිණුම් යාවත්කාලීන කරන ලදී.', 'ok');
+            App.render();
+
+            if (newRet) {
+              Views.returns.showReceipt(newRet);
+            }
+          } catch(err) {
+            console.error('Failed to process return/exchange:', err);
+            toast('සුරැකීමට නොහැකි විය!', 'err');
+          }
+        });
+      }
+    });
+  },
+
+  showReceipt(ret) {
+    const s = DB.data.settings || {};
+    const shopName = s.shopName || 'HardwarePOS';
+    const shopDesc = s.shopDescription || '';
+    const logo = s.logo || '';
+    const rawLogoSize = Number(s.logoSize) || 50;
+    const logoSize = Math.min(Math.max(rawLogoSize * 1.8, 85), 150);
+
+    const d = new Date(ret.date);
+    const formattedDate = d.toLocaleDateString('en-GB') + ' ' + d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+
+    const itemsList = ret.items || [];
+    const excList = ret.exchangeItems || [];
+    const hasExchange = excList.length > 0;
+
+    const returnTotal = Number(ret.returnTotal) || (itemsList.reduce((s, it) => s + (it.lineTotal || ((it.qty || it.returnQty) * it.unitPrice)), 0));
+    const exchangeTotal = Number(ret.exchangeTotal) || (excList.reduce((s, it) => s + (it.lineTotal || (it.qty * it.unitPrice)), 0));
+    const netDiff = Math.round((exchangeTotal - returnTotal) * 100) / 100;
+    const originalSale = ret.saleId ? DB.getSale(ret.saleId) : null;
+
+    const retCode = ret.returnNo || ('RET-' + ret.id);
+
+    openModal({
+      title: 'රිසිට්පත (Return & Exchange Receipt)',
+      wide: false,
+      bodyHTML: `
+        <div class="receipt" id="printArea">
+          ${logo ? `<div style="text-align:center; margin-bottom:6px;"><img class="receipt-logo" src="${logo}" alt="Logo" style="height:${logoSize}px; max-height:140px; max-width:250px; object-fit:contain; margin:0 auto; display:block;"></div>` : ''}
+          <h2>${escapeHTML(shopName)}</h2>
+          ${shopDesc ? `<div class="r-center" style="font-size:9.5px; color:#222; margin-bottom:3px; white-space:pre-line;">${escapeHTML(shopDesc)}</div>` : ''}
+
+          <div style="border-top:1px dashed #000; border-bottom:1px dashed #000; padding:2px 0; margin:3px 0; font-size:10px; width:100%; box-sizing:border-box;">
+            <div style="display:flex; justify-content:space-between; align-items:center; width:100%;">
+              <span><b>${hasExchange ? 'RETURN & EXCHANGE #' : 'RETURN #'}${ret.id}</b></span>
+              <span style="font-size:9.5px;">${formattedDate}</span>
+            </div>
+            ${ret.saleId ? `<div style="margin-top:2px; font-size:9.5px;">මුල් බිල්පත: <b>INVOICE #${ret.saleId}</b>${originalSale ? ` &nbsp;|&nbsp; මිලදී ගත් එකතුව: <b>${fmt(originalSale.total)}</b>` : ''}</div>` : ''}
+            <div style="margin-top:2px; font-size:9.5px;">පාරිභෝගිකයා: <b>${escapeHTML(ret.customerName || 'සාමාන්‍ය පාරිභෝගිකයා')}</b></div>
+            ${ret.reason ? `<div style="font-size:9.5px;">හේතුව: <b>${escapeHTML(ret.reason)}</b></div>` : ''}
+          </div>
+
+          <!-- 1. RETURNED ITEMS -->
+          <div style="font-size:10px; font-weight:800; border-bottom:1px dashed #000; padding-bottom:2px; margin-top:4px; color:#b91c1c;">
+            රිටන් ආ භාණ්ඩ (RETURNED ITEMS)
+          </div>
+          <table style="width:100%; border-collapse:collapse; margin:2px 0; font-size:9.5px; table-layout:fixed; box-sizing:border-box;">
+            <thead>
+              <tr style="border-bottom:1px dashed #000;">
+                <th style="text-align:left; padding:2px 0; width:34%;">විස්තරය</th>
+                <th style="text-align:center; width:20%; padding:2px 0;">ගණන</th>
+                <th style="text-align:right; width:22%; padding:2px 0;">මිල</th>
+                <th style="text-align:right; width:24%; padding:2px 0;">එකතුව</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${itemsList.map(it => {
+                const qtyText = it.looseInfo ? `${it.looseInfo.looseQty} ${it.looseInfo.looseUnit || ''}` : `${it.qty || it.returnQty} ${it.unit || 'pcs'}`;
+                const lineAmt = it.lineTotal || ((it.qty || it.returnQty) * it.unitPrice);
+                return `
+                  <tr>
+                    <td colspan="4" style="padding-top:2px; font-weight:700; color:#000; font-size:10px; word-break:break-word;">${escapeHTML(it.name)}</td>
+                  </tr>
+                  <tr style="border-bottom:1px dotted #ccc;">
+                    <td style="padding-bottom:2px; font-size:9px; color:#444;"></td>
+                    <td style="text-align:center; padding-bottom:2px; font-size:9.5px; white-space:nowrap;">${qtyText}</td>
+                    <td style="text-align:right; padding-bottom:2px; font-size:9.5px; white-space:nowrap;">${fmt(it.unitPrice)}</td>
+                    <td style="text-align:right; padding-bottom:2px; font-weight:700; font-size:9.5px; white-space:nowrap;">${fmt(lineAmt)}</td>
+                  </tr>
+                `;
+              }).join('')}
+            </tbody>
+          </table>
+          <div style="border-top:1px dashed #000; padding-top:2px; margin-top:2px; width:100%; box-sizing:border-box;">
+            <div class="receipt-totals-row" style="color:#b91c1c; font-weight:800;">
+              <span>රිටන් මුළු වටිනාකම (Return Total):</span>
+              <span>${fmt(returnTotal)}</span>
+            </div>
+          </div>
+
+          <!-- 2. EXCHANGE ITEMS (IF ANY) -->
+          ${hasExchange ? `
+            <div style="font-size:10px; font-weight:800; border-bottom:1px dashed #000; padding-bottom:2px; margin-top:8px; color:#15803d;">
+              ඒ වෙනුවට ලබාගත් භාණ්ඩ (EXCHANGE ITEMS)
+            </div>
+            <table style="width:100%; border-collapse:collapse; margin:2px 0; font-size:9.5px; table-layout:fixed; box-sizing:border-box;">
+              <thead>
+                <tr style="border-bottom:1px dashed #000;">
+                  <th style="text-align:left; padding:2px 0; width:34%;">විස්තරය</th>
+                  <th style="text-align:center; width:20%; padding:2px 0;">ගණන</th>
+                  <th style="text-align:right; width:22%; padding:2px 0;">මිල</th>
+                  <th style="text-align:right; width:24%; padding:2px 0;">එකතුව</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${excList.map(it => {
+                  const lineAmt = it.lineTotal || (it.qty * it.unitPrice);
+                  return `
+                    <tr>
+                      <td colspan="4" style="padding-top:2px; font-weight:700; color:#000; font-size:10px; word-break:break-word;">${escapeHTML(it.name)}</td>
+                    </tr>
+                    <tr style="border-bottom:1px dotted #ccc;">
+                      <td style="padding-bottom:2px; font-size:9px; color:#444;"></td>
+                      <td style="text-align:center; padding-bottom:2px; font-size:9.5px; white-space:nowrap;">${it.qty} ${escapeHTML(it.unit || 'pcs')}</td>
+                      <td style="text-align:right; padding-bottom:2px; font-size:9.5px; white-space:nowrap;">${fmt(it.unitPrice)}</td>
+                      <td style="text-align:right; padding-bottom:2px; font-weight:700; font-size:9.5px; white-space:nowrap;">${fmt(lineAmt)}</td>
+                    </tr>
+                  `;
+                }).join('')}
+              </tbody>
+            </table>
+            <div style="border-top:1px dashed #000; padding-top:2px; margin-top:2px; width:100%; box-sizing:border-box;">
+              <div class="receipt-totals-row" style="color:#15803d; font-weight:800;">
+                <span>නව භාණ්ඩ එකතුව (Exchange Total):</span>
+                <span>${fmt(exchangeTotal)}</span>
+              </div>
+            </div>
+          ` : ''}
+
+          <!-- 3. SETTLEMENT -->
+          <div style="border-top:2px dashed #000; margin-top:6px; padding-top:4px;">
+            ${netDiff > 0 ? `
+              <div class="receipt-totals-row grand" style="color:#b45309; font-size:11px;">
+                <span style="font-size:11px; font-weight:800;">අමතරව ගෙවූ මුදල (Extra Paid):</span>
+                <span style="font-size:12px; font-weight:800;">${fmt(netDiff)}</span>
+              </div>
+              <div class="receipt-totals-row" style="font-size:9.5px; margin-top:1px;">
+                <span>ගෙවූ ආකාරය (Payment):</span>
+                <b>${ret.settlementType === 'credit_added' ? 'ණයට එකතු විය (Added to Credit)' : 'මුදලින් ගෙවන ලදී (Paid by Cash)'}</b>
+              </div>
+            ` : (netDiff < 0 ? `
+              <div class="receipt-totals-row grand" style="color:#dc2626; font-size:11px;">
+                <span style="font-size:11px; font-weight:800;">ආපසු දුන් මුදල (Refunded):</span>
+                <span style="font-size:12px; font-weight:800;">${fmt(Math.abs(netDiff))}</span>
+              </div>
+              <div class="receipt-totals-row" style="font-size:9.5px; margin-top:1px;">
+                <span>ආපසු දුන් ආකාරය:</span>
+                <b>${ret.settlementType === 'credit_deduct' ? 'ණයෙන් අඩු කිරීම (Credit Deducted)' : 'මුදල් ආපසු දීම (Cash Refund)'}</b>
+              </div>
+            ` : `
+              <div class="receipt-totals-row grand" style="color:#334155; font-size:11px;">
+                <span style="font-size:11px; font-weight:800;">ශුද්ධ වෙනස (Net Difference):</span>
+                <span style="font-size:12px; font-weight:800;">රු. 0.00 (සම සමව)</span>
+              </div>
+            `)}
+            ${Number(ret.amountPaid) > 0 ? `
+              <div class="receipt-totals-row" style="font-size:9.5px; border-top:1px dotted #ccc; margin-top:2px; padding-top:2px;">
+                <span>දුන් මුදල (Paid):</span>
+                <span>${fmt(ret.amountPaid)}</span>
+              </div>
+              <div class="receipt-totals-row" style="font-size:9.5px; font-weight:700;">
+                <span>ඉතිරි මුදල (Change):</span>
+                <span>${fmt(ret.changeAmount || 0)}</span>
+              </div>
+            ` : ''}
+          </div>
+
+          ${ret.note ? `<div style="font-size:9px; color:#444; margin-top:4px;"><b>සටහන:</b> ${escapeHTML(ret.note)}</div>` : ''}
+
+          <div style="text-align:center; margin-top:4px; border-top:1px dashed #000; padding-top:4px;">
+            <div style="font-weight:700; font-size:10px; margin-bottom:1px;">ස්තූතියි! නැවත එන්න.</div>
+            <div style="font-size:8.5px; color:#222; margin-bottom:3px; line-height:1.25;">භාණ්ඩ ආපසු භාරදීමේදී මෙම බිල්පත ඉදිරිපත් කිරීම අනිවාර්ය වේ.</div>
+            <div style="margin:3px 0; display:flex; flex-direction:column; align-items:center; justify-content:center;">
+              ${typeof BarcodeSystem !== 'undefined' ? BarcodeSystem.generateCode128SVG(retCode, { width: 130, height: 30, fontSize: 8 }) : ''}
+            </div>
+            <div style="font-size:9.5px; font-weight:700; color:#000; margin-top:5px; text-align:center; letter-spacing:0.2px;">
+              ImagineX Software Solution - 0761945587
+            </div>
+          </div>
+        </div>
+      `,
+      footHTML: `
+        <button class="btn btn-outline" data-close>${t('close')}</button>
+        <button class="btn btn-primary" id="printReturnReceiptBtn"><i class="ph ph-printer"></i> Print කරන්න</button>
+      `,
+      onMount: (wrap) => {
+        wrap.querySelector('#printReturnReceiptBtn')?.addEventListener('click', () => {
+          window.print();
+        });
+      }
     });
   }
 };

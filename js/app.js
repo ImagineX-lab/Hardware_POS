@@ -16,6 +16,7 @@ const App = {
       lowstock: t('nav_lowstock'),
       customers: t('nav_customers'),
       history: t('nav_history'),
+      returns: t('nav_returns'),
       settings: t('nav_settings')
     };
     if (document.getElementById('viewTitle')) {

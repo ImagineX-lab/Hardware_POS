@@ -4,13 +4,13 @@ const path = require('path');
 const db = require('./backend/database');
 // compression may not be installed yet — safe fallback if missing
 let compression;
-try { compression = require('compression'); } catch(e) { compression = null; }
+try { compression = require('compression'); } catch (e) { compression = null; }
 
 const app = express();
 app.use(cors());
 if (compression) app.use(compression()); // --- PERFORMANCE: gzip API responses ---
-app.use(express.json({ limit: '50mb' }));
-app.use(express.urlencoded({ limit: '50mb', extended: true }));
+app.use(express.json({ limit: '100mb' }));
+app.use(express.urlencoded({ limit: '100mb', extended: true }));
 
 // Serve static files
 app.use('/css', express.static(path.join(__dirname, 'css')));
@@ -43,8 +43,8 @@ app.post('/api/items', async (req, res) => {
 });
 app.put('/api/items/:id', async (req, res) => {
     const updated = await db.updateItem(req.params.id, req.body);
-    if(updated) res.json(updated);
-    else res.status(404).json({error: "Item not found"});
+    if (updated) res.json(updated);
+    else res.status(404).json({ error: "Item not found" });
 });
 app.delete('/api/items/:id', async (req, res) => {
     await db.deleteItem(req.params.id);
@@ -66,8 +66,8 @@ app.post('/api/customers', async (req, res) => {
 app.put('/api/customers/:id', async (req, res) => {
     try {
         const updated = await db.updateCustomer(req.params.id, req.body);
-        if(updated) res.json(updated);
-        else res.status(404).json({error: "Customer not found"});
+        if (updated) res.json(updated);
+        else res.status(404).json({ error: "Customer not found" });
     } catch (err) {
         res.status(400).json({ error: err.message || "Failed to update customer" });
     }
@@ -79,8 +79,8 @@ app.delete('/api/customers/:id', async (req, res) => {
 app.post('/api/customers/:id/payment', async (req, res) => {
     const { amount, note } = req.body;
     const customer = await db.recordPayment(req.params.id, amount, note);
-    if(customer) res.json(customer);
-    else res.status(404).json({error: "Customer not found"});
+    if (customer) res.json(customer);
+    else res.status(404).json({ error: "Customer not found" });
 });
 
 // Sales
@@ -118,8 +118,8 @@ app.post('/api/purchases', async (req, res) => {
 });
 app.put('/api/purchases/:id', async (req, res) => {
     const updated = await db.updatePurchase(req.params.id, req.body);
-    if(updated) res.json(updated);
-    else res.status(404).json({error: "Purchase bill not found"});
+    if (updated) res.json(updated);
+    else res.status(404).json({ error: "Purchase bill not found" });
 });
 app.delete('/api/purchases/:id', async (req, res) => {
     await db.deletePurchase(req.params.id);
@@ -128,8 +128,30 @@ app.delete('/api/purchases/:id', async (req, res) => {
 app.post('/api/purchases/:id/payment', async (req, res) => {
     const { amount } = req.body;
     const updated = await db.recordPurchasePayment(req.params.id, amount);
-    if(updated) res.json(updated);
-    else res.status(404).json({error: "Purchase bill not found"});
+    if (updated) res.json(updated);
+    else res.status(404).json({ error: "Purchase bill not found" });
+});
+
+// Returns
+app.get('/api/returns', async (req, res) => {
+    res.json(await db.getAllReturns());
+});
+app.get('/api/returns/:id', async (req, res) => {
+    const r = await db.getReturn(req.params.id);
+    if (r) res.json(r);
+    else res.status(404).json({ error: "Return record not found" });
+});
+app.post('/api/returns', async (req, res) => {
+    try {
+        const newReturn = await db.addReturn(req.body);
+        res.json(newReturn);
+    } catch(err) {
+        res.status(400).json({ error: err.message });
+    }
+});
+app.delete('/api/returns/:id', async (req, res) => {
+    await db.deleteReturn(req.params.id);
+    res.json({ success: true });
 });
 
 // Backup
@@ -140,7 +162,7 @@ app.post('/api/backup', async (req, res) => {
     try {
         await db.importJSON(req.body);
         res.json({ success: true });
-    } catch(err) {
+    } catch (err) {
         res.status(400).json({ error: err.message });
     }
 });

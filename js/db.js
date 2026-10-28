@@ -13,18 +13,20 @@ const DB = {
 
   async load(){
     try {
-      const [settingsRes, itemsRes, custRes, salesRes, purchasesRes] = await Promise.all([
+      const [settingsRes, itemsRes, custRes, salesRes, purchasesRes, returnsRes] = await Promise.all([
         fetch('/api/settings'),
         fetch('/api/items'),
         fetch('/api/customers'),
         fetch('/api/sales'),
-        fetch('/api/purchases')
+        fetch('/api/purchases'),
+        fetch('/api/returns')
       ]);
       this.data.settings = await settingsRes.json();
       this.data.items = await itemsRes.json();
       this.data.customers = await custRes.json();
       this.data.sales = await salesRes.json();
       this.data.purchases = await purchasesRes.json();
+      this.data.returns = await returnsRes.json();
       this.invalidateItemsCache();
     } catch(err) {
       console.error("Failed to load data", err);
@@ -86,6 +88,24 @@ const DB = {
     }
     return this._sortedItemsCache;
   },
+  searchItems(query, category = 'All') {
+    let items = this.allItems();
+    if (category && category !== 'All' && category !== 'all') {
+      if (category === 'වෙනත්') {
+        items = items.filter(i => !i.category || (i.category || '').trim() === 'වෙනත්' || (i.category || '').trim() === '');
+      } else {
+        items = items.filter(i => (i.category || '').trim() === category);
+      }
+    }
+    const q = (query || '').trim();
+    if (!q) return items;
+    if (typeof Singlish !== 'undefined') {
+      const prepared = Singlish.prepareQuery(q);
+      return items.filter(i => Singlish.matchPrepared(i, prepared));
+    }
+    const qLower = q.toLowerCase();
+    return items.filter(i => (i.name || '').toLowerCase().includes(qLower) || (i.barcode || '').toLowerCase().includes(qLower));
+  },
   lowStockItems(){ return this.allItems().filter(i=>i.qty <= i.reorderLevel); },
 
   /* ---------------- CUSTOMERS (Credit / Nayata) ---------------- */
@@ -128,11 +148,18 @@ const DB = {
   searchCustomers(q){
     q = (q || '').trim();
     if(!q) return this.allCustomers();
-    return this.data.customers.filter(c => 
-      (typeof Singlish !== 'undefined' ? Singlish.match(c.name, q) : c.name.toLowerCase().includes(q.toLowerCase())) ||
-      (c.phone || '').includes(q) ||
-      (c.nic || '').toLowerCase().includes(q.toLowerCase())
-    ).sort((a,b)=>a.name.localeCompare(b.name));
+    const qLower = q.toLowerCase();
+    const qPrepared = (typeof Singlish !== 'undefined') ? Singlish.prepareQuery(q) : null;
+    return this.data.customers.filter(c => {
+      const name = (c.name || '').toLowerCase();
+      const phone = (c.phone || '');
+      const nic = (c.nic || '').toLowerCase();
+      if (name.includes(qLower) || phone.includes(q) || nic.includes(qLower)) return true;
+      if (qPrepared && typeof Singlish !== 'undefined') {
+        return Singlish.matchPrepared(c, qPrepared);
+      }
+      return false;
+    }).sort((a,b)=>a.name.localeCompare(b.name));
   },
 
   async recordPayment(custId, amount, note){
@@ -316,6 +343,99 @@ const DB = {
   allPurchases(){ return this.data.purchases.slice().sort((a,b)=>b.id - a.id); },
   getPurchase(id){ return this.data.purchases.find(p=>p.id===id); },
   totalPurchaseDue(){ return this.data.purchases.reduce((s,p)=>s + (p.dueAmount||0), 0); },
+
+  /* ---------------- RETURNS ---------------- */
+  allReturns(){ return (this.data.returns || []).slice().sort((a,b)=>b.id - a.id); },
+  getReturn(id){ return (this.data.returns || []).find(r=>r.id===id); },
+  todayReturns(){
+    const start = new Date(); start.setHours(0,0,0,0);
+    const end = new Date(); end.setHours(23,59,59,999);
+    return this.allReturns().filter(r => r.date >= start.getTime() && r.date <= end.getTime());
+  },
+  async createReturn(ret){
+    const res = await fetch('/api/returns', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(ret)
+    });
+    const newReturn = await res.json();
+    this.data.returns = this.data.returns || [];
+    this.data.returns.unshift(newReturn);
+
+    // Update in-memory stock: returned items (+)
+    for (const item of (newReturn.items || [])) {
+      const it = this.data.items.find(i => i.id === item.itemId);
+      if (it) it.qty = Math.round((it.qty + (Number(item.qty || item.returnQty) || 0)) * 10000) / 10000;
+    }
+
+    // Update in-memory stock: exchange items taken (-)
+    for (const item of (newReturn.exchangeItems || [])) {
+      const it = this.data.items.find(i => i.id === item.itemId);
+      if (it) it.qty = Math.max(0, Math.round((it.qty - (Number(item.qty) || 0)) * 10000) / 10000);
+    }
+
+    // Update in-memory customer balance
+    if (newReturn.customerId) {
+      const c = this.data.customers.find(cu => cu.id === newReturn.customerId);
+      if (c) {
+        if (newReturn.settlementType === 'credit_deduct' && newReturn.refundAmount > 0) {
+          c.balance = Math.max(0, c.balance - Number(newReturn.refundAmount));
+          c.ledger = c.ledger || [];
+          c.ledger.unshift({
+            id: Date.now(),
+            customerId: c.id,
+            date: newReturn.date || Date.now(),
+            type: 'payment',
+            amount: newReturn.refundAmount,
+            note: `රිටන්/මාරු භාණ්ඩ (${newReturn.returnNo || 'Return'})`,
+            saleId: newReturn.saleId
+          });
+        } else if (newReturn.settlementType === 'credit_added' && newReturn.extraPaid > 0) {
+          c.balance = c.balance + Number(newReturn.extraPaid);
+          c.ledger = c.ledger || [];
+          c.ledger.unshift({
+            id: Date.now(),
+            customerId: c.id,
+            date: newReturn.date || Date.now(),
+            type: 'sale',
+            amount: newReturn.extraPaid,
+            note: `භාණ්ඩ මාරුකිරීමේ අමතර ණය (${newReturn.returnNo || 'Exchange'})`,
+            saleId: newReturn.saleId
+          });
+        }
+      }
+    }
+    this.invalidateItemsCache();
+    return newReturn;
+  },
+  async deleteReturn(id){
+    const ret = this.getReturn(id);
+    await fetch(`/api/returns/${id}`, { method: 'DELETE' });
+    this.data.returns = (this.data.returns || []).filter(r => r.id !== id);
+
+    // Revert in-memory stock
+    if (ret) {
+      for (const item of (ret.items || [])) {
+        const it = this.data.items.find(i => i.id === item.itemId);
+        if (it) it.qty = Math.max(0, Math.round((it.qty - (Number(item.qty || item.returnQty) || 0)) * 10000) / 10000);
+      }
+      for (const item of (ret.exchangeItems || [])) {
+        const it = this.data.items.find(i => i.id === item.itemId);
+        if (it) it.qty = Math.round((it.qty + (Number(item.qty) || 0)) * 10000) / 10000;
+      }
+      if (ret.customerId) {
+        const c = this.data.customers.find(cu => cu.id === ret.customerId);
+        if (c) {
+          if (ret.settlementType === 'credit_deduct' && ret.refundAmount > 0) {
+            c.balance = c.balance + Number(ret.refundAmount);
+          } else if (ret.settlementType === 'credit_added' && ret.extraPaid > 0) {
+            c.balance = Math.max(0, c.balance - Number(ret.extraPaid));
+          }
+        }
+      }
+    }
+    this.invalidateItemsCache();
+  },
 
   /* ---------------- BACKUP & SETTINGS ---------------- */
   async exportJSON(){

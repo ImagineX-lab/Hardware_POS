@@ -288,24 +288,77 @@ const Singlish = {
     return false;
   },
 
+  indexItem(item) {
+    if (!item) return '';
+    if (item._searchIdx) return item._searchIdx;
+
+    const name = String(item.name || '').toLowerCase();
+    const barcode = String(item.barcode || '').toLowerCase();
+    const cat = String(item.category || '').toLowerCase();
+    const subCat = String(item.subCategory || '').toLowerCase();
+    const desc = String(item.description || '').toLowerCase();
+
+    const nameStripped = this.stripSinhalaStrokes(name);
+    const namePhonetic = this.toPhonetic(name);
+    const nameNorm = this.normalize(namePhonetic || name);
+    const catPhonetic = this.toPhonetic(cat);
+    const descPhonetic = this.toPhonetic(desc);
+
+    // Fast indexed composite string
+    item._searchIdx = `${name} ${barcode} ${cat} ${subCat} ${desc} ${nameStripped} ${namePhonetic} ${nameNorm} ${catPhonetic} ${descPhonetic}`;
+    return item._searchIdx;
+  },
+
+  prepareQuery(query) {
+    if (!query) return null;
+    const q = String(query).trim().toLowerCase();
+    if (!q) return null;
+
+    const words = q.split(/\s+/).filter(Boolean);
+    return words.map(w => {
+      const wSinhala = this.toSinhala(w);
+      const wStripped = this.stripSinhalaStrokes(wSinhala);
+      const wNorm = this.normalize(w);
+      return {
+        raw: w,
+        sinhala: wSinhala,
+        stripped: wStripped,
+        norm: wNorm
+      };
+    });
+  },
+
+  matchPrepared(item, preparedWords) {
+    if (!preparedWords || !preparedWords.length) return true;
+    if (!item) return false;
+    const idx = item._searchIdx || this.indexItem(item);
+
+    for (let i = 0; i < preparedWords.length; i++) {
+      const w = preparedWords[i];
+      if (idx.includes(w.raw)) continue;
+      if (w.sinhala && idx.includes(w.sinhala)) continue;
+      if (w.stripped && idx.includes(w.stripped)) continue;
+      if (w.norm && idx.includes(w.norm)) continue;
+      return false;
+    }
+    return true;
+  },
+
+  _lastQ: null,
+  _lastPrepared: null,
+
   matchItem(item, query) {
     if (!query) return true;
     if (!item) return false;
-    const q = String(query).trim().toLowerCase();
-    if (!q) return true;
 
-    // Fast-path: Direct lower-case match against name, category, barcode, description
-    const name = (item.name || '').toLowerCase();
-    const barcode = (item.barcode || '').toLowerCase();
-    const category = (item.category || '').toLowerCase();
-    const description = (item.description || '').toLowerCase();
-
-    if (name.includes(q) || barcode.includes(q) || category.includes(q) || description.includes(q)) {
-      return true;
+    // Cache the prepared query so that inside array.filter(i => matchItem(i, q)),
+    // query is prepared ONCE for the entire batch of items!
+    if (this._lastQ !== query) {
+      this._lastQ = query;
+      this._lastPrepared = this.prepareQuery(query);
     }
 
-    // Fall back to Singlish transliteration & phonetic match
-    return this.match(item.name, q) || this.match(item.category || '', q) || this.match(item.description || '', q);
+    return this.matchPrepared(item, this._lastPrepared);
   },
 
   match(target, query) {
@@ -326,3 +379,7 @@ const Singlish = {
     return this.matchSingleWord(t, q);
   }
 };
+
+if (typeof module !== 'undefined') {
+  module.exports = Singlish;
+}

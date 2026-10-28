@@ -205,6 +205,36 @@ module.exports = {
             createdAt INTEGER
         )`);
 
+        await run(`CREATE TABLE IF NOT EXISTS returns (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            returnNo TEXT,
+            date INTEGER,
+            saleId INTEGER,
+            customerId INTEGER,
+            customerName TEXT,
+            items TEXT,
+            exchangeItems TEXT,
+            returnTotal REAL DEFAULT 0,
+            exchangeTotal REAL DEFAULT 0,
+            netAmount REAL DEFAULT 0,
+            refundAmount REAL DEFAULT 0,
+            extraPaid REAL DEFAULT 0,
+            settlementType TEXT DEFAULT 'cash_refund',
+            refundType TEXT,
+            reason TEXT,
+            note TEXT,
+            createdAt INTEGER
+        )`);
+
+        try { await run(`ALTER TABLE returns ADD COLUMN exchangeItems TEXT`); } catch(e) {}
+        try { await run(`ALTER TABLE returns ADD COLUMN returnTotal REAL DEFAULT 0`); } catch(e) {}
+        try { await run(`ALTER TABLE returns ADD COLUMN exchangeTotal REAL DEFAULT 0`); } catch(e) {}
+        try { await run(`ALTER TABLE returns ADD COLUMN netAmount REAL DEFAULT 0`); } catch(e) {}
+        try { await run(`ALTER TABLE returns ADD COLUMN settlementType TEXT DEFAULT 'cash_refund'`); } catch(e) {}
+        try { await run(`ALTER TABLE returns ADD COLUMN extraPaid REAL DEFAULT 0`); } catch(e) {}
+        try { await run(`ALTER TABLE returns ADD COLUMN amountPaid REAL DEFAULT 0`); } catch(e) {}
+        try { await run(`ALTER TABLE returns ADD COLUMN changeAmount REAL DEFAULT 0`); } catch(e) {}
+
         const settings = await get(`SELECT * FROM settings WHERE key = 'shopName'`);
         if (!settings) {
             await run(`INSERT INTO settings (key, value) VALUES ('shopName', 'රත්න HARDWARE')`);
@@ -659,6 +689,191 @@ module.exports = {
         }
         return updated;
     },
+
+    /* ---------------- RETURNS & EXCHANGES ---------------- */
+    getAllReturns: async () => {
+        const rows = await all(`SELECT * FROM returns ORDER BY id DESC`);
+        rows.forEach(r => {
+            try { r.items = typeof r.items === 'string' ? JSON.parse(r.items) : (r.items || []); } catch(e) { r.items = []; }
+            try { r.exchangeItems = typeof r.exchangeItems === 'string' ? JSON.parse(r.exchangeItems) : (r.exchangeItems || []); } catch(e) { r.exchangeItems = []; }
+        });
+        return rows;
+    },
+    getReturn: async (id) => {
+        const r = await get(`SELECT * FROM returns WHERE id = ?`, [id]);
+        if (r) {
+            try { r.items = typeof r.items === 'string' ? JSON.parse(r.items) : (r.items || []); } catch(e) { r.items = []; }
+            try { r.exchangeItems = typeof r.exchangeItems === 'string' ? JSON.parse(r.exchangeItems) : (r.exchangeItems || []); } catch(e) { r.exchangeItems = []; }
+        }
+        return r;
+    },
+    addReturn: async (ret) => {
+        const itemsList = Array.isArray(ret.items) ? ret.items : [];
+        const exchangeList = Array.isArray(ret.exchangeItems) ? ret.exchangeItems : [];
+        const itemsJson = JSON.stringify(itemsList);
+        const exchangeJson = JSON.stringify(exchangeList);
+
+        const returnTotal = Math.round((Number(ret.returnTotal) || itemsList.reduce((s, it) => s + (Number(it.lineTotal) || ((Number(it.qty || it.returnQty) || 0) * (Number(it.unitPrice) || 0))), 0)) * 100) / 100;
+        const exchangeTotal = Math.round((Number(ret.exchangeTotal) || exchangeList.reduce((s, it) => s + (Number(it.lineTotal) || ((Number(it.qty) || 0) * (Number(it.unitPrice) || 0))), 0)) * 100) / 100;
+        const netAmount = Math.round((exchangeTotal - returnTotal) * 100) / 100; // positive = customer owes; negative = shop refunds
+
+        let refundAmount = 0;
+        let extraPaid = 0;
+        let settlementType = ret.settlementType || 'even';
+
+        if (netAmount < 0) {
+            refundAmount = Math.abs(netAmount);
+            extraPaid = 0;
+            if (!ret.settlementType || ret.settlementType === 'even') {
+                settlementType = (ret.refundType === 'credit') ? 'credit_deduct' : 'cash_refund';
+            }
+        } else if (netAmount > 0) {
+            extraPaid = netAmount;
+            refundAmount = 0;
+            if (!ret.settlementType || ret.settlementType === 'even') {
+                settlementType = (ret.refundType === 'credit' || ret.paymentType === 'credit') ? 'credit_added' : 'cash_paid';
+            }
+        } else {
+            settlementType = 'even';
+            refundAmount = 0;
+            extraPaid = 0;
+        }
+
+        const saleId = ret.saleId ? Number(ret.saleId) : null;
+        const customerId = ret.customerId ? Number(ret.customerId) : null;
+        const customerName = (ret.customerName || '').trim() || (customerId ? 'Customer' : 'සාමාන්‍ය පාරිභෝගිකයා');
+        const reason = (ret.reason || '').trim() || 'සාමාන්‍ය රිටන් / මාරුකිරීම';
+        const note = (ret.note || '').trim();
+        const date = ret.date || Date.now();
+        const refundType = (settlementType === 'credit_deduct' || settlementType === 'credit_added') ? 'credit' : 'cash';
+
+        // 1. Auto stock increment: add returned items back to stock
+        for (let item of itemsList) {
+            if (item.itemId) {
+                const existing = await get(`SELECT qty FROM items WHERE id = ?`, [item.itemId]);
+                if (existing) {
+                    const addQty = Number(item.qty || item.returnQty) || 0;
+                    const restoredQty = Math.round((existing.qty + addQty) * 10000) / 10000;
+                    await run(`UPDATE items SET qty = ? WHERE id = ?`, [restoredQty, item.itemId]);
+                }
+            }
+        }
+
+        // 2. Auto stock decrement: deduct exchange items taken from stock
+        for (let item of exchangeList) {
+            if (item.itemId) {
+                const existing = await get(`SELECT qty FROM items WHERE id = ?`, [item.itemId]);
+                if (existing) {
+                    const subQty = Number(item.qty) || 0;
+                    const newQty = Math.max(0, Math.round((existing.qty - subQty) * 10000) / 10000);
+                    await run(`UPDATE items SET qty = ? WHERE id = ?`, [newQty, item.itemId]);
+                }
+            }
+        }
+
+        // 3. Customer balance and ledger update
+        const countRow = await get(`SELECT COUNT(*) as count FROM returns`);
+        const nextNum = (countRow?.count || 0) + 1;
+        const returnNo = ret.returnNo || `RET-${String(nextNum).padStart(4, '0')}`;
+
+        if (customerId) {
+            const cust = await get(`SELECT balance FROM customers WHERE id = ?`, [customerId]);
+            if (cust) {
+                if (settlementType === 'credit_deduct' && refundAmount > 0) {
+                    const newBalance = Math.max(0, cust.balance - refundAmount);
+                    await run(`UPDATE customers SET balance = ? WHERE id = ?`, [newBalance, customerId]);
+                    await run(`INSERT INTO customer_ledger (customerId, date, type, amount, note, saleId) VALUES (?, ?, 'payment', ?, ?, ?)`,
+                        [customerId, date, refundAmount, `රිටන්/මාරු භාණ්ඩ (${saleId ? `බිල් #${saleId}` : returnNo})`, saleId]);
+                } else if (settlementType === 'credit_added' && extraPaid > 0) {
+                    const newBalance = cust.balance + extraPaid;
+                    await run(`UPDATE customers SET balance = ? WHERE id = ?`, [newBalance, customerId]);
+                    await run(`INSERT INTO customer_ledger (customerId, date, type, amount, note, saleId) VALUES (?, ?, 'sale', ?, ?, ?)`,
+                        [customerId, date, extraPaid, `භාණ්ඩ මාරුකිරීමේ අමතර ණය (${returnNo})`, saleId]);
+                }
+            }
+        }
+
+        const amountPaid = Number(ret.amountPaid) || 0;
+        const changeAmount = Number(ret.changeAmount) || 0;
+
+        // 4. Insert return record
+        const res = await run(
+            `INSERT INTO returns (
+                returnNo, date, saleId, customerId, customerName,
+                items, exchangeItems, returnTotal, exchangeTotal,
+                netAmount, refundAmount, extraPaid, settlementType,
+                amountPaid, changeAmount,
+                refundType, reason, note, createdAt
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [
+                returnNo, date, saleId, customerId, customerName,
+                itemsJson, exchangeJson, returnTotal, exchangeTotal,
+                netAmount, refundAmount, extraPaid, settlementType,
+                amountPaid, changeAmount,
+                refundType, reason, note, Date.now()
+            ]
+        );
+
+        const newReturn = await get(`SELECT * FROM returns WHERE id = ?`, [res.lastID]);
+        if (newReturn) {
+            try { newReturn.items = JSON.parse(newReturn.items); } catch(e) { newReturn.items = []; }
+            try { newReturn.exchangeItems = JSON.parse(newReturn.exchangeItems); } catch(e) { newReturn.exchangeItems = []; }
+        }
+        return newReturn;
+    },
+    deleteReturn: async (id) => {
+        const ret = await get(`SELECT * FROM returns WHERE id = ?`, [id]);
+        if (!ret) return;
+
+        let itemsList = [];
+        let exchangeList = [];
+        try { itemsList = JSON.parse(ret.items); } catch(e) {}
+        try { exchangeList = JSON.parse(ret.exchangeItems); } catch(e) {}
+
+        // 1. Reverse returned items (+ stock -> - stock)
+        for (let item of itemsList) {
+            if (item.itemId) {
+                const existing = await get(`SELECT qty FROM items WHERE id = ?`, [item.itemId]);
+                if (existing) {
+                    const subQty = Number(item.qty || item.returnQty) || 0;
+                    const revertedQty = Math.max(0, Math.round((existing.qty - subQty) * 10000) / 10000);
+                    await run(`UPDATE items SET qty = ? WHERE id = ?`, [revertedQty, item.itemId]);
+                }
+            }
+        }
+
+        // 2. Reverse exchange items (- stock -> + stock)
+        for (let item of exchangeList) {
+            if (item.itemId) {
+                const existing = await get(`SELECT qty FROM items WHERE id = ?`, [item.itemId]);
+                if (existing) {
+                    const addQty = Number(item.qty) || 0;
+                    const restoredQty = Math.round((existing.qty + addQty) * 10000) / 10000;
+                    await run(`UPDATE items SET qty = ? WHERE id = ?`, [restoredQty, item.itemId]);
+                }
+            }
+        }
+
+        // 3. Reverse customer balance
+        if (ret.customerId) {
+            const cust = await get(`SELECT balance FROM customers WHERE id = ?`, [ret.customerId]);
+            if (cust) {
+                if (ret.settlementType === 'credit_deduct' && ret.refundAmount > 0) {
+                    const newBalance = cust.balance + (Number(ret.refundAmount) || 0);
+                    await run(`UPDATE customers SET balance = ? WHERE id = ?`, [newBalance, ret.customerId]);
+                    await run(`INSERT INTO customer_ledger (customerId, date, type, amount, note, saleId) VALUES (?, ?, 'sale', ?, ?, ?)`,
+                        [ret.customerId, Date.now(), ret.refundAmount, `රිටන් #${ret.returnNo || id} අවලංගු කිරීම`, ret.saleId]);
+                } else if (ret.settlementType === 'credit_added' && ret.extraPaid > 0) {
+                    const newBalance = Math.max(0, cust.balance - (Number(ret.extraPaid) || 0));
+                    await run(`UPDATE customers SET balance = ? WHERE id = ?`, [newBalance, ret.customerId]);
+                    await run(`INSERT INTO customer_ledger (customerId, date, type, amount, note, saleId) VALUES (?, ?, 'payment', ?, ?, ?)`,
+                        [ret.customerId, Date.now(), ret.extraPaid, `මාරුකිරීමේ අමතර ණය #${ret.returnNo || id} අවලංගු කිරීම`, ret.saleId]);
+                }
+            }
+        }
+
+        await run(`DELETE FROM returns WHERE id = ?`, [id]);
+    },
     deletePurchase: async (id) => {
         await run(`DELETE FROM purchases WHERE id = ?`, [id]);
     },
@@ -689,24 +904,28 @@ module.exports = {
             settings: await module.exports.getSettings(),
             items: await module.exports.getAllItems(),
             customers: await module.exports.getAllCustomers(),
-            sales: await module.exports.getAllSales() // no limit for backup — export everything
+            sales: await module.exports.getAllSales(), // no limit for backup — export everything
+            purchases: await module.exports.getAllPurchases(),
+            returns: await module.exports.getAllReturns()
         };
     },
     importJSON: async (data) => {
         // Basic naive import, just wipes and rewrites
         await module.exports.wipeAll();
-        if(data.settings) await module.exports.updateSettings(data.settings.shopName);
-        if(data.items) {
+        if(data.settings && typeof data.settings === 'object') {
+            await module.exports.updateSettings(data.settings);
+        }
+        if(data.items && Array.isArray(data.items)) {
             for(let it of data.items) {
                 await run(`INSERT INTO items (id, name, barcode, category, subCategory, unit, costPrice, sellPrice, qty, reorderLevel, description, image, packSize, packUnit, loosePrice, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
                 [it.id, it.name, it.barcode || '', it.category, it.subCategory || '', it.unit, it.costPrice, it.sellPrice, it.qty, it.reorderLevel, it.description || '', it.image || '', it.packSize || 1, it.packUnit || '', it.loosePrice || 0, it.createdAt]);
             }
         }
-        if(data.customers) {
+        if(data.customers && Array.isArray(data.customers)) {
             for(let c of data.customers) {
                 await run(`INSERT INTO customers (id, name, phone, address, nic, creditLimit, balance, createdAt, customerType, discountPercent) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
                 [c.id, c.name, c.phone, c.address, c.nic, c.creditLimit, c.balance, c.createdAt, c.customerType || 'customer', c.discountPercent || 0]);
-                if(c.ledger) {
+                if(c.ledger && Array.isArray(c.ledger)) {
                     for(let l of c.ledger) {
                         await run(`INSERT INTO customer_ledger (id, customerId, date, type, amount, note, saleId) VALUES (?, ?, ?, ?, ?, ?, ?)`,
                         [l.id, c.id, l.date, l.type, l.amount, l.note, l.saleId]);
@@ -714,12 +933,28 @@ module.exports = {
                 }
             }
         }
-        if(data.sales) {
+        if(data.sales && Array.isArray(data.sales)) {
             for(let s of data.sales) {
+                const linesJson = typeof s.lines === 'string' ? s.lines : JSON.stringify(s.lines || []);
                 await run(`INSERT INTO sales (id, date, lines, subtotal, discount, total, paymentType, customerId, customerName, amountPaid, changeAmount) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-                [s.id, s.date, JSON.stringify(s.lines), s.subtotal, s.discount, s.total, s.paymentType, s.customerId, s.customerName, s.amountPaid || 0, s.changeAmount || 0]);
+                [s.id, s.date, linesJson, s.subtotal, s.discount, s.total, s.paymentType, s.customerId, s.customerName, s.amountPaid || 0, s.changeAmount || 0]);
             }
         }
+        if(data.purchases && Array.isArray(data.purchases)) {
+            for(let p of data.purchases) {
+                const itemsJson = typeof p.items === 'string' ? p.items : JSON.stringify(p.items || []);
+                await run(`INSERT INTO purchases (id, supplierName, billNo, date, items, subtotal, discount, totalAmount, paidAmount, dueAmount, paymentStatus, note, image, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                [p.id, p.supplierName || 'වෙනත් සැපයුම්කරු', p.billNo || '', p.date || Date.now(), itemsJson, Number(p.subtotal) || 0, Number(p.discount) || 0, Number(p.totalAmount) || 0, Number(p.paidAmount) || 0, Number(p.dueAmount) || 0, p.paymentStatus || 'paid', p.note || '', p.image || '', p.createdAt || Date.now()]);
+            }
+        }
+        if(data.returns && Array.isArray(data.returns)) {
+            for(let r of data.returns) {
+                const itemsJson = typeof r.items === 'string' ? r.items : JSON.stringify(r.items || []);
+                const exchangeJson = typeof r.exchangeItems === 'string' ? r.exchangeItems : JSON.stringify(r.exchangeItems || []);
+                await run(`INSERT INTO returns (id, returnNo, date, saleId, customerId, customerName, items, exchangeItems, returnTotal, exchangeTotal, netAmount, refundAmount, extraPaid, settlementType, refundType, reason, note, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                [r.id, r.returnNo || '', r.date || Date.now(), r.saleId || null, r.customerId || null, r.customerName || '', itemsJson, exchangeJson, Number(r.returnTotal) || 0, Number(r.exchangeTotal) || 0, Number(r.netAmount) || 0, Number(r.refundAmount) || 0, Number(r.extraPaid) || 0, r.settlementType || 'cash_refund', r.refundType || 'cash', r.reason || '', r.note || '', r.createdAt || Date.now()]);
+            }
+                }
     },
     wipeAll: async () => {
         await run(`DELETE FROM items`);
@@ -727,6 +962,7 @@ module.exports = {
         await run(`DELETE FROM customer_ledger`);
         await run(`DELETE FROM sales`);
         await run(`DELETE FROM purchases`);
+        await run(`DELETE FROM returns`);
         try {
             await run(`DELETE FROM sqlite_sequence`);
         } catch(e) {}
