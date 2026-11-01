@@ -269,9 +269,9 @@ Views.sale = {
           </div>
 
           <!-- Amount Paid & Change Due / Short for Cash -->
-          <div class="field" id="amountPaidWrap" style="display:${Views.sale.payType === 'cash' ? 'block' : 'none'}; margin-bottom:4px;">
-            <label class="field-label" style="margin-bottom:2px; font-size:12px;">${t('sale_amount_paid')}</label>
-            <input class="input" id="saleAmountPaid" type="number" min="0" step="any" placeholder="0.00" value="${Views.sale.amountPaid || ''}" style="height:36px; padding:6px 10px; font-size:15px;" autocomplete="off">
+          <div class="field" id="amountPaidWrap" style="margin-bottom:4px;">
+            <label class="field-label" id="amountPaidLabel" style="margin-bottom:2px; font-size:12px;">${Views.sale.payType === 'credit' ? '💵 දැන් ගෙවන මුදල (Advance / Paid Now - විකල්පයි):' : t('sale_amount_paid')}</label>
+            <input class="input" id="saleAmountPaid" type="number" min="0" step="any" placeholder="${Views.sale.payType === 'credit' ? 'දැන් ගෙවන මුදලක් ඇත්නම් ගසන්න (0.00)' : '0.00'}" value="${Views.sale.amountPaid || ''}" style="height:36px; padding:6px 10px; font-size:15px;" autocomplete="off">
             
             <!-- Message when amount paid is less than total -->
             <div id="amountShortWrap" class="amount-short-box" style="display:none; margin-top:4px; padding:6px 10px;">
@@ -287,6 +287,13 @@ Views.sale = {
                 <i class="ph ph-check-circle" style="font-size:15px;"></i> ${t('sale_change_due')}
               </span>
               <span id="changeDueAmount" style="font-size:14.5px; font-weight:700;">0.00</span>
+            </div>
+            <!-- Credit Remaining Info (Credit mode) -->
+            <div id="creditRemainingWrap" class="amount-short-box" style="display:none; background:#fff7ed; border-color:#fed7aa; color:#9a3412; margin-top:4px; padding:6px 10px;">
+              <span style="font-size:12px; display:inline-flex; align-items:center; gap:4px;">
+                <i class="ph ph-wallet" style="font-size:15px; color:#c2410c;"></i> මෙම බිලෙන් ඉතිරි ණය:
+              </span>
+              <span style="font-size:13.5px; font-weight:800; color:#c2410c;">රු. <span id="creditRemainingAmount">0.00</span></span>
             </div>
           </div>
 
@@ -519,20 +526,41 @@ Views.sale = {
     const shortWrap = document.getElementById('amountShortWrap');
     const changeAmtEl = document.getElementById('changeDueAmount');
     const shortAmtEl = document.getElementById('amountShortAmount');
+    const creditWrap = document.getElementById('creditRemainingWrap');
+    const creditAmtEl = document.getElementById('creditRemainingAmount');
 
     if (paidInput) {
       paidInput.classList.remove('input-error', 'input-success');
     }
+    if (changeWrap) changeWrap.style.display = 'none';
+    if (shortWrap) shortWrap.style.display = 'none';
+    if (creditWrap) creditWrap.style.display = 'none';
+
+    if (Views.sale.payType === 'credit') {
+      const remainingCredit = Math.max(0, total - paid);
+      if (creditWrap) {
+        creditWrap.style.display = 'flex';
+        if (creditAmtEl) creditAmtEl.textContent = remainingCredit.toLocaleString('en-LK', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      }
+      if (paid > total) {
+        const change = paid - total;
+        if (changeWrap) {
+          changeWrap.style.display = 'flex';
+          if (changeAmtEl) changeAmtEl.textContent = fmt(change);
+        }
+      }
+      if (paid > 0 && paidInput) {
+        paidInput.classList.add('input-success');
+      }
+      return;
+    }
 
     if (!paidVal || isNaN(paid) || paid <= 0) {
-      if (changeWrap) changeWrap.style.display = 'none';
-      if (shortWrap) shortWrap.style.display = 'none';
       return;
     }
 
     if (total > 0 && paid < total) {
       const shortDiff = total - paid;
-      if (changeWrap) changeWrap.style.display = 'none';
       if (shortWrap) {
         shortWrap.style.display = 'flex';
         if (shortAmtEl) shortAmtEl.textContent = fmt(shortDiff);
@@ -547,9 +575,82 @@ Views.sale = {
       }
       if (paidInput) paidInput.classList.add('input-success');
     }
+    return;
+  },
+  _oldUpdateChangeDue() { /*
+
+    if (paidInput) {
+      paidInput.classList.remove('input-error', 'input-success');
+    }
+
+
+    if (changeWrap) changeWrap.style.display = 'none';
+    if (shortWrap) shortWrap.style.display = 'none';
+    if (creditWrap) creditWrap.style.display = 'none';
+
+    if (Views.sale.payType === 'credit') {
+      const remainingCredit = Math.max(0, total - paid);
+      if (creditWrap) {
+        creditWrap.style.display = 'flex';
+        if (creditAmtEl) creditAmtEl.textContent = remainingCredit.toLocaleString('en-LK', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      }
+      if (paid > total) {
+        const change = paid - total;
+        if (changeWrap) {
+          changeWrap.style.display = 'flex';
+          if (changeAmtEl) changeAmtEl.textContent = fmt(change);
+        }
+      }
+      if (paid > 0 && paidInput) {
+        paidInput.classList.add('input-success');
+      }
+      return;
+    }
+    if (!paidVal || isNaN(paid) || paid <= 0) return;
+      return;
+    }
+
+    if (total > 0 && paid < total) {
+      const shortDiff = total - paid;
+    if (changeWrap) changeWrap.style.display = 'none';
+    if (shortWrap) shortWrap.style.display = 'none';
+    if (creditWrap) creditWrap.style.display = 'none';
+
+    if (Views.sale.payType === 'credit') {
+      const remainingCredit = Math.max(0, total - paid);
+      if (creditWrap) {
+        creditWrap.style.display = 'flex';
+        if (creditAmtEl) creditAmtEl.textContent = remainingCredit.toLocaleString('en-LK', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      }
+      if (paid > total) {
+        const change = paid - total;
+        if (changeWrap) {
+          changeWrap.style.display = 'flex';
+          if (changeAmtEl) changeAmtEl.textContent = fmt(change);
+        }
+      }
+      if (paid > 0 && paidInput) {
+        paidInput.classList.add('input-success');
+      }
+      return;
+    }
+      if (shortWrap) {
+        shortWrap.style.display = 'flex';
+        if (shortAmtEl) shortAmtEl.textContent = fmt(shortDiff);
+      }
+      if (paidInput) paidInput.classList.add('input-error');
+    } else {
+      const change = Math.max(0, paid - total);
+    if (!paidVal || isNaN(paid) || paid <= 0) return;
+      if (changeWrap) {
+        changeWrap.style.display = 'flex';
+        if (changeAmtEl) changeAmtEl.textContent = fmt(change);
+      }
+      if (paidInput) paidInput.classList.add('input-success');
+    }
   },
 
-  applyCustomerHardwareDiscount() {
+  */ }, applyCustomerHardwareDiscount() {
     if (Views.sale.selectedCustomer && Views.sale.selectedCustomer.customerType === 'hardware' && Views.sale.selectedCustomer.discountPercent > 0) {
       const subtotal = Views.sale.calcSubtotal();
       const disc = Math.round((subtotal * (Views.sale.selectedCustomer.discountPercent / 100)) * 100) / 100;
@@ -1564,8 +1665,14 @@ Views.sale = {
     Views.sale.payType = type;
     document.getElementById('payCashBtn').classList.toggle('active', type === 'cash');
     document.getElementById('payCreditBtn').classList.toggle('active', type === 'credit');
-    const paidWrap = document.getElementById('amountPaidWrap');
-    if (paidWrap) paidWrap.style.display = type === 'cash' ? 'block' : 'none';
+    const paidLabel = document.getElementById('amountPaidLabel');
+    const paidInput = document.getElementById('saleAmountPaid');
+    if (paidLabel) {
+      paidLabel.textContent = type === 'credit' ? '💵 දැන් ගෙවන මුදල (Advance / Paid Now - විකල්පයි):' : (t('sale_amount_paid') || 'ලැබුණු මුදල');
+    }
+    if (paidInput) {
+      paidInput.placeholder = type === 'credit' ? 'දැන් ගෙවන මුදලක් ඇත්නම් ගසන්න (0.00)' : '0.00';
+    }
     const custField = document.getElementById('customerSelectionField');
     if (custField) custField.style.display = type === 'credit' ? 'block' : 'none';
     Views.sale.updateChangeDue();
@@ -2310,6 +2417,11 @@ Views.sale = {
       App.updateSidebarCounts();
       // Tab stays open after completing bill - user must manually close it
       App.render();
+      // Auto-focus the search bar so cashier can immediately scan/search the next item
+      setTimeout(() => {
+        const searchInp = document.getElementById('saleSearch');
+        if (searchInp) { searchInp.focus(); if (typeof searchInp.select === 'function') searchInp.select(); }
+      }, 200);
     } finally {
       Views.sale.isSubmitting = false;
     }
@@ -2390,12 +2502,13 @@ Views.sale = {
             <b>${sale.paymentType === 'credit' ? `ණයට (Credit) - ${escapeHTML(sale.customerName || '')}` : 'මුදල් (Cash)'}</b>
           </div>
           ${sale.paymentType === 'credit' ? `
+            ${sale.amountPaid > 0 ? `<div class="receipt-totals-row" style="color:#166534; font-weight:700;"><span>දැන් ගෙවූ මුදල (Paid / Advance):</span><span>${fmt(sale.amountPaid)}</span></div>` : ''}
             <div class="receipt-totals-row" style="color:#b91c1c; font-weight:700;">
-              <span>මෙම බිලෙන් ණය (Credit):</span>
-              <span>${fmt(sale.total)}</span>
+              <span>${sale.amountPaid > 0 ? 'මෙම බිලෙන් ඉතිරි ණය (Bill Credit):' : 'මෙම බිලෙන් ණය (Credit):'}</span>
+              <span>${fmt(Math.max(0, sale.total - (sale.amountPaid || 0)))}</span>
             </div>
-            ${sale.amountPaid > 0 ? `
-              <div class="receipt-totals-row"><span>ගෙවූ මුදල (Paid):</span><span>${fmt(sale.amountPaid)}</span></div>
+            ${false ? `
+
             ` : ''}
             ${(()=>{
               if (sale.customerId) {
@@ -4253,7 +4366,7 @@ Views.customers = {
             <span style="font-size:12.5px; font-weight:700; color:var(--charcoal); display:inline-flex; align-items:center; gap:5px;">
               <i class="ph ph-money" style="color:var(--primary-dark);"></i> ${t('cust_record_payment_title')}
             </span>
-            ${currentDue > 0 ? `<button type="button" class="btn btn-xs btn-outline" id="payFullDueBtn" style="font-size:11px; padding:2px 8px;"><i class="ph ph-arrows-down-up"></i> සම්පූර්ණ හිඟය (${fmt(currentDue)})</button>` : ''}
+            ${currentDue > 0 ? `<div style="display:inline-flex; gap:6px;"><button type="button" class="btn btn-xs btn-outline" id="payHalfDueBtn" style="font-size:11px; padding:2px 8px; color:#c2410c; border-color:#fed7aa; background:#fff7ed;" title="හිඟයෙන් භාගයක් (50%) ගෙවන්න"><i class="ph ph-percent"></i> භාගයක් (${fmt(Math.round(currentDue / 2 * 100) / 100)})</button><button type="button" class="btn btn-xs btn-outline" id="payFullDueBtn" style="font-size:11px; padding:2px 8px;"><i class="ph ph-arrows-down-up"></i> සම්පූර්ණ හිඟය (${fmt(currentDue)})</button></div>` : ''}
           </div>
           <div class="grid grid-3 gap-8" style="align-items:center;">
             <div class="field" style="margin-bottom:0;">
@@ -4263,7 +4376,7 @@ Views.customers = {
               <input class="input" id="paymentNote" placeholder="සටහන (මුදල් / බැංකු / චෙක්පත්...)" style="height:36px; font-size:13px;">
             </div>
             <div>
-              <button class="btn btn-success" id="recordPaymentBtn" style="width:100%; height:36px; font-size:13px; font-weight:700; display:inline-flex; align-items:center; justify-content:center; gap:5px;">
+              <div style="display:grid; grid-template-columns:1fr 1fr; gap:6px;"><button type="button" class="btn btn-outline" id="recordPaymentBtn" style="height:36px; font-size:12px; font-weight:700; display:inline-flex; align-items:center; justify-content:center; gap:4px; padding:0 6px;" title="ගෙවීම සටහන් කර රිසිට්පත බලන්න"><i class="ph ph-check-circle"></i> Save</button><button type="button" class="btn btn-success" id="recordAndPrintPaymentBtn" style="height:36px; font-size:12px; font-weight:700; display:inline-flex; align-items:center; justify-content:center; gap:4px; padding:0 6px; background:#16a34a; color:#fff;" title="ගෙවීම සටහන් කර කෙලින්ම බිල Print කරන්න"><i class="ph ph-printer"></i> Save + Print</button></div><button type="button" style="display:none;">
                 <i class="ph ph-check-circle"></i> ${t('cust_record_payment_btn')}
               </button>
             </div>
@@ -4359,6 +4472,15 @@ Views.customers = {
       `,
       footHTML: `<button class="btn btn-outline" data-close>${t('close')}</button>`,
       onMount: (wrap) => {
+        // Quick Pay Half Due Button
+        wrap.querySelector('#payHalfDueBtn')?.addEventListener('click', () => {
+          const amtInp = wrap.querySelector('#paymentAmt');
+          if (amtInp) {
+            amtInp.value = Math.round((Math.max(0, currentDue) / 2) * 100) / 100;
+            amtInp.focus();
+          }
+        });
+
         // Quick Pay Full Due Button
         wrap.querySelector('#payFullDueBtn')?.addEventListener('click', () => {
           const amtInp = wrap.querySelector('#paymentAmt');
@@ -4368,7 +4490,46 @@ Views.customers = {
           }
         });
 
-        // Record Payment button
+        const handleProcessPayment = async (shouldPrintDirectly = false) => {
+          const amtInp = wrap.querySelector('#paymentAmt');
+          const amt = Number(amtInp?.value) || 0;
+          const noteInp = wrap.querySelector('#paymentNote');
+          const note = (noteInp?.value || '').trim() || 'මුදල් ගෙවීම';
+
+          if (amt <= 0) {
+            toast(t('cust_err_amt'), 'err');
+            if (amtInp) amtInp.focus();
+            return;
+          }
+
+          const prevBalance = c.balance;
+          const newBalance = Math.max(0, prevBalance - amt);
+
+          const updatedCustomer = await DB.recordPayment(id, amt, note);
+          toast(shouldPrintDirectly ? 'ගෙවීම සටහන් විය! (රිසිට්පත මුද්‍රණය කෙරේ)' : 'ගෙවීම සාර්ථකව සටහන් විය!', 'ok');
+          closeModal();
+          App.render();
+
+          const slipParams = {
+            customer: updatedCustomer || c,
+            prevBalance,
+            amountPaid: amt,
+            newBalance,
+            date: Date.now(),
+            note,
+            paymentId: Date.now().toString().slice(-6),
+            returnCustId: id
+          };
+
+          if (shouldPrintDirectly) {
+            Views.customers.printPaymentReceiptDirect(slipParams);
+          }
+          Views.customers.showPaymentReceiptModal(slipParams);
+        };
+
+        wrap.querySelector('#recordPaymentBtn')?.addEventListener('click', () => handleProcessPayment(false));
+        wrap.querySelector('#recordAndPrintPaymentBtn')?.addEventListener('click', () => handleProcessPayment(true));
+        /*
         wrap.querySelector('#recordPaymentBtn')?.addEventListener('click', async () => {
           const amtInp = wrap.querySelector('#paymentAmt');
           const amt = Number(amtInp?.value) || 0;
@@ -4402,7 +4563,7 @@ Views.customers = {
           });
         });
 
-        // Ledger print payment slips
+        */ // Ledger print payment slips
         wrap.querySelectorAll('[data-print-pay-slip]').forEach(btn => {
           btn.addEventListener('click', () => {
             const amt = Number(btn.dataset.payAmt) || 0;

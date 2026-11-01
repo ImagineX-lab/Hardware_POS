@@ -529,9 +529,15 @@ module.exports = {
         if(sale.paymentType === 'credit' && sale.customerId) {
             const c = await get(`SELECT balance FROM customers WHERE id = ?`, [sale.customerId]);
             if(c) {
-                await run(`UPDATE customers SET balance = ? WHERE id = ?`, [c.balance + total, sale.customerId]);
+                const creditToAdd = Math.max(0, total - amountPaid);
+                await run(`UPDATE customers SET balance = ? WHERE id = ?`, [c.balance + creditToAdd, sale.customerId]);
                 await run(`INSERT INTO customer_ledger (customerId, date, type, amount, note, saleId) VALUES (?, ?, 'sale', ?, ?, ?)`,
                     [sale.customerId, date, total, `බිල් #${saleId}`, saleId]);
+                if (amountPaid > 0) {
+                    const actualPaid = Math.min(amountPaid, total);
+                    await run(`INSERT INTO customer_ledger (customerId, date, type, amount, note, saleId) VALUES (?, ?, 'payment', ?, ?, ?)`,
+                        [sale.customerId, date + 1, actualPaid, `බිල් #${saleId} වෙනුවෙන් අත්පිට මුදල් (Advance)`, saleId]);
+                }
             }
         }
 
@@ -553,9 +559,12 @@ module.exports = {
         if(s.paymentType === 'credit' && s.customerId) {
             const c = await get(`SELECT balance FROM customers WHERE id = ?`, [s.customerId]);
             if(c) {
-                await run(`UPDATE customers SET balance = ? WHERE id = ?`, [c.balance - s.total, s.customerId]);
+                const sTotal = Number(s.total) || 0;
+                const sPaid = Number(s.amountPaid) || 0;
+                const creditAdded = Math.max(0, sTotal - sPaid);
+                await run(`UPDATE customers SET balance = ? WHERE id = ?`, [Math.max(0, c.balance - creditAdded), s.customerId]);
                 await run(`INSERT INTO customer_ledger (customerId, date, type, amount, note) VALUES (?, ?, 'payment', ?, ?)`,
-                    [s.customerId, Date.now(), s.total, `බිල් #${id} අවලංගු කිරීම`]);
+                    [s.customerId, Date.now(), creditAdded, `බිල් #${id} අවලංගු කිරීම`]);
             }
         }
 
@@ -584,9 +593,12 @@ module.exports = {
                     if (s.paymentType === 'credit' && s.customerId) {
                         const c = await get(`SELECT balance FROM customers WHERE id = ?`, [s.customerId]);
                         if (c) {
-                            await run(`UPDATE customers SET balance = ? WHERE id = ?`, [Math.max(0, c.balance - s.total), s.customerId]);
+                            const sTotal = Number(s.total) || 0;
+                            const sPaid = Number(s.amountPaid) || 0;
+                            const creditAdded = Math.max(0, sTotal - sPaid);
+                            await run(`UPDATE customers SET balance = ? WHERE id = ?`, [Math.max(0, c.balance - creditAdded), s.customerId]);
                             await run(`INSERT INTO customer_ledger (customerId, date, type, amount, note) VALUES (?, ?, 'payment', ?, ?)`,
-                                [s.customerId, Date.now(), s.total, `බිල්පත් සියල්ල මකා දැමීම (#${s.id})`]);
+                                [s.customerId, Date.now(), creditAdded, `බිල්පත් සියල්ල මකා දැමීම (#${s.id})`]);
                         }
                     }
                 } catch(e) {}

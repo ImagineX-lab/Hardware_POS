@@ -197,7 +197,30 @@ const DB = {
     if (sale.paymentType === 'credit' && sale.customerId) {
       const customer = this.data.customers.find(c => c.id === sale.customerId);
       if (customer) {
-        customer.balance = (customer.balance || 0) + newSale.total;
+        const paidNow = Number(newSale.amountPaid) || 0;
+        const creditToAdd = Math.max(0, newSale.total - paidNow);
+        customer.balance = (customer.balance || 0) + creditToAdd;
+        customer.ledger = customer.ledger || [];
+        customer.ledger.unshift({
+          id: Date.now(),
+          customerId: customer.id,
+          date: newSale.date || Date.now(),
+          type: 'sale',
+          amount: newSale.total,
+          note: `බිල් #${newSale.id}`,
+          saleId: newSale.id
+        });
+        if (paidNow > 0) {
+          customer.ledger.unshift({
+            id: Date.now() + 1,
+            customerId: customer.id,
+            date: (newSale.date || Date.now()) + 1,
+            type: 'payment',
+            amount: Math.min(paidNow, newSale.total),
+            note: `බිල් #${newSale.id} වෙනුවෙන් අත්පිට මුදල් (Advance)`,
+            saleId: newSale.id
+          });
+        }
       }
     }
     return newSale;
@@ -246,7 +269,10 @@ const DB = {
       if (deleted.paymentType === 'credit' && deleted.customerId) {
         const customer = this.data.customers.find(c => c.id === deleted.customerId);
         if (customer) {
-          customer.balance = Math.max(0, (customer.balance || 0) - deleted.total);
+          const dTotal = Number(deleted.total) || 0;
+          const dPaid = Number(deleted.amountPaid) || 0;
+          const creditAdded = Math.max(0, dTotal - dPaid);
+          customer.balance = Math.max(0, (customer.balance || 0) - creditAdded);
         }
       }
     }
@@ -270,7 +296,11 @@ const DB = {
         }
         if (sale.paymentType === 'credit' && sale.customerId) {
           const customer = this.data.customers.find(c => c.id === sale.customerId);
-          if (customer) customer.balance = Math.max(0, (customer.balance || 0) - sale.total);
+          if (customer) {
+            const sTotal = Number(sale.total) || 0;
+            const sPaid = Number(sale.amountPaid) || 0;
+            customer.balance = Math.max(0, (customer.balance || 0) - Math.max(0, sTotal - sPaid));
+          }
         }
       }
     }

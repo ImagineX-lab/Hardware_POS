@@ -965,32 +965,11 @@ const BarcodeSystem = {
     // 0. CHECK IF THIS IS A BILL / INVOICE BARCODE!
     const billSale = DB.findSaleByBarcode ? DB.findSaleByBarcode(code) : null;
     if (billSale) {
-      BarcodeSystem.playBeep(true);
-      Views.sale.showReceipt(billSale);
-      toast(`🧾 බිල්පත #${billSale.id} විවෘත විය! (${billSale.lines.length} items - ${fmt(billSale.total)})`, 'ok');
-
-      // Clear search inputs if they contain the code
-      const searchInp = document.getElementById('saleSearch');
-      if (searchInp) {
-        searchInp.value = '';
-        const suggest = document.getElementById('saleSuggest');
-        if (suggest) {
-          suggest.style.display = 'none';
-          suggest.innerHTML = '';
-        }
-      }
-      const histSearch = document.getElementById('historySearch');
-      if (histSearch) {
-        histSearch.value = String(billSale.id);
-        if (typeof Views.history !== 'undefined' && Views.history.tableHTML) {
-          Views.history.searchQ = String(billSale.id);
-          const histWrap = document.getElementById('histTableWrap');
-          if (histWrap) {
-            histWrap.innerHTML = Views.history.tableHTML();
-            Views.history.bindRowActions();
-          }
-        }
-      }
+      // Bill barcode scanned — do NOT open receipt or print (user disabled this behavior)
+      BarcodeSystem.playBeep(false);
+      // Clear search bar silently
+      const searchInp2 = document.getElementById('saleSearch');
+      if (searchInp2) { searchInp2.value = ''; const s2 = document.getElementById('saleSuggest'); if (s2) { s2.style.display = 'none'; s2.innerHTML = ''; } }
       return;
     }
 
