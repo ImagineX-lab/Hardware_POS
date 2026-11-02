@@ -1,4 +1,4 @@
-/* =========================================================
+﻿/* =========================================================
    HardwarePOS — Views
    Each view has: render (returns HTML string) + bind (attach events)
    ========================================================= */
@@ -3026,12 +3026,21 @@ Views.items = {
     }
   },
 
-  openAddModal(initialData = null) {
+  openAddModal(initialData = null, onSaved = null, onCancel = null) {
     openModal({
       title: t('items_add_btn'),
       bodyHTML: Views.items.formHTML(initialData),
-      footHTML: `<button class="btn btn-outline" data-close>${t('cancel')}</button><button class="btn btn-primary" id="saveItemBtn">${t('confirm')}</button>`,
-      onMount: () => {
+      footHTML: `<button class="btn btn-outline" id="cancelAddModalBtn" data-close>${t('cancel')}</button><button class="btn btn-primary" id="saveItemBtn">${t('confirm')}</button>`,
+      onMount: (wrap) => {
+        let isSaved = false;
+        if (typeof onCancel === 'function') {
+          wrap.querySelector('#cancelAddModalBtn')?.addEventListener('click', () => {
+            if (!isSaved) onCancel();
+          });
+          wrap.querySelector('.modal-close')?.addEventListener('click', () => {
+            if (!isSaved) onCancel();
+          });
+        }
         Views.items.bindCategoryCombo();
         Views.items.bindSubCategoryCombo();
         Views.items.bindImageUpload();
@@ -3055,7 +3064,7 @@ Views.items = {
           }
 
           try {
-            await DB.addItem({
+            const newItem = await DB.addItem({
               name, barcode, category, subCategory,
               unit: document.getElementById('f_unit').value,
               costPrice: document.getElementById('f_cost').value,
@@ -3065,9 +3074,14 @@ Views.items = {
               loosePrice: Number(document.getElementById('f_loosePrice')?.value) || 0,
               description: desc, image: image
             });
+            isSaved = true;
             closeModal();
             toast(t('items_added'), 'ok');
-            App.render();
+            if (typeof onSaved === 'function') {
+              onSaved(newItem);
+            } else {
+              App.render();
+            }
           } catch (err) {
             console.error("Failed to add item:", err);
             toast("භාණ්ඩය එකතු කිරීමට නොහැකි විය!", "err");
@@ -5286,6 +5300,7 @@ Views.purchases = {
             <option value="due" ${Views.purchases.filterStatus === 'due' ? 'selected' : ''}>ගෙවීමට ඇති බිල්</option>
             <option value="paid" ${Views.purchases.filterStatus === 'paid' ? 'selected' : ''}>සම්පූර්ණ ගෙවූ බිල්</option>
           </select>
+          <button class="btn btn-primary" id="addPurchaseItemBtn">＋ අලුත් භාණ්ඩයක් එක් කරන්න</button>
           <button class="btn btn-primary" id="addPurchaseBtn">＋ අලුත් බිලක් එක් කරන්න</button>
         </div>
       </div>
@@ -5423,8 +5438,8 @@ Views.purchases = {
     `;
   },
 
-  openAddPurchaseModal() {
-    let purchaseItems = [];
+  openAddPurchaseModal(prefill = null) {
+    let purchaseItems = (prefill && Array.isArray(prefill.purchaseItems)) ? prefill.purchaseItems : [];
     const existingItems = DB.allItems();
 
     function renderModalItemsHTML() {
@@ -5468,20 +5483,25 @@ Views.purchases = {
         <div class="grid grid-3">
           <div class="field">
             <label class="field-label">සැපයුම්කරු / සමාගමේ නම (Supplier)</label>
-            <input class="input" id="pb_supplier" placeholder="උදා: DSI, Tokyo Cement, S-Lon">
+            <input class="input" id="pb_supplier" placeholder="උදා: DSI, Tokyo Cement, S-Lon" value="${escapeHTML(prefill?.supplier || '')}">
           </div>
           <div class="field">
             <label class="field-label">බිල් අංකය (Invoice / Bill No)</label>
-            <input class="input" id="pb_billNo" placeholder="උදා: INV-1042">
+            <input class="input" id="pb_billNo" placeholder="උදා: INV-1042" value="${escapeHTML(prefill?.billNo || '')}">
           </div>
           <div class="field">
             <label class="field-label">දිනය</label>
-            <input class="input" id="pb_date" type="date" value="${new Date().toISOString().slice(0, 10)}">
+            <input class="input" id="pb_date" type="date" value="${prefill?.date || new Date().toISOString().slice(0, 10)}">
           </div>
         </div>
 
         <div class="card" style="background:var(--paper); padding:12px; margin-bottom:14px; box-shadow:none;">
-          <div class="card-title" style="font-size:13px; margin-bottom:8px;"><i class="ph ph-package"></i> ගත් භාණ්ඩ ලැයිස්තුව</div>
+          <div class="card-title" style="font-size:13px; margin-bottom:8px; display:flex; justify-content:space-between; align-items:center;">
+            <span><i class="ph ph-package"></i> ගත් භාණ්ඩ ලැයිස්තුව</span>
+            <button type="button" class="btn btn-sm btn-primary" id="modalAddNewItemBtn" style="font-size:11px; padding:3px 10px; display:inline-flex; align-items:center; gap:4px;">
+              ＋ අලුත් භාණ්ඩයක් එක් කරන්න
+            </button>
+          </div>
           <div id="modalItemsTableWrap">${renderModalItemsHTML()}</div>
 
           <div style="background:#fff; border:1px solid var(--border); border-radius:8px; padding:8px; margin-top:8px;">
@@ -5509,11 +5529,11 @@ Views.purchases = {
         <div class="grid grid-2">
           <div class="field">
             <label class="field-label">මුළු බිල්පත් වටිනාකම (රු.)</label>
-            <input class="input" id="pb_total" type="number" step="any" min="0" placeholder="0.00" style="font-weight:700; font-size:16px;">
+            <input class="input" id="pb_total" type="number" step="any" min="0" placeholder="0.00" value="${prefill?.total !== undefined ? prefill.total : ''}" style="font-weight:700; font-size:16px;">
           </div>
           <div class="field">
             <label class="field-label">අද ගෙවූ මුදල (Amount Paid, රු.)</label>
-            <input class="input" id="pb_paid" type="number" step="any" min="0" placeholder="0.00" style="font-weight:700; font-size:16px;">
+            <input class="input" id="pb_paid" type="number" step="any" min="0" placeholder="0.00" value="${prefill?.paid !== undefined ? prefill.paid : ''}" style="font-weight:700; font-size:16px;">
           </div>
         </div>
 
@@ -5526,7 +5546,7 @@ Views.purchases = {
                   <i class="ph ph-image"></i> 📁 Photo එකක් තෝරන්න
                 </label>
                 <input type="file" id="pb_image_file" accept="image/*" style="display:none;">
-                <input type="hidden" id="pb_image_data" value="">
+                <input type="hidden" id="pb_image_data" value="${prefill?.image || ''}">
                 <button type="button" class="btn btn-sm btn-outline danger" id="pb_remove_img_btn" style="display:none;"><i class="ph ph-trash"></i> ✕ ඉවත් කරන්න</button>
               </div>
               <button type="button" class="btn btn-sm btn-outline" id="pb_zoom_preview_btn" style="display:none; font-size:11px;"><i class="ph ph-magnifying-glass-plus"></i> 🔍 විශාල කර බලන්න</button>
@@ -5543,14 +5563,14 @@ Views.purchases = {
 
         <div class="field" style="margin-top:10px;">
           <label style="display:flex; align-items:center; gap:8px; cursor:pointer; font-weight:600;">
-            <input type="checkbox" id="pb_autoStock" checked>
+            <input type="checkbox" id="pb_autoStock" ${(prefill && prefill.autoStock === false) ? '' : 'checked'}>
             <span>☑ මෙම භාණ්ඩ කඩේ තොගයට (Stock Qty) ස්වයංක්‍රීයව එකතු කරන්න</span>
           </label>
         </div>
 
         <div class="field">
           <label class="field-label">විස්තර / සටහන් (Notes)</label>
-          <textarea class="input" id="pb_note" placeholder="අමතර විස්තර..." style="min-height:45px;"></textarea>
+          <textarea class="input" id="pb_note" placeholder="අමතර විස්තර..." style="min-height:45px;">${escapeHTML(prefill?.note || '')}</textarea>
         </div>
       `,
       footHTML: `<button class="btn btn-outline" data-close>${t('cancel')}</button><button class="btn btn-primary" id="savePurchaseBtn">✔ බිල සුරකින්න</button>`,
@@ -5568,6 +5588,47 @@ Views.purchases = {
         const removeBtn = wrap.querySelector('#pb_remove_img_btn');
         const zoomBtn = wrap.querySelector('#pb_zoom_preview_btn');
         const hintEl = wrap.querySelector('#pb_img_hint');
+
+        if (prefill && prefill.image) {
+          previewImgEl.src = prefill.image;
+          previewBox.style.display = 'block';
+          removeBtn.style.display = 'inline-flex';
+          zoomBtn.style.display = 'inline-flex';
+          if (hintEl) hintEl.textContent = 'ඡායාරූපය සාර්ථකව තෝරා ගන්නා ලදී.';
+        }
+
+        wrap.querySelector('#modalAddNewItemBtn')?.addEventListener('click', () => {
+          const currentState = {
+            supplier: wrap.querySelector('#pb_supplier')?.value || '',
+            billNo: wrap.querySelector('#pb_billNo')?.value || '',
+            date: wrap.querySelector('#pb_date')?.value || '',
+            purchaseItems: [...purchaseItems],
+            total: totalInp?.value || '',
+            paid: paidInp?.value || '',
+            image: hiddenImgInput?.value || '',
+            note: wrap.querySelector('#pb_note')?.value || '',
+            autoStock: wrap.querySelector('#pb_autoStock')?.checked ?? true
+          };
+          Views.items.openAddModal(null, (newItem) => {
+            if (newItem) {
+              currentState.purchaseItems.push({
+                itemId: newItem.id,
+                name: newItem.name,
+                qty: Number(newItem.qty) || 1,
+                unit: newItem.unit || 'pcs',
+                costPrice: Number(newItem.costPrice) || 0
+              });
+              const newTotal = currentState.purchaseItems.reduce((s, i) => s + (i.qty * i.costPrice), 0);
+              if (newTotal > 0) {
+                currentState.total = newTotal;
+                currentState.paid = newTotal;
+              }
+            }
+            Views.purchases.openAddPurchaseModal(currentState);
+          }, () => {
+            Views.purchases.openAddPurchaseModal(currentState);
+          });
+        });
 
         if (fileInput) {
           fileInput.addEventListener('change', () => {
@@ -5638,6 +5699,10 @@ Views.purchases = {
             totalInp.value = calculatedTotal;
             paidInp.value = calculatedTotal;
           }
+          bindRemoveBtns();
+        }
+
+        function bindRemoveBtns() {
           wrap.querySelectorAll('[data-remove-pitem]').forEach(btn => {
             btn.addEventListener('click', (e) => {
               const idx = Number(e.currentTarget.dataset.removePitem);
@@ -5646,6 +5711,7 @@ Views.purchases = {
             });
           });
         }
+        bindRemoveBtns();
 
         wrap.querySelector('#addPItemBtn').addEventListener('click', () => {
           const name = nameInp.value.trim();
@@ -5903,7 +5969,8 @@ Views.purchases = {
   },
 
   bind() {
-    document.getElementById('addPurchaseBtn')?.addEventListener('click', Views.purchases.openAddPurchaseModal);
+    document.getElementById('addPurchaseBtn')?.addEventListener('click', () => Views.purchases.openAddPurchaseModal());
+    document.getElementById('addPurchaseItemBtn')?.addEventListener('click', () => Views.items.openAddModal(null, () => App.render()));
 
     const search = document.getElementById('purchasesSearch');
     if (search) {
@@ -6090,7 +6157,7 @@ Views.returns = {
               }).join('<br>');
 
               const excSummary = excList.length ? excList.map(it => {
-                const qtyText = `${it.qty} ${escapeHTML(it.unit || 'pcs')}`;
+                const qtyText = it.looseInfo ? `${it.looseInfo.looseQty} ${escapeHTML(it.looseInfo.looseUnit || '')}` : `${it.qty} ${escapeHTML(it.unit || 'pcs')}`;
                 return `• <b>${escapeHTML(it.name)}</b> (${qtyText} × ${fmt(it.unitPrice)})`;
               }).join('<br>') : '<span class="text-muted small">කිසිවක් ගෙන නැත</span>';
 
@@ -6200,11 +6267,23 @@ Views.returns = {
     let currentSale = preselectedSaleId ? DB.allSales().find(s => s.id === Number(preselectedSaleId)) : null;
     let exchangeItems = []; // Replacement / new items taken
     let returnAmountPaid = '';
+    let lineLooseReturn = {}; // Map of billLineIdx -> loose return result object
 
     openModal({
       title: 'භාණ්ඩ රිටන් කිරීම සහ මාරු කිරීම (Returns & Exchanges)',
       wide: true,
       bodyHTML: `
+        <!-- Secondary Loose Calculator Overlay for Returns -->
+        <div id="returnLooseOverlay" style="display:none; position:fixed; inset:0; z-index:99999; background:rgba(0,0,0,0.6); align-items:center; justify-content:center; backdrop-filter:blur(2px);">
+          <div style="background:#fff; border-radius:12px; width:95%; max-width:440px; box-shadow:0 12px 36px rgba(0,0,0,0.28); overflow:hidden; border:1px solid var(--border); font-family:'Noto Sans Sinhala', sans-serif;">
+            <div style="background:var(--paper); padding:10px 16px; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:center;">
+              <h3 style="margin:0; font-size:15px; font-weight:800; color:var(--charcoal);" id="rlo_title">⚖️ ලිහිල් ගණනය (Loose)</h3>
+              <button type="button" class="modal-close" id="rlo_close_x" style="background:none; border:none; font-size:22px; cursor:pointer; color:var(--steel); line-height:1;">&times;</button>
+            </div>
+            <div style="padding:14px 16px; max-height:80vh; overflow-y:auto;" id="rlo_body"></div>
+            <div style="background:var(--paper); padding:10px 16px; border-top:1px solid var(--border); display:flex; justify-content:space-between; align-items:center;" id="rlo_foot"></div>
+          </div>
+        </div>
 
         <!-- SECTION 1: RETURN ITEMS (MODE 1: BY BILL) -->
         <div id="returnByBillWrap" style="display:block;">
@@ -6266,7 +6345,6 @@ Views.returns = {
             <span>⚖️ ගිණුම් බේරුම්කරණය (Balance Settlement):</span>
           </div>
 
-
           <div style="display:none;">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
               <label class="field-label" style="font-size:12.5px; font-weight:800; color:var(--charcoal); margin:0; display:flex; align-items:center; gap:6px;">
@@ -6318,7 +6396,355 @@ Views.returns = {
         const custSelect = wrap.querySelector('#returnCustSelect');
 
         // ==============================================================
-        // MASTER RECALCULATION FUNCTION (Defined first to prevent TDZ errors)
+        // SECONDARY LOOSE CALCULATOR MODAL FOR RETURNS
+        // ==============================================================
+        function openReturnLooseModal({ item, title, onApply, onReset }) {
+          const overlay = wrap.querySelector('#returnLooseOverlay');
+          const titleEl = wrap.querySelector('#rlo_title');
+          const bodyEl = wrap.querySelector('#rlo_body');
+          const footEl = wrap.querySelector('#rlo_foot');
+          if (!overlay || !bodyEl || !footEl) return;
+
+          titleEl.textContent = title || '⚖️ ලිහිල් ගණනය (Loose)';
+
+          let defaultPackSize = 1;
+          let defaultPackUnit = item.unit || 'pcs';
+          let defaultLooseUnit = item.unit || 'pcs';
+
+          const nameLower = (item.name || '').toLowerCase();
+          const matchWeight = nameLower.match(/(\d+(?:\.\d+)?)\s*(kg|g|කිලෝ|ග්‍රෑම්)/i);
+          const matchVolume = nameLower.match(/(\d+(?:\.\d+)?)\s*(l|ml|ltr|ලීටර්|මිලිලීටර්)/i);
+          const matchLength = nameLower.match(/(\d+(?:\.\d+)?)\s*(ft|in|m|cm|අඩි|අඟල්|මීටර්)/i);
+
+          const containerUnits = ['bag', 'box', 'pkt', 'roll', 'bundle', 'bottle', 'can', 'tube', 'set', 'pair', 'sheet', 'length', 'cube', 'sqft'];
+          if (containerUnits.includes(item.unit)) {
+            if (matchWeight) {
+              defaultPackSize = parseFloat(matchWeight[1]) || 50;
+              defaultPackUnit = matchWeight[2].toLowerCase().startsWith('g') && !matchWeight[2].toLowerCase().startsWith('kg') ? 'g' : 'kg';
+              defaultLooseUnit = defaultPackUnit;
+            } else if (matchVolume) {
+              defaultPackSize = parseFloat(matchVolume[1]) || 1;
+              defaultPackUnit = matchVolume[2].toLowerCase().startsWith('ml') ? 'ml' : 'L';
+              defaultLooseUnit = defaultPackUnit;
+            } else if (matchLength) {
+              defaultPackSize = parseFloat(matchLength[1]) || 1;
+              defaultPackUnit = matchLength[2].includes('in') || matchLength[2].includes('අඟල්') ? 'in' : (matchLength[2].includes('m') ? 'm' : 'ft');
+              defaultLooseUnit = defaultPackUnit;
+            } else if (nameLower.includes('50kg') || nameLower.includes('50 kg') || nameLower.includes('සිමෙන්ති')) {
+              defaultPackSize = 50;
+              defaultPackUnit = 'kg';
+              defaultLooseUnit = 'kg';
+            }
+          } else if (item.unit === 'kg') {
+            defaultPackSize = 1; defaultPackUnit = 'kg'; defaultLooseUnit = 'kg';
+          } else if (item.unit === 'g') {
+            defaultPackSize = 1000; defaultPackUnit = 'g'; defaultLooseUnit = 'g';
+          } else if (item.unit === 'L') {
+            defaultPackSize = 1; defaultPackUnit = 'L'; defaultLooseUnit = 'L';
+          } else if (item.unit === 'ml') {
+            defaultPackSize = 1000; defaultPackUnit = 'ml'; defaultLooseUnit = 'ml';
+          } else if (item.unit === 'ft') {
+            defaultPackSize = 1; defaultPackUnit = 'ft'; defaultLooseUnit = 'ft';
+          } else if (item.unit === 'm') {
+            defaultPackSize = 1; defaultPackUnit = 'm'; defaultLooseUnit = 'm';
+          }
+
+          const dbItem = item.itemId ? DB.getItem(item.itemId) : null;
+          const configuredPackSize = (dbItem && Number(dbItem.packSize) > 0) ? Number(dbItem.packSize) : ((Number(item.packSize) > 0) ? Number(item.packSize) : null);
+          const configuredPackUnit = (dbItem && dbItem.packUnit) ? dbItem.packUnit : (item.packUnit || null);
+          const configuredLoosePrice = (dbItem && Number(dbItem.loosePrice) > 0) ? Number(dbItem.loosePrice) : (Number(item.loosePrice) || 0);
+
+          if (configuredPackSize) defaultPackSize = configuredPackSize;
+          if (configuredPackUnit) { defaultPackUnit = configuredPackUnit; defaultLooseUnit = configuredPackUnit; }
+
+          const curLoose = item.looseInfo || {};
+          const initPackSize = curLoose.packSize || defaultPackSize;
+          const initPackUnit = curLoose.packUnit || defaultPackUnit;
+          const initLooseUnit = curLoose.looseUnit || defaultLooseUnit;
+          const initLooseQty = (curLoose.looseQty !== undefined && curLoose.looseQty !== null) ? curLoose.looseQty : 1;
+          const initCustomPrice = (curLoose.customLooseUnitPrice !== undefined && curLoose.customLooseUnitPrice !== null)
+            ? curLoose.customLooseUnitPrice
+            : (configuredLoosePrice > 0 ? configuredLoosePrice : '');
+
+          const unitOptions = [
+            { val: 'kg', label: 'kg (කිලෝ)' },
+            { val: 'g', label: 'g (ග්‍රෑම්)' },
+            { val: 'in', label: 'අඟල් (in)' },
+            { val: 'ft', label: 'අඩි (ft)' },
+            { val: 'm', label: 'මීටර් (m)' },
+            { val: 'cm', label: 'සෙ.මී. (cm)' },
+            { val: 'L', label: 'ලීටර් (L)' },
+            { val: 'ml', label: 'මිලිලීටර් (ml)' },
+            { val: 'pcs', label: 'කෑලි (pcs)' }
+          ];
+
+          const getUnitFactor = (fromU, toU) => {
+            fromU = (fromU || '').toLowerCase().trim();
+            toU = (toU || '').toLowerCase().trim();
+            if (fromU === 'ltr') fromU = 'l';
+            if (toU === 'ltr') toU = 'l';
+            if (fromU === toU) return 1;
+            if (fromU === 'g' && toU === 'kg') return 0.001;
+            if (fromU === 'kg' && toU === 'g') return 1000;
+            if ((fromU === 'in' || fromU === 'agal' || fromU === 'අඟල්') && (toU === 'ft' || toU === 'adi' || toU === 'අඩි')) return 1 / 12;
+            if ((fromU === 'ft' || fromU === 'adi' || fromU === 'අඩි') && (toU === 'in' || toU === 'agal' || toU === 'අඟල්')) return 12;
+            if (fromU === 'cm' && toU === 'm') return 0.01;
+            if (fromU === 'm' && toU === 'cm') return 100;
+            if ((fromU === 'in' || fromU === 'agal' || fromU === 'අඟල්') && toU === 'm') return 0.0254;
+            if ((fromU === 'in' || fromU === 'agal' || fromU === 'අඟල්') && toU === 'cm') return 2.54;
+            if (fromU === 'm' && (toU === 'in' || toU === 'agal' || toU === 'අඟල්')) return 39.3701;
+            if (fromU === 'cm' && (toU === 'in' || toU === 'agal' || toU === 'අඟල්')) return 0.393701;
+            if (fromU === 'ft' && toU === 'm') return 0.3048;
+            if (fromU === 'm' && toU === 'ft') return 3.28084;
+            if (fromU === 'ft' && toU === 'cm') return 30.48;
+            if (fromU === 'ml' && toU === 'l') return 0.001;
+            if (fromU === 'l' && toU === 'ml') return 1000;
+            return 0;
+          };
+
+          bodyEl.innerHTML = `
+            <div style="background:var(--bg-card, #f1f5f9); border-radius:8px; padding:10px 14px; margin-bottom:12px; display:flex; justify-content:space-between; align-items:center;">
+              <div>
+                <div style="font-size:15px; font-weight:800; color:var(--charcoal);">${escapeHTML(item.name)}</div>
+                <div style="font-size:12px; color:var(--steel); margin-top:2px;">
+                  මිල: <b style="color:var(--primary); font-size:13px;">${fmt(item.unitPrice)}</b> / ${escapeHTML(item.unit || 'pcs')}
+                </div>
+              </div>
+              <span style="font-size:22px;">⚖️</span>
+            </div>
+
+            <div style="display:flex; background:#f1f5f9; border-radius:8px; padding:3px; margin-bottom:12px; gap:3px;">
+              <button type="button" id="rlo_tab_qty" style="flex:1; padding:7px 0; font-size:13px; font-weight:700; border:none; border-radius:6px; cursor:pointer; background:white; color:var(--primary); box-shadow:0 1px 4px rgba(0,0,0,0.12); transition:all 0.15s;">
+                📏 ප්‍රමාණය
+              </button>
+              <button type="button" id="rlo_tab_cash" style="flex:1; padding:7px 0; font-size:13px; font-weight:700; border:none; border-radius:6px; cursor:pointer; background:transparent; color:var(--steel); transition:all 0.15s;">
+                💵 මුදල
+              </button>
+            </div>
+
+            <div id="rlo_qty_section">
+              <div style="margin-bottom:10px;">
+                <label style="font-size:13px; font-weight:700; color:var(--charcoal); display:block; margin-bottom:6px;">📏 ප්‍රමාණය සහ මිනුම:</label>
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+                  <input type="number" id="rlo_loose_qty" class="input" min="0.0001" step="any" value="${initLooseQty}" placeholder="ප්‍රමාණය" style="font-size:20px; font-weight:900; text-align:center; height:46px; border:2px solid var(--primary);">
+                  <select id="rlo_loose_unit" class="input" style="font-size:13.5px; font-weight:700; height:46px; border:2px solid var(--primary-light, #bae6fd);">
+                    ${unitOptions.map(u => `<option value="${u.val}" ${initLooseUnit === u.val ? 'selected' : ''}>${u.label}</option>`).join('')}
+                  </select>
+                </div>
+              </div>
+              <div style="margin-bottom:12px;">
+                <div id="rlo_presets" style="display:flex; flex-wrap:wrap; gap:6px;"></div>
+              </div>
+            </div>
+
+            <div id="rlo_cash_section" style="display:none;">
+              <div style="margin-bottom:10px;">
+                <label style="font-size:13px; font-weight:700; color:var(--charcoal); display:block; margin-bottom:6px;">ඉල්ලූ මුදල (රු.):</label>
+                <input type="number" id="rlo_cash_amount" class="input" min="1" step="any" placeholder="උදා: 100" style="font-size:20px; font-weight:900; text-align:center; height:46px; border:2px solid #f59e0b; width:100%;">
+              </div>
+              <div style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:12px;">
+                ${[50, 100, 150, 200, 250, 500, 1000, 2000].map(amt => `
+                  <button type="button" class="btn-cash-chip" data-rlo-cash="${amt}" style="padding:4px 9px; font-size:11.5px; font-weight:700; background:#fffbeb; border:1px solid #fde68a; border-radius:6px; cursor:pointer; color:#92400e;">
+                    රු.${amt}
+                  </button>
+                `).join('')}
+              </div>
+              <div id="rlo_cash_qty_show" style="font-size:12px; color:var(--steel); font-weight:700; margin-bottom:8px; text-align:center;"></div>
+            </div>
+
+            <div style="background:#f0fdf4; border:2px solid #86efac; border-radius:10px; padding:10px 14px; text-align:center;">
+              <div style="font-size:12px; font-weight:700; color:#15803d; margin-bottom:2px;">අදාළ මුළු මුදල:</div>
+              <div id="rlo_res_price" style="font-size:24px; font-weight:900; color:#166534; line-height:1.2;">රු. 0.00</div>
+              <div style="font-size:12px; color:#15803d; margin-top:4px; font-weight:600;">
+                Stock ප්‍රමාණය: <b id="rlo_res_stock" style="color:#14532d; font-size:13px;">0</b>
+              </div>
+            </div>
+          `;
+
+          footEl.innerHTML = `
+            <div>
+              ${item.looseInfo ? `<button type="button" class="btn btn-outline" id="rlo_reset_btn" style="color:var(--danger); border-color:var(--danger); font-size:12px; padding:6px 10px;">සාමාන්‍ය තත්ත්වයට</button>` : ''}
+            </div>
+            <div style="display:flex; gap:8px;">
+              <button type="button" class="btn btn-outline" id="rlo_cancel_btn" style="padding:6px 12px; font-size:13px;">අයින් වන්න</button>
+              <button type="button" class="btn btn-primary" id="rlo_apply_btn" style="font-weight:800; font-size:13px; padding:6px 16px;">✔ හරි (යොදන්න)</button>
+            </div>
+          `;
+
+          overlay.style.display = 'flex';
+
+          let activeMode = 'qty';
+          const looseQtyEl = overlay.querySelector('#rlo_loose_qty');
+          const looseUnitEl = overlay.querySelector('#rlo_loose_unit');
+          const cashAmountEl = overlay.querySelector('#rlo_cash_amount');
+          const cashQtyShowEl = overlay.querySelector('#rlo_cash_qty_show');
+          const resPriceEl = overlay.querySelector('#rlo_res_price');
+          const resStockEl = overlay.querySelector('#rlo_res_stock');
+          const presetsWrap = overlay.querySelector('#rlo_presets');
+          const tabQtyBtn = overlay.querySelector('#rlo_tab_qty');
+          const tabCashBtn = overlay.querySelector('#rlo_tab_cash');
+          const qtySec = overlay.querySelector('#rlo_qty_section');
+          const cashSec = overlay.querySelector('#rlo_cash_section');
+
+          const setTab = (mode) => {
+            activeMode = mode;
+            if (mode === 'qty') {
+              tabQtyBtn.style.background = 'white';
+              tabQtyBtn.style.color = 'var(--primary)';
+              tabQtyBtn.style.boxShadow = '0 1px 4px rgba(0,0,0,0.12)';
+              tabCashBtn.style.background = 'transparent';
+              tabCashBtn.style.color = 'var(--steel)';
+              tabCashBtn.style.boxShadow = 'none';
+              qtySec.style.display = 'block';
+              cashSec.style.display = 'none';
+              looseQtyEl?.focus();
+            } else {
+              tabCashBtn.style.background = 'white';
+              tabCashBtn.style.color = '#f59e0b';
+              tabCashBtn.style.boxShadow = '0 1px 4px rgba(0,0,0,0.12)';
+              tabQtyBtn.style.background = 'transparent';
+              tabQtyBtn.style.color = 'var(--steel)';
+              tabQtyBtn.style.boxShadow = 'none';
+              cashSec.style.display = 'block';
+              qtySec.style.display = 'none';
+              cashAmountEl?.focus();
+            }
+            calc();
+          };
+
+          tabQtyBtn.addEventListener('click', () => setTab('qty'));
+          tabCashBtn.addEventListener('click', () => setTab('cash'));
+
+          const updatePresets = () => {
+            const u = looseUnitEl.value;
+            let list = [];
+            if (u === 'kg') list = [0.25, 0.5, 1, 2, 5, 10, 25];
+            else if (u === 'g') list = [100, 250, 500, 750, 1000];
+            else if (u === 'in') list = [1, 2, 3, 6, 12, 18, 24];
+            else if (u === 'ft') list = [0.5, 1, 2, 3, 5, 10, 15];
+            else if (u === 'm') list = [0.5, 1, 2, 3, 5, 10];
+            else if (u === 'cm') list = [10, 25, 50, 100];
+            else if (u === 'L') list = [0.25, 0.5, 1, 2, 4, 5];
+            else if (u === 'ml') list = [100, 250, 500, 750];
+            else list = [1, 2, 3, 5, 10];
+
+            presetsWrap.innerHTML = list.map(v => `
+              <button type="button" class="btn-preset-chip" data-val="${v}" style="padding:3px 8px; font-size:11.5px; font-weight:700; background:#f0fdf4; border:1px solid #bbf7d0; border-radius:6px; cursor:pointer; color:#15803d;">
+                ${v} ${u}
+              </button>
+            `).join('');
+
+            presetsWrap.querySelectorAll('.btn-preset-chip').forEach(b => {
+              b.addEventListener('click', () => {
+                looseQtyEl.value = b.dataset.val;
+                calc();
+              });
+            });
+          };
+
+          const calc = () => {
+            const packSize = Math.max(0.0001, Number(initPackSize) || 1);
+            const packUnit = initPackUnit || 'pcs';
+            const looseUnit = looseUnitEl.value;
+            const dbItem = item.itemId ? DB.getItem(item.itemId) : null;
+            const unitPrice = (dbItem && Number(dbItem.sellPrice) > 0) ? Number(dbItem.sellPrice) : Number(item.unitPrice || 0);
+            let calcLooseQty = 0, stockQty = 0, linePrice = 0;
+
+            const hasCustomPrice = initCustomPrice !== '' && Number(initCustomPrice) > 0;
+            const autoLooseUnitPrice = (() => {
+              if (unitPrice <= 0) return 0;
+              const factor = getUnitFactor(packUnit, looseUnit);
+              const looseUnitsPerPack = packSize * factor;
+              return looseUnitsPerPack > 0 ? unitPrice / looseUnitsPerPack : 0;
+            })();
+            const effectiveLooseUnitPrice = hasCustomPrice ? (Number(initCustomPrice) * getUnitFactor(looseUnit, packUnit)) : autoLooseUnitPrice;
+
+            if (activeMode === 'qty') {
+              calcLooseQty = Math.max(0, parseFloat(looseQtyEl.value) || 0);
+              if (hasCustomPrice) {
+                linePrice = calcLooseQty * effectiveLooseUnitPrice;
+                const factor = getUnitFactor(looseUnit, packUnit);
+                stockQty = (calcLooseQty * factor) / packSize;
+              } else {
+                const factor = getUnitFactor(looseUnit, packUnit);
+                stockQty = (calcLooseQty * factor) / packSize;
+                linePrice = stockQty * unitPrice;
+              }
+            } else {
+              const cash = Math.max(0, parseFloat(cashAmountEl.value) || 0);
+              linePrice = cash;
+              if (hasCustomPrice && effectiveLooseUnitPrice > 0) {
+                const looseUnitsGiven = cash / effectiveLooseUnitPrice;
+                calcLooseQty = Math.round(looseUnitsGiven * 1000) / 1000;
+                const factor = getUnitFactor(looseUnit, packUnit);
+                stockQty = (looseUnitsGiven * factor) / packSize;
+              } else {
+                stockQty = unitPrice > 0 ? (cash / unitPrice) : 0;
+                const effectiveInPack = stockQty * packSize;
+                const factor = getUnitFactor(packUnit, looseUnit);
+                calcLooseQty = Math.round(effectiveInPack * factor * 1000) / 1000;
+              }
+              if (cashQtyShowEl) {
+                cashQtyShowEl.textContent = cash > 0
+                  ? `➜ ලැබෙන්නේ: ${calcLooseQty} ${looseUnit} (Stock: ${Math.round(stockQty * 10000)/10000} ${item.unit || 'pcs'})`
+                  : '';
+              }
+            }
+
+            linePrice = Math.round(linePrice * 100) / 100;
+            resPriceEl.textContent = fmt(linePrice);
+            const displayStock = Math.round(stockQty * 10000) / 10000;
+            resStockEl.textContent = `${displayStock} ${item.unit || 'pcs'} (${calcLooseQty} ${looseUnit})`;
+
+            return {
+              stockQty: displayStock,
+              looseQty: calcLooseQty,
+              looseUnit,
+              packSize,
+              packUnit,
+              customLooseUnitPrice: hasCustomPrice ? Number(initCustomPrice) : null,
+              linePrice,
+              shortText: `${calcLooseQty} ${looseUnit}`,
+              fullText: `${calcLooseQty} ${looseUnit} (${packSize} ${packUnit} පැකේජයකින්)`
+            };
+          };
+
+          looseQtyEl.addEventListener('input', calc);
+          looseUnitEl.addEventListener('change', () => { updatePresets(); calc(); });
+          cashAmountEl.addEventListener('input', calc);
+
+          overlay.querySelectorAll('[data-rlo-cash]').forEach(b => {
+            b.addEventListener('click', () => { cashAmountEl.value = b.dataset.rloCash; calc(); });
+          });
+
+          updatePresets();
+          calc();
+
+          const closeOverlay = () => {
+            overlay.style.display = 'none';
+          };
+
+          overlay.querySelector('#rlo_close_x')?.addEventListener('click', closeOverlay);
+          overlay.querySelector('#rlo_cancel_btn')?.addEventListener('click', closeOverlay);
+
+          overlay.querySelector('#rlo_reset_btn')?.addEventListener('click', () => {
+            closeOverlay();
+            if (typeof onReset === 'function') onReset();
+          });
+
+          overlay.querySelector('#rlo_apply_btn')?.addEventListener('click', () => {
+            const res = calc();
+            if (res.looseQty <= 0 && res.linePrice <= 0) {
+              toast('කරුණාකර වලංගු ප්‍රමාණයක් ඇතුළත් කරන්න', 'err');
+              return;
+            }
+            closeOverlay();
+            if (typeof onApply === 'function') onApply(res);
+          });
+        }
+
+        // ==============================================================
+        // MASTER RECALCULATION FUNCTION
         // ==============================================================
         function recalcAll() {
           // 1. Calculate return total
@@ -6326,17 +6752,39 @@ Views.returns = {
           if (currentSale) {
             wrap.querySelectorAll('.bill-return-qty').forEach(inp => {
               const idx = Number(inp.dataset.billLineIdx);
-              const val = Number(inp.value) || 0;
               const line = (currentSale.lines && currentSale.lines[idx]) ? currentSale.lines[idx] : null;
-              if (line && val > 0) {
-                returnTotal += (val * Number(line.unitPrice || 0));
+              if (!line) return;
+
+              let lineRefund = 0;
+              if (lineLooseReturn[idx]) {
+                lineRefund = Number(lineLooseReturn[idx].linePrice) || 0;
+              } else {
+                const val = Number(inp.value) || 0;
+                if (val > 0) {
+                  if (line.looseInfo && line.looseInfo.looseQty > 0) {
+                    const ratio = Math.min(1, val / line.looseInfo.looseQty);
+                    lineRefund = ratio * (Number(line.qty) * Number(line.unitPrice));
+                  } else {
+                    lineRefund = val * Number(line.unitPrice || 0);
+                  }
+                }
               }
+              lineRefund = Math.round(lineRefund * 100) / 100;
+              returnTotal += lineRefund;
+
+              const lbl = wrap.querySelector(`#billLineRefund_${idx}`);
+              if (lbl) lbl.textContent = fmt(lineRefund);
             });
           }
           returnTotal = Math.round(returnTotal * 100) / 100;
 
           // 2. Calculate exchange total
-          let exchangeTotal = exchangeItems.reduce((s, it) => s + ((Number(it.qty) || 0) * (Number(it.unitPrice) || 0)), 0);
+          let exchangeTotal = exchangeItems.reduce((s, it) => {
+            if (it.looseInfo && it.looseInfo.linePrice !== undefined) {
+              return s + Number(it.looseInfo.linePrice || 0);
+            }
+            return s + ((Number(it.qty) || 0) * (Number(it.unitPrice) || 0));
+          }, 0);
           exchangeTotal = Math.round(exchangeTotal * 100) / 100;
 
           // 3. Update banners and table footer totals
@@ -6382,71 +6830,69 @@ Views.returns = {
             settlementContent.innerHTML = `
               <div style="background:#fffbeb; border:1.5px solid #fde68a; border-radius:8px; padding:12px; margin-bottom:8px;">
                 ${origBillTotal !== null ? `
-                  <div style="display:flex; justify-content:space-between; margin-bottom:4px; font-size:12.5px; color:var(--steel);">
+                  <div style="display:flex; justify-content:space-between; margin-bottom:4px; font-size:12px; color:var(--steel);">
                     <span>පාරිභෝගිකයා මිලදී ගත් මුළු එකතුව (Original Bill):</span>
                     <span style="font-weight:700; color:var(--primary-dark);">${fmt(origBillTotal)}</span>
                   </div>
                 ` : ''}
                 <div style="display:flex; justify-content:space-between; margin-bottom:4px; font-size:12.5px; color:#92400e;">
                   <span>රිටන් ආ භාණ්ඩවල වටිනාකම:</span>
-                  <span style="font-weight:700;">- ${fmt(returnTotal)}</span>
+                  <span style="font-weight:700;">${fmt(returnTotal)}</span>
                 </div>
-                <div style="display:flex; justify-content:space-between; margin-bottom:6px; font-size:12.5px; color:#166534;">
+                <div style="display:flex; justify-content:space-between; margin-bottom:6px; font-size:12.5px; color:#15803d;">
                   <span>ඒ වෙනුවට ලබාගත් භාණ්ඩවල එකතුව:</span>
-                  <span style="font-weight:700;">+ ${fmt(exchangeTotal)}</span>
+                  <span style="font-weight:700;">- ${fmt(exchangeTotal)}</span>
                 </div>
-                <div style="display:flex; justify-content:space-between; align-items:center; border-top:1px dashed #fde68a; padding-top:8px;">
+                <div style="display:flex; justify-content:space-between; align-items:center; border-top:1.5px dashed #fde68a; padding-top:6px; margin-top:4px;">
                   <span style="font-size:14px; font-weight:800; color:#b45309;">
-                    ⚠️ පාරිභෝගිකයා තව ගෙවිය යුතු මුදල (Customer Extra Due):
+                    💰 පාරිභෝගිකයාගෙන් අයවිය යුතු අමතර මුදල (Customer Pays Extra):
                   </span>
-                  <span style="font-size:22px; font-weight:900; color:#b45309;" id="calculatedDiffAmt">
+                  <span style="font-size:20px; font-weight:900; color:#b45309;">
                     ${fmt(diff)}
                   </span>
                 </div>
-                <div style="margin-top:10px; display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
-                  <label style="font-size:12px; font-weight:700; color:#92400e; margin:0;">අමතර මුදල බේරුම් කිරීමේ ක්‍රමය:</label>
-                  <select class="input" id="extraPayMethod" style="width:240px; height:32px; font-size:12.5px; font-weight:700;">
-                    <option value="cash_paid" ${currentExtraMethod === 'cash_paid' || !isCreditCust ? 'selected' : ''}>💵 මුදලින් ගෙවීම (Paid by Cash)</option>
-                    <option value="credit_added" ${!isCreditCust ? 'disabled' : ''} ${currentExtraMethod === 'credit_added' && isCreditCust ? 'selected' : ''}>💳 ණයට ගැනීම (Add to Customer Credit)${!isCreditCust ? ' - ඉහතින් පාරිභෝගිකයා තෝරන්න' : ''}</option>
+              </div>
+
+              <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; align-items:center;">
+                <div class="field" style="margin-bottom:0;">
+                  <label class="field-label" style="font-size:12px; font-weight:700;">ගෙවීම් ක්‍රමය (Payment Method):</label>
+                  <select class="input" id="extraPayMethod" style="font-weight:700; height:38px;">
+                    <option value="cash_paid" ${currentExtraMethod === 'cash_paid' ? 'selected' : ''}>💵 මුදලින් අය කරගැනීම (Cash)</option>
+                    <option value="card_paid" ${currentExtraMethod === 'card_paid' ? 'selected' : ''}>💳 Card මගින් අය කරගැනීම (Card)</option>
+                    ${isCreditCust ? `<option value="credit_added" ${currentExtraMethod === 'credit_added' ? 'selected' : ''}>👤 ණය පොතට එකතු කිරීම (Add to Credit Balance)</option>` : ''}
                   </select>
-                  ${isCreditCust ? `
-                    <div style="font-size:12px; font-weight:700; color:#92400e; background:#fffbeb; padding:4px 8px; border-radius:6px; border:1px solid #fde68a;">
-                      👤 ${escapeHTML(selectedCust.name)}: ණය ${fmt(selectedCust.balance)} → <span style="color:#b45309; font-weight:800;">${fmt((selectedCust.balance || 0) + diff)}</span>
-                    </div>
-                  ` : ''}
                 </div>
 
-                <!-- Customer Paid & Change Box -->
-                <div id="returnAmountPaidWrap" style="display:${currentExtraMethod === 'cash_paid' ? 'block' : 'none'}; margin-top:10px; padding:10px 14px; background:#fff; border:1.5px solid #fde68a; border-radius:8px;">
-                  <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
-                    <div style="display:flex; align-items:center; gap:8px;">
-                      <label style="font-size:13px; font-weight:800; color:#92400e; margin:0;">
-                        💵 පාරිභෝගිකයා දුන් මුදල (Customer Paid):
+                <!-- Customer Paid / Handed & Change Box -->
+                <div id="returnAmountPaidWrap" style="display:${currentExtraMethod === 'cash_paid' ? 'block' : 'none'}; padding:8px 12px; background:#fff; border:1.5px solid #bbf7d0; border-radius:8px;">
+                  <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+                    <div style="display:flex; align-items:center; gap:6px;">
+                      <label style="font-size:12px; font-weight:800; color:#166534; margin:0;">
+                        💵 දුන් මුදල:
                       </label>
-                      <div style="position:relative; width:170px;">
-                        <span style="position:absolute; left:10px; top:50%; transform:translateY(-50%); font-weight:700; color:var(--steel); font-size:13px;">රු.</span>
-                        <input class="input" id="returnAmountPaidInput" type="number" min="0" step="any" placeholder="උදා: 10000" value="${returnAmountPaid || ''}" style="padding-left:34px; height:36px; font-size:15px; font-weight:800; color:#15803d; border-color:#f59e0b;" autocomplete="off">
+                      <div style="position:relative; width:130px;">
+                        <span style="position:absolute; left:8px; top:50%; transform:translateY(-50%); font-weight:700; color:var(--steel); font-size:12px;">රු.</span>
+                        <input class="input" id="returnAmountPaidInput" type="number" min="0" step="any" placeholder="උදා: 1000" value="${returnAmountPaid || ''}" style="padding-left:28px; height:32px; font-size:14px; font-weight:800; color:#15803d; border-color:#86efac;" autocomplete="off">
                       </div>
                     </div>
-                    <div id="returnChangeBox" style="display:none; align-items:center; gap:6px; background:#dcfce7; border:1.5px solid #86efac; border-radius:6px; padding:6px 14px; color:#166534;">
-                      <span style="font-size:13px; font-weight:700;">ඉතිරි මුදල (Change):</span>
-                      <span style="font-size:18px; font-weight:900; color:#15803d;" id="returnChangeDisplay">රු. 0.00</span>
+                    <div id="returnChangeBox" style="display:none; align-items:center; gap:4px; background:#dcfce7; border:1px solid #86efac; border-radius:6px; padding:4px 10px; color:#166534;">
+                      <span style="font-size:12px; font-weight:700;">ඉතිරි:</span>
+                      <span style="font-size:15px; font-weight:900; color:#15803d;" id="returnChangeDisplay">රු. 0.00</span>
                     </div>
-                    <div id="returnShortBox" style="display:none; align-items:center; gap:6px; background:#fee2e2; border:1.5px solid #fca5a5; border-radius:6px; padding:6px 14px; color:#991b1b; font-weight:700; font-size:13px;">
-                      <i class="ph ph-warning-circle" style="font-size:16px;"></i>
-                      <span>තව රු. <b id="returnShortDisplay">0.00</b> ක් මදි</span>
+                    <div id="returnShortBox" style="display:none; align-items:center; gap:4px; background:#fee2e2; border:1px solid #fca5a5; border-radius:6px; padding:4px 10px; color:#991b1b; font-weight:700; font-size:12px;">
+                      <span>තව රු. <b id="returnShortDisplay">0.00</b> මදි</span>
                     </div>
                   </div>
                 </div>
               </div>
             `;
           } else if (diff < 0) {
-            // Shop refunds customer!
+            // Shop refunds to customer!
             const refundAmt = Math.abs(diff);
             settlementContent.innerHTML = `
               <div style="background:#fef2f2; border:1.5px solid #fecaca; border-radius:8px; padding:12px; margin-bottom:8px;">
                 ${origBillTotal !== null ? `
-                  <div style="display:flex; justify-content:space-between; margin-bottom:4px; font-size:12.5px; color:var(--steel);">
+                  <div style="display:flex; justify-content:space-between; margin-bottom:4px; font-size:12px; color:var(--steel);">
                     <span>පාරිභෝගිකයා මිලදී ගත් මුළු එකතුව (Original Bill):</span>
                     <span style="font-weight:700; color:var(--primary-dark);">${fmt(origBillTotal)}</span>
                   </div>
@@ -6459,46 +6905,43 @@ Views.returns = {
                   <span>ඒ වෙනුවට ලබාගත් භාණ්ඩවල එකතුව:</span>
                   <span style="font-weight:700;">- ${fmt(exchangeTotal)}</span>
                 </div>
-                <div style="display:flex; justify-content:space-between; align-items:center; border-top:1px dashed #fecaca; padding-top:8px;">
+                <div style="display:flex; justify-content:space-between; align-items:center; border-top:1.5px dashed #fecaca; padding-top:6px; margin-top:4px;">
                   <span style="font-size:14px; font-weight:800; color:#dc2626;">
                     💰 පාරිභෝගිකයාට ආපසු දිය යුතු මුදල (Refund to Customer):
                   </span>
-                  <span style="font-size:22px; font-weight:900; color:#dc2626;" id="calculatedDiffAmt">
+                  <span style="font-size:20px; font-weight:900; color:#dc2626;">
                     ${fmt(refundAmt)}
                   </span>
                 </div>
-                <div style="margin-top:10px; display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
-                  <label style="font-size:12px; font-weight:700; color:#991b1b; margin:0;">ආපසු දෙන ක්‍රමය:</label>
-                  <select class="input" id="refundPayMethod" style="width:240px; height:32px; font-size:12.5px; font-weight:700;">
-                    <option value="cash_refund" ${currentRefundMethod === 'cash_refund' || !isCreditCust ? 'selected' : ''}>💵 මුදල් ආපසු දීම (Cash Refund)</option>
-                    <option value="credit_deduct" ${!isCreditCust ? 'disabled' : ''} ${currentRefundMethod === 'credit_deduct' && isCreditCust ? 'selected' : ''}>💳 ණයෙන් අඩු කිරීම (Deduct Credit)${!isCreditCust ? ' - ඉහතින් පාරිභෝගිකයා තෝරන්න' : ''}</option>
+              </div>
+
+              <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; align-items:center;">
+                <div class="field" style="margin-bottom:0;">
+                  <label class="field-label" style="font-size:12px; font-weight:700;">ආපසු දෙන ක්‍රමය (Refund Method):</label>
+                  <select class="input" id="refundPayMethod" style="font-weight:700; height:38px;">
+                    <option value="cash_refund" ${currentRefundMethod === 'cash_refund' ? 'selected' : ''}>💵 මුදල් ආපසු දීම (Cash Refund)</option>
+                    ${isCreditCust ? `<option value="credit_deduct" ${currentRefundMethod === 'credit_deduct' ? 'selected' : ''}>👤 පාරිභෝගික ණය මුදලින් අඩු කිරීම (Deduct from Credit Balance)</option>` : ''}
                   </select>
-                  ${isCreditCust ? `
-                    <div style="font-size:12px; font-weight:700; color:#1e3a8a; background:#eff6ff; padding:4px 8px; border-radius:6px; border:1px solid #bfdbfe;">
-                      👤 ${escapeHTML(selectedCust.name)}: ණය ${fmt(selectedCust.balance)} → <span style="color:#15803d; font-weight:800;">${fmt(Math.max(0, (selectedCust.balance || 0) - refundAmt))}</span>
-                    </div>
-                  ` : ''}
                 </div>
 
                 <!-- Customer Paid / Handed & Change Box -->
-                <div id="returnAmountPaidWrap" style="display:${currentRefundMethod === 'cash_refund' ? 'block' : 'none'}; margin-top:10px; padding:10px 14px; background:#fff; border:1.5px solid #fecaca; border-radius:8px;">
-                  <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
-                    <div style="display:flex; align-items:center; gap:8px;">
-                      <label style="font-size:13px; font-weight:800; color:#991b1b; margin:0;">
-                        💵 පාරිභෝගිකයා දුන් මුදල (Customer Paid / Handed):
+                <div id="returnAmountPaidWrap" style="display:${currentRefundMethod === 'cash_refund' ? 'block' : 'none'}; padding:8px 12px; background:#fff; border:1.5px solid #fecaca; border-radius:8px;">
+                  <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+                    <div style="display:flex; align-items:center; gap:6px;">
+                      <label style="font-size:12px; font-weight:800; color:#991b1b; margin:0;">
+                        💵 දුන් මුදල:
                       </label>
-                      <div style="position:relative; width:170px;">
-                        <span style="position:absolute; left:10px; top:50%; transform:translateY(-50%); font-weight:700; color:var(--steel); font-size:13px;">රු.</span>
-                        <input class="input" id="returnAmountPaidInput" type="number" min="0" step="any" placeholder="උදා: 10000" value="${returnAmountPaid || ''}" style="padding-left:34px; height:36px; font-size:15px; font-weight:800; color:#15803d; border-color:#f87171;" autocomplete="off">
+                      <div style="position:relative; width:130px;">
+                        <span style="position:absolute; left:8px; top:50%; transform:translateY(-50%); font-weight:700; color:var(--steel); font-size:12px;">රු.</span>
+                        <input class="input" id="returnAmountPaidInput" type="number" min="0" step="any" placeholder="උදා: 10000" value="${returnAmountPaid || ''}" style="padding-left:28px; height:32px; font-size:14px; font-weight:800; color:#15803d; border-color:#f87171;" autocomplete="off">
                       </div>
                     </div>
-                    <div id="returnChangeBox" style="display:none; align-items:center; gap:6px; background:#dcfce7; border:1.5px solid #86efac; border-radius:6px; padding:6px 14px; color:#166534;">
-                      <span style="font-size:13px; font-weight:700;">ඉතිරි මුදල (Change):</span>
-                      <span style="font-size:18px; font-weight:900; color:#15803d;" id="returnChangeDisplay">රු. 0.00</span>
+                    <div id="returnChangeBox" style="display:none; align-items:center; gap:4px; background:#dcfce7; border:1px solid #86efac; border-radius:6px; padding:4px 10px; color:#166534;">
+                      <span style="font-size:12px; font-weight:700;">ඉතිරි:</span>
+                      <span style="font-size:15px; font-weight:900; color:#15803d;" id="returnChangeDisplay">රු. 0.00</span>
                     </div>
-                    <div id="returnShortBox" style="display:none; align-items:center; gap:6px; background:#fee2e2; border:1.5px solid #fca5a5; border-radius:6px; padding:6px 14px; color:#991b1b; font-weight:700; font-size:13px;">
-                      <i class="ph ph-warning-circle" style="font-size:16px;"></i>
-                      <span>තව රු. <b id="returnShortDisplay">0.00</b> ක් මදි</span>
+                    <div id="returnShortBox" style="display:none; align-items:center; gap:4px; background:#fee2e2; border:1px solid #fca5a5; border-radius:6px; padding:4px 10px; color:#991b1b; font-weight:700; font-size:12px;">
+                      <span>තව රු. <b id="returnShortDisplay">0.00</b> මදි</span>
                     </div>
                   </div>
                 </div>
@@ -6582,7 +7025,6 @@ Views.returns = {
           });
         }
 
-
         // ===================================
         // MODE 1: Load Bill
         // ===================================
@@ -6608,7 +7050,6 @@ Views.returns = {
 
           billContainer.innerHTML = `
             <div style="background:#fff; border:1px solid var(--border); border-radius:8px; padding:12px; margin-bottom:8px;">
-              <!-- BILL HEADER WITH CUSTOMER PURCHASE TOTAL PROMINENTLY DISPLAYED -->
               <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; flex-wrap:wrap; gap:8px; padding-bottom:8px; border-bottom:1px solid var(--border);">
                 <div>
                   <div style="display:flex; align-items:center; gap:8px;">
@@ -6621,7 +7062,6 @@ Views.returns = {
                   </div>
                 </div>
 
-                <!-- ORIGINAL PURCHASED TOTAL CARD -->
                 <div style="background:var(--paper); border:1.5px solid var(--border); border-radius:8px; padding:6px 14px; text-align:right;">
                   <div style="font-size:11px; font-weight:700; color:var(--steel); text-transform:uppercase;">
                     පාරිභෝගිකයා මිලදී ගත් මුළු එකතුව (Total Bill):
@@ -6642,25 +7082,41 @@ Views.returns = {
                       <th class="num" style="padding:7px 8px; font-size:12px; width:95px;">මිල (Price)</th>
                       <th class="num" style="padding:7px 8px; font-size:12px; width:85px;">ගත් ගණන</th>
                       <th class="num" style="padding:7px 8px; font-size:12px; width:100px;">ගත් මුදල</th>
-                      <th style="padding:7px 8px; font-size:12px; width:100px; text-align:center;">රිටන් ගණන</th>
+                      <th style="padding:7px 8px; font-size:12px; width:145px; text-align:center;">රිටන් ගණන</th>
                       <th class="num" style="padding:7px 8px; font-size:12px; width:110px;">රිටන් මුදල</th>
                     </tr>
                   </thead>
                   <tbody>
                     ${sale.lines.map((l, idx) => {
-                      const qtyText = l.looseInfo ? `${l.looseInfo.looseQty} ${escapeHTML(l.looseInfo.looseUnit || '')}` : `${l.qty} ${escapeHTML(l.unit || '')}`;
+                      const isOrigLoose = Boolean(l.looseInfo);
+                      const hasActiveLoose = Boolean(lineLooseReturn[idx]);
+                      const maxInputVal = isOrigLoose ? l.looseInfo.looseQty : l.qty;
+                      const unitDisplay = isOrigLoose ? l.looseInfo.looseUnit : (l.unit || 'pcs');
+                      const qtyText = isOrigLoose ? `${l.looseInfo.looseQty} ${escapeHTML(l.looseInfo.looseUnit || '')}` : `${l.qty} ${escapeHTML(l.unit || '')}`;
                       const purchasedLineTotal = Number(l.qty) * Number(l.unitPrice);
+                      const currentInputVal = hasActiveLoose ? lineLooseReturn[idx].looseQty : 0;
                       return `
                         <tr style="border-bottom:1px solid var(--border);">
-                          <td style="padding:7px 8px; font-weight:600; font-size:12.5px;">${escapeHTML(l.name)}</td>
+                          <td style="padding:7px 8px; font-weight:600; font-size:12.5px;">
+                            ${escapeHTML(l.name)}
+                            ${isOrigLoose ? `<div style="font-size:11px; color:#15803d; font-weight:700;">⚖️ මුල් බිලේ ලිහිල්: ${escapeHTML(l.looseInfo.shortText || '')}</div>` : ''}
+                            ${hasActiveLoose ? `<div style="font-size:11px; color:#b91c1c; font-weight:700;">↩️ රිටන් ලිහිල්: ${escapeHTML(lineLooseReturn[idx].shortText || '')}</div>` : ''}
+                          </td>
                           <td class="num" style="padding:7px 8px; font-size:12.5px;">${fmt(l.unitPrice)}</td>
                           <td class="num" style="padding:7px 8px; color:var(--steel); font-size:12.5px;">${qtyText}</td>
                           <td class="num" style="padding:7px 8px; font-weight:700; color:var(--charcoal); font-size:12.5px;">${fmt(purchasedLineTotal)}</td>
                           <td style="padding:7px 8px; text-align:center;">
-                            <input type="number" min="0" max="${l.qty}" step="any" value="0" data-bill-line-idx="${idx}" class="input bill-return-qty" style="width:75px; height:30px; font-size:13px; font-weight:700; text-align:center; padding:2px 4px;">
+                            <div style="display:flex; align-items:center; justify-content:center; gap:3px;">
+                              <input type="number" min="0" max="${hasActiveLoose ? lineLooseReturn[idx].looseQty : maxInputVal}" step="any" value="${currentInputVal}" data-bill-line-idx="${idx}" class="input bill-return-qty" style="width:60px; height:28px; font-size:12px; font-weight:700; text-align:center; padding:2px 3px;" ${hasActiveLoose ? 'readonly' : ''}>
+                              <span style="font-size:11px; font-weight:700; color:var(--steel); min-width:18px;">${hasActiveLoose ? lineLooseReturn[idx].looseUnit : unitDisplay}</span>
+                              <button type="button" class="btn-loose-toggle" data-bill-loose-idx="${idx}" title="ලිහිල් රිටන් කිරීම" style="padding:2px 5px; font-size:11px; height:28px; border-radius:4px; border:1px solid var(--primary); background:${hasActiveLoose ? 'var(--primary)' : '#fff'}; color:${hasActiveLoose ? '#fff' : 'var(--primary)'}; cursor:pointer; font-weight:700; display:inline-flex; align-items:center; gap:2px;">
+                                <span style="font-size:12px;">⚖️</span>
+                                <span>${hasActiveLoose ? escapeHTML(lineLooseReturn[idx].shortText) : 'ලිහිල්'}</span>
+                              </button>
+                            </div>
                           </td>
                           <td class="num" style="padding:7px 8px; font-weight:700; color:var(--danger); font-size:12.5px;" id="billLineRefund_${idx}">
-                            රු. 0.00
+                            ${hasActiveLoose ? fmt(lineLooseReturn[idx].linePrice) : 'රු. 0.00'}
                           </td>
                         </tr>
                       `;
@@ -6683,15 +7139,54 @@ Views.returns = {
             ['input', 'change', 'keyup', 'paste'].forEach(evtType => {
               inp.addEventListener(evtType, () => {
                 const idx = Number(inp.dataset.billLineIdx);
+                const line = sale.lines[idx];
                 const max = Number(inp.max) || 0;
                 let val = Number(inp.value) || 0;
                 if (val < 0) { val = 0; inp.value = 0; }
                 if (val > max) { val = max; inp.value = max; }
-                const line = sale.lines[idx];
-                const lineRefund = val * Number(line.unitPrice || 0);
+                
+                let lineRefund = 0;
+                if (line.looseInfo && line.looseInfo.looseQty > 0) {
+                  const ratio = Math.min(1, val / line.looseInfo.looseQty);
+                  lineRefund = ratio * (Number(line.qty) * Number(line.unitPrice));
+                } else {
+                  lineRefund = val * Number(line.unitPrice || 0);
+                }
                 const lbl = wrap.querySelector(`#billLineRefund_${idx}`);
                 if (lbl) lbl.textContent = fmt(lineRefund);
                 recalcAll();
+              });
+            });
+          });
+
+          wrap.querySelectorAll('[data-bill-loose-idx]').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+              const idx = Number(e.currentTarget.dataset.billLooseIdx);
+              const line = sale.lines[idx];
+              if (!line) return;
+              const dbItem = line.itemId ? DB.getItem(line.itemId) : null;
+              const lineItemForModal = {
+                itemId: line.itemId,
+                name: line.name,
+                unit: line.unit || 'pcs',
+                unitPrice: line.unitPrice,
+                maxQty: line.qty,
+                packSize: line.looseInfo?.packSize || dbItem?.packSize,
+                packUnit: line.looseInfo?.packUnit || dbItem?.packUnit,
+                loosePrice: line.looseInfo?.customLooseUnitPrice || dbItem?.loosePrice,
+                looseInfo: lineLooseReturn[idx] || line.looseInfo || null
+              };
+              openReturnLooseModal({
+                item: lineItemForModal,
+                title: `⚖️ ලිහිල් රිටන් කිරීම — ${line.name}`,
+                onApply: (res) => {
+                  lineLooseReturn[idx] = res;
+                  renderBillLines(sale);
+                },
+                onReset: () => {
+                  delete lineLooseReturn[idx];
+                  renderBillLines(sale);
+                }
               });
             });
           });
@@ -6710,10 +7205,12 @@ Views.returns = {
           if (!sale) {
             toast('එම අංකය සහිත බිල්පතක් සොයාගත නොහැකි විය!', 'err');
             currentSale = null;
+            lineLooseReturn = {};
             renderBillLines(null);
             return;
           }
           currentSale = sale;
+          lineLooseReturn = {};
           renderBillLines(sale);
         };
 
@@ -6745,8 +7242,8 @@ Views.returns = {
                 <thead>
                   <tr style="background:#f0fdf4; border-bottom:1px solid #bbf7d0;">
                     <th style="padding:6px 8px; font-size:12px; color:#166534;">ලබාගත් නව භාණ්ඩය</th>
-                    <th class="num" style="padding:6px 8px; font-size:12px; width:100px; color:#166534;">මිල (Price)</th>
-                    <th style="padding:6px 8px; font-size:12px; width:85px; text-align:center; color:#166534;">ප්‍රමාණය</th>
+                    <th class="num" style="padding:6px 8px; font-size:12px; width:95px; color:#166534;">මිල (Price)</th>
+                    <th style="padding:6px 8px; font-size:12px; width:135px; text-align:center; color:#166534;">ප්‍රමාණය</th>
                     <th class="num" style="padding:6px 8px; font-size:12px; width:105px; color:#166534;">මුදල</th>
                     <th style="width:36px;"></th>
                   </tr>
@@ -6754,15 +7251,25 @@ Views.returns = {
                 <tbody>
                   ${exchangeItems.map((item, idx) => `
                     <tr style="border-bottom:1px solid #dcfce7;">
-                      <td style="padding:6px 8px; font-weight:600; font-size:12.5px;">${escapeHTML(item.name)}</td>
+                      <td style="padding:6px 8px; font-weight:600; font-size:12.5px;">
+                        ${escapeHTML(item.name)}
+                        ${item.looseInfo ? `<div style="font-size:11px; color:#15803d; font-weight:700;">⚖️ ලිහිල්: ${escapeHTML(item.looseInfo.shortText || '')}</div>` : ''}
+                      </td>
                       <td class="num" style="padding:6px 8px;">
-                        <input type="number" min="0" step="any" value="${item.unitPrice}" data-exc-price-idx="${idx}" class="input" style="width:80px; height:28px; font-size:12.5px; text-align:right; padding:2px 4px;">
+                        <input type="number" min="0" step="any" value="${item.unitPrice}" data-exc-price-idx="${idx}" class="input" style="width:75px; height:28px; font-size:12px; text-align:right; padding:2px 4px;" ${item.looseInfo ? 'readonly' : ''}>
                       </td>
                       <td style="padding:6px 8px; text-align:center;">
-                        <input type="number" min="0.01" step="any" value="${item.qty}" data-exc-qty-idx="${idx}" class="input" style="width:70px; height:28px; font-size:12.5px; text-align:center; font-weight:700; padding:2px 4px;">
+                        <div style="display:flex; align-items:center; justify-content:center; gap:3px;">
+                          <input type="number" min="0.0001" step="any" value="${item.looseInfo ? item.looseInfo.looseQty : item.qty}" data-exc-qty-idx="${idx}" class="input" style="width:55px; height:28px; font-size:12px; text-align:center; font-weight:700; padding:2px 3px;" ${item.looseInfo ? 'readonly' : ''}>
+                          <span style="font-size:11px; font-weight:700; color:var(--steel); min-width:18px;">${item.looseInfo ? item.looseInfo.looseUnit : (item.unit || 'pcs')}</span>
+                          <button type="button" class="btn-loose-toggle" data-exc-loose-idx="${idx}" title="ලිහිල් කැල්කියුලේටරය" style="padding:2px 5px; font-size:11px; height:28px; border-radius:4px; border:1px solid var(--primary); background:${item.looseInfo ? 'var(--primary)' : '#fff'}; color:${item.looseInfo ? '#fff' : 'var(--primary)'}; cursor:pointer; font-weight:700; display:inline-flex; align-items:center; gap:2px;">
+                            <span style="font-size:12px;">⚖️</span>
+                            <span>${item.looseInfo ? escapeHTML(item.looseInfo.shortText) : 'ලිහිල්'}</span>
+                          </button>
+                        </div>
                       </td>
                       <td class="num" style="padding:6px 8px; font-weight:700; color:#15803d; font-size:12.5px;">
-                        ${fmt(item.qty * item.unitPrice)}
+                        ${fmt(item.looseInfo && item.looseInfo.linePrice !== undefined ? item.looseInfo.linePrice : (item.qty * item.unitPrice))}
                       </td>
                       <td style="padding:6px 4px; text-align:center;">
                         <button type="button" class="icon-btn" data-exc-del-idx="${idx}" style="color:var(--steel); font-size:15px;">✕</button>
@@ -6802,6 +7309,45 @@ Views.returns = {
             });
           });
 
+          wrap.querySelectorAll('[data-exc-loose-idx]').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+              const idx = Number(e.currentTarget.dataset.excLooseIdx);
+              const it = exchangeItems[idx];
+              if (!it) return;
+              const dbItem = it.itemId ? DB.getItem(it.itemId) : null;
+              const excItemForModal = {
+                itemId: it.itemId,
+                name: it.name,
+                unit: it.unit || 'pcs',
+                unitPrice: (dbItem && dbItem.sellPrice) ? dbItem.sellPrice : it.unitPrice,
+                maxQty: (dbItem && dbItem.qty !== undefined) ? dbItem.qty : 9999,
+                packSize: it.looseInfo?.packSize || dbItem?.packSize,
+                packUnit: it.looseInfo?.packUnit || dbItem?.packUnit,
+                loosePrice: it.looseInfo?.customLooseUnitPrice || dbItem?.loosePrice,
+                looseInfo: it.looseInfo || null
+              };
+              openReturnLooseModal({
+                item: excItemForModal,
+                title: `⚖️ ලිහිල් මාරුකිරීම — ${it.name}`,
+                onApply: (res) => {
+                  exchangeItems[idx].qty = res.stockQty;
+                  exchangeItems[idx].unitPrice = (res.linePrice > 0 && res.stockQty > 0) ? (res.linePrice / res.stockQty) : exchangeItems[idx].unitPrice;
+                  exchangeItems[idx].looseInfo = res;
+                  renderExchangeTable();
+                },
+                onReset: () => {
+                  exchangeItems[idx].looseInfo = null;
+                  const origDb = DB.getItem(exchangeItems[idx].itemId);
+                  if (origDb) {
+                    exchangeItems[idx].unitPrice = origDb.sellPrice || 0;
+                    exchangeItems[idx].qty = 1;
+                  }
+                  renderExchangeTable();
+                }
+              });
+            });
+          });
+
           recalcAll();
         };
 
@@ -6833,7 +7379,7 @@ Views.returns = {
                 if (it) {
                   const existingIdx = exchangeItems.findIndex(x => x.itemId === it.id);
                   if (existingIdx !== -1) exchangeItems[existingIdx].qty += 1;
-                  else exchangeItems.push({ itemId: it.id, name: it.name, unit: it.unit || 'pcs', unitPrice: it.sellPrice || 0, qty: 1 });
+                  else exchangeItems.push({ itemId: it.id, name: it.name, unit: it.unit || 'pcs', unitPrice: it.sellPrice || 0, qty: 1, looseInfo: null });
                   exchangeSearch.value = '';
                   exchangeSuggest.classList.remove('open');
                   renderExchangeTable();
@@ -6896,19 +7442,63 @@ Views.returns = {
 
           wrap.querySelectorAll('.bill-return-qty').forEach(inp => {
             const idx = Number(inp.dataset.billLineIdx);
-            const val = Number(inp.value) || 0;
             const line = currentSale.lines[idx];
-            if (line && val > 0) {
+            if (!line) return;
+            const looseRet = lineLooseReturn[idx];
+
+            if (looseRet && looseRet.stockQty > 0) {
               returnItemsList.push({
                 itemId: line.itemId,
                 name: line.name,
                 unit: line.unit || 'pcs',
                 unitPrice: line.unitPrice,
-                qty: val,
-                returnQty: val,
-                lineTotal: val * line.unitPrice,
-                looseInfo: line.looseInfo || null
+                qty: looseRet.stockQty,
+                returnQty: looseRet.stockQty,
+                lineTotal: looseRet.linePrice,
+                looseInfo: {
+                  isLoose: true,
+                  looseQty: looseRet.looseQty,
+                  looseUnit: looseRet.looseUnit,
+                  packSize: looseRet.packSize,
+                  packUnit: looseRet.packUnit,
+                  shortText: looseRet.shortText,
+                  fullText: looseRet.fullText
+                }
               });
+            } else {
+              const val = Number(inp.value) || 0;
+              if (val > 0) {
+                if (line.looseInfo && line.looseInfo.looseQty > 0) {
+                  const ratio = Math.min(1, val / line.looseInfo.looseQty);
+                  const refundAmt = Math.round(ratio * (line.qty * line.unitPrice) * 100) / 100;
+                  const stockQty = Math.round(ratio * Number(line.qty) * 10000) / 10000;
+                  returnItemsList.push({
+                    itemId: line.itemId,
+                    name: line.name,
+                    unit: line.unit || 'pcs',
+                    unitPrice: line.unitPrice,
+                    qty: stockQty,
+                    returnQty: stockQty,
+                    lineTotal: refundAmt,
+                    looseInfo: {
+                      ...line.looseInfo,
+                      looseQty: val,
+                      shortText: `${val} ${line.looseInfo.looseUnit || ''}`
+                    }
+                  });
+                } else {
+                  returnItemsList.push({
+                    itemId: line.itemId,
+                    name: line.name,
+                    unit: line.unit || 'pcs',
+                    unitPrice: line.unitPrice,
+                    qty: val,
+                    returnQty: val,
+                    lineTotal: Math.round(val * line.unitPrice * 100) / 100,
+                    looseInfo: null
+                  });
+                }
+              }
             }
           });
 
@@ -6917,14 +7507,28 @@ Views.returns = {
             return;
           }
 
-          const exchangeList = exchangeItems.map(it => ({
-            itemId: it.itemId,
-            name: it.name,
-            unit: it.unit || 'pcs',
-            unitPrice: it.unitPrice,
-            qty: it.qty,
-            lineTotal: it.qty * it.unitPrice
-          })).filter(x => x.qty > 0);
+          const exchangeList = exchangeItems.map(it => {
+            const lineTotal = it.looseInfo && it.looseInfo.linePrice !== undefined
+              ? Number(it.looseInfo.linePrice)
+              : Math.round(it.qty * it.unitPrice * 100) / 100;
+            return {
+              itemId: it.itemId,
+              name: it.name,
+              unit: it.unit || 'pcs',
+              unitPrice: it.unitPrice,
+              qty: it.qty,
+              lineTotal,
+              looseInfo: it.looseInfo ? {
+                isLoose: true,
+                looseQty: it.looseInfo.looseQty,
+                looseUnit: it.looseInfo.looseUnit,
+                packSize: it.looseInfo.packSize,
+                packUnit: it.looseInfo.packUnit,
+                shortText: it.looseInfo.shortText,
+                fullText: it.looseInfo.fullText
+              } : null
+            };
+          }).filter(x => x.qty > 0);
 
           const returnTotal = returnItemsList.reduce((s, it) => s + it.lineTotal, 0);
           const exchangeTotal = exchangeList.reduce((s, it) => s + it.lineTotal, 0);
@@ -7075,13 +7679,14 @@ Views.returns = {
               <tbody>
                 ${excList.map(it => {
                   const lineAmt = it.lineTotal || (it.qty * it.unitPrice);
+                  const qtyText = it.looseInfo ? `${it.looseInfo.looseQty} ${it.looseInfo.looseUnit || ''}` : `${it.qty} ${escapeHTML(it.unit || 'pcs')}`;
                   return `
                     <tr>
-                      <td colspan="4" style="padding-top:2px; font-weight:700; color:#000; font-size:10px; word-break:break-word;">${escapeHTML(it.name)}</td>
+                      <td colspan="4" style="padding-top:2px; font-weight:700; color:#000; font-size:10px; word-break:break-word;">${escapeHTML(it.name)}${it.looseInfo ? ` [ලිහිල්: ${escapeHTML(it.looseInfo.shortText || '')}]` : ''}</td>
                     </tr>
                     <tr style="border-bottom:1px dotted #ccc;">
                       <td style="padding-bottom:2px; font-size:9px; color:#444;"></td>
-                      <td style="text-align:center; padding-bottom:2px; font-size:9.5px; white-space:nowrap;">${it.qty} ${escapeHTML(it.unit || 'pcs')}</td>
+                      <td style="text-align:center; padding-bottom:2px; font-size:9.5px; white-space:nowrap;">${qtyText}</td>
                       <td style="text-align:right; padding-bottom:2px; font-size:9.5px; white-space:nowrap;">${fmt(it.unitPrice)}</td>
                       <td style="text-align:right; padding-bottom:2px; font-weight:700; font-size:9.5px; white-space:nowrap;">${fmt(lineAmt)}</td>
                     </tr>

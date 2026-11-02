@@ -655,6 +655,19 @@ module.exports = {
                         const costPrice = Number(item.costPrice) || 0;
                         await run(`UPDATE items SET qty = ?, costPrice = CASE WHEN ? > 0 THEN ? ELSE costPrice END WHERE id = ?`, [existing.qty + addQty, costPrice, costPrice, item.itemId]);
                     }
+                } else if (item.name) {
+                    const existingByName = await get(`SELECT id, qty FROM items WHERE LOWER(TRIM(name)) = LOWER(TRIM(?))`, [item.name]);
+                    if (existingByName) {
+                        const addQty = Number(item.qty) || 0;
+                        const costPrice = Number(item.costPrice) || 0;
+                        await run(`UPDATE items SET qty = ?, costPrice = CASE WHEN ? > 0 THEN ? ELSE costPrice END WHERE id = ?`, [existingByName.qty + addQty, costPrice, costPrice, existingByName.id]);
+                    } else {
+                        const addQty = Number(item.qty) || 0;
+                        const costPrice = Number(item.costPrice) || 0;
+                        const unit = item.unit || 'pcs';
+                        await run(`INSERT INTO items (name, barcode, category, subCategory, unit, costPrice, sellPrice, qty, reorderLevel, description, image, packSize, packUnit, loosePrice, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                            [item.name.trim(), '', 'වෙනත්', '', unit, costPrice, costPrice, addQty, 5, '', '', 1, '', 0, Date.now()]);
+                    }
                 }
             }
         }
