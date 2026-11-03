@@ -234,6 +234,7 @@ module.exports = {
         try { await run(`ALTER TABLE returns ADD COLUMN extraPaid REAL DEFAULT 0`); } catch(e) {}
         try { await run(`ALTER TABLE returns ADD COLUMN amountPaid REAL DEFAULT 0`); } catch(e) {}
         try { await run(`ALTER TABLE returns ADD COLUMN changeAmount REAL DEFAULT 0`); } catch(e) {}
+        try { await run(`ALTER TABLE returns ADD COLUMN deliveryFee REAL DEFAULT 0`); } catch(e) {}
 
         const settings = await get(`SELECT * FROM settings WHERE key = 'shopName'`);
         if (!settings) {
@@ -738,9 +739,10 @@ module.exports = {
         const itemsJson = JSON.stringify(itemsList);
         const exchangeJson = JSON.stringify(exchangeList);
 
+        const deliveryFee = Math.max(0, Number(ret.deliveryFee) || 0);
         const returnTotal = Math.round((Number(ret.returnTotal) || itemsList.reduce((s, it) => s + (Number(it.lineTotal) || ((Number(it.qty || it.returnQty) || 0) * (Number(it.unitPrice) || 0))), 0)) * 100) / 100;
         const exchangeTotal = Math.round((Number(ret.exchangeTotal) || exchangeList.reduce((s, it) => s + (Number(it.lineTotal) || ((Number(it.qty) || 0) * (Number(it.unitPrice) || 0))), 0)) * 100) / 100;
-        const netAmount = Math.round((exchangeTotal - returnTotal) * 100) / 100; // positive = customer owes; negative = shop refunds
+        const netAmount = Math.round(((exchangeTotal + deliveryFee) - returnTotal) * 100) / 100; // positive = customer owes; negative = shop refunds
 
         let refundAmount = 0;
         let extraPaid = 0;
@@ -822,17 +824,20 @@ module.exports = {
         const changeAmount = Number(ret.changeAmount) || 0;
 
         // 4. Insert return record
+        try { await run(`ALTER TABLE returns ADD COLUMN deliveryFee REAL DEFAULT 0`); } catch(e) {}
         const res = await run(
             `INSERT INTO returns (
                 returnNo, date, saleId, customerId, customerName,
                 items, exchangeItems, returnTotal, exchangeTotal,
+                deliveryFee,
                 netAmount, refundAmount, extraPaid, settlementType,
                 amountPaid, changeAmount,
                 refundType, reason, note, createdAt
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
             [
                 returnNo, date, saleId, customerId, customerName,
                 itemsJson, exchangeJson, returnTotal, exchangeTotal,
+                deliveryFee,
                 netAmount, refundAmount, extraPaid, settlementType,
                 amountPaid, changeAmount,
                 refundType, reason, note, Date.now()

@@ -6194,6 +6194,7 @@ Views.returns = {
                   <td style="font-size:12px; line-height:1.4;">
                     ${excSummary}
                     ${excList.length ? `<div style="font-size:11px; font-weight:700; color:var(--success); margin-top:2px;">එකතුව: ${fmt(excTotal)}</div>` : ''}
+                    ${r.deliveryFee > 0 ? `<div style="font-size:11px; font-weight:700; color:#b45309; margin-top:1px;">🚚 ප්‍රවාහන ගාස්තු: ${fmt(r.deliveryFee)}</div>` : ''}
                   </td>
                   <td style="vertical-align:middle;">
                     ${settlementHTML}
@@ -6329,11 +6330,24 @@ Views.returns = {
             <div class="text-muted small" style="text-align:center; padding:8px 0; color:#166534;">අලුතින් භාණ්ඩ ලබාගන්නේ නම් ඉහතින් සොයා එකතු කරන්න. (භාණ්ඩ නොගන්නේ නම් හිස්ව තබන්න)</div>
           </div>
 
-          <div style="display:flex; justify-content:space-between; align-items:center; margin-top:8px; padding-top:8px; border-top:1px dashed #bbf7d0;">
-            <div style="font-weight:700; color:#166534; font-size:13px;">
-              ඒ වෙනුවට ලබාගත් භාණ්ඩවල එකතුව (Exchange Items Total):
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-top:10px; padding-top:10px; border-top:1px dashed #bbf7d0; flex-wrap:wrap; gap:10px;">
+            <div style="display:flex; align-items:center; gap:8px;">
+              <label for="returnDeliveryFeeInput" style="font-weight:700; color:#166534; font-size:12.5px; margin:0; display:flex; align-items:center; gap:4px;">
+                <i class="ph ph-truck" style="font-size:18px; color:#166534;"></i> ප්‍රවාහන ගාස්තු (Transport / Delivery):
+              </label>
+              <div style="position:relative; width:130px;">
+                <span style="position:absolute; left:8px; top:50%; transform:translateY(-50%); font-weight:700; color:var(--steel); font-size:11px;">රු.</span>
+                <input class="input" id="returnDeliveryFeeInput" type="number" min="0" step="any" placeholder="0.00" value="" style="height:32px; font-size:13px; font-weight:800; padding-left:26px; background:#fff; border-color:#86efac; color:#166534; text-align:right;">
+              </div>
+              <button type="button" id="clearReturnDeliveryFeeBtn" title="ප්‍රවාහන ගාස්තු ඉවත් කරන්න" style="height:32px; width:32px; border-radius:6px; border:1px solid #bbf7d0; background:#fff; color:var(--steel); cursor:pointer; display:inline-flex; align-items:center; justify-content:center; font-size:13px; font-weight:700;">✕</button>
             </div>
-            <div style="font-size:18px; font-weight:800; color:#15803d;" id="liveExchangeTotalBanner">රු. 0.00</div>
+
+            <div style="display:flex; align-items:center; gap:8px;">
+              <div style="font-weight:700; color:#166534; font-size:13px;">
+                ඒ වෙනුවට ලබාගත් භාණ්ඩවල එකතුව:
+              </div>
+              <div style="font-size:18px; font-weight:800; color:#15803d;" id="liveExchangeTotalBanner">රු. 0.00</div>
+            </div>
           </div>
         </div>
 
@@ -6801,7 +6815,10 @@ Views.returns = {
           const settlementContent = wrap.querySelector('#settlementCalculationContent');
           if (!settlementContent) return;
 
-          const diff = Math.round((exchangeTotal - returnTotal) * 100) / 100;
+          const delivFeeEl = wrap.querySelector('#returnDeliveryFeeInput');
+          const deliveryFee = delivFeeEl ? Math.max(0, Number(delivFeeEl.value) || 0) : 0;
+          const totalNewCharge = Math.round((exchangeTotal + deliveryFee) * 100) / 100;
+          const diff = Math.round((totalNewCharge - returnTotal) * 100) / 100;
           const selectedCustId = custSelect && custSelect.value ? Number(custSelect.value) : null;
           const selectedCust = selectedCustId ? DB.getCustomer(selectedCustId) : null;
           const isCreditCust = Boolean(selectedCust);
@@ -6839,10 +6856,16 @@ Views.returns = {
                   <span>රිටන් ආ භාණ්ඩවල වටිනාකම:</span>
                   <span style="font-weight:700;">${fmt(returnTotal)}</span>
                 </div>
-                <div style="display:flex; justify-content:space-between; margin-bottom:6px; font-size:12.5px; color:#15803d;">
+                <div style="display:flex; justify-content:space-between; margin-bottom:4px; font-size:12.5px; color:#15803d;">
                   <span>ඒ වෙනුවට ලබාගත් භාණ්ඩවල එකතුව:</span>
                   <span style="font-weight:700;">- ${fmt(exchangeTotal)}</span>
                 </div>
+                ${deliveryFee > 0 ? `
+                  <div style="display:flex; justify-content:space-between; margin-bottom:6px; font-size:12.5px; color:#b45309; font-weight:700;">
+                    <span>🚚 ප්‍රවාහන ගාස්තු (Transport / Delivery Fee):</span>
+                    <span>- ${fmt(deliveryFee)}</span>
+                  </div>
+                ` : ''}
                 <div style="display:flex; justify-content:space-between; align-items:center; border-top:1.5px dashed #fde68a; padding-top:6px; margin-top:4px;">
                   <span style="font-size:14px; font-weight:800; color:#b45309;">
                     💰 පාරිභෝගිකයාගෙන් අයවිය යුතු අමතර මුදල (Customer Pays Extra):
@@ -6901,10 +6924,16 @@ Views.returns = {
                   <span>රිටන් ආ භාණ්ඩවල වටිනාකම:</span>
                   <span style="font-weight:700;">${fmt(returnTotal)}</span>
                 </div>
-                <div style="display:flex; justify-content:space-between; margin-bottom:6px; font-size:12.5px; color:#166534;">
+                <div style="display:flex; justify-content:space-between; margin-bottom:4px; font-size:12.5px; color:#166534;">
                   <span>ඒ වෙනුවට ලබාගත් භාණ්ඩවල එකතුව:</span>
                   <span style="font-weight:700;">- ${fmt(exchangeTotal)}</span>
                 </div>
+                ${deliveryFee > 0 ? `
+                  <div style="display:flex; justify-content:space-between; margin-bottom:6px; font-size:12.5px; color:#b45309; font-weight:700;">
+                    <span>🚚 ප්‍රවාහන ගාස්තු (Transport / Delivery Fee):</span>
+                    <span>- ${fmt(deliveryFee)}</span>
+                  </div>
+                ` : ''}
                 <div style="display:flex; justify-content:space-between; align-items:center; border-top:1.5px dashed #fecaca; padding-top:6px; margin-top:4px;">
                   <span style="font-size:14px; font-weight:800; color:#dc2626;">
                     💰 පාරිභෝගිකයාට ආපසු දිය යුතු මුදල (Refund to Customer):
@@ -7395,6 +7424,19 @@ Views.returns = {
           });
         }
 
+        const retDelivInp = wrap.querySelector('#returnDeliveryFeeInput');
+        const retClearDelivBtn = wrap.querySelector('#clearReturnDeliveryFeeBtn');
+        if (retDelivInp) {
+          retDelivInp.addEventListener('input', recalcAll);
+          retDelivInp.addEventListener('change', recalcAll);
+        }
+        if (retClearDelivBtn && retDelivInp) {
+          retClearDelivBtn.addEventListener('click', () => {
+            retDelivInp.value = '';
+            recalcAll();
+          });
+        }
+
         custSelect?.addEventListener('change', recalcAll);
 
         const custFilter = wrap.querySelector('#custQuickFilter');
@@ -7530,9 +7572,12 @@ Views.returns = {
             };
           }).filter(x => x.qty > 0);
 
+          const delivInp = wrap.querySelector('#returnDeliveryFeeInput');
+          const deliveryFee = delivInp ? Math.max(0, Number(delivInp.value) || 0) : 0;
           const returnTotal = returnItemsList.reduce((s, it) => s + it.lineTotal, 0);
           const exchangeTotal = exchangeList.reduce((s, it) => s + it.lineTotal, 0);
-          const diff = Math.round((exchangeTotal - returnTotal) * 100) / 100;
+          const totalNewCharge = Math.round((exchangeTotal + deliveryFee) * 100) / 100;
+          const diff = Math.round((totalNewCharge - returnTotal) * 100) / 100;
 
           let settlementType = 'even';
           if (diff > 0) {
@@ -7556,6 +7601,7 @@ Views.returns = {
               customerName,
               items: returnItemsList,
               exchangeItems: exchangeList,
+              deliveryFee,
               returnTotal,
               exchangeTotal,
               netAmount: diff,
@@ -7600,7 +7646,9 @@ Views.returns = {
 
     const returnTotal = Number(ret.returnTotal) || (itemsList.reduce((s, it) => s + (it.lineTotal || ((it.qty || it.returnQty) * it.unitPrice)), 0));
     const exchangeTotal = Number(ret.exchangeTotal) || (excList.reduce((s, it) => s + (it.lineTotal || (it.qty * it.unitPrice)), 0));
-    const netDiff = Math.round((exchangeTotal - returnTotal) * 100) / 100;
+    const deliveryFee = Number(ret.deliveryFee) || 0;
+    const totalNewCharges = exchangeTotal + deliveryFee;
+    const netDiff = Math.round((totalNewCharges - returnTotal) * 100) / 100;
     const originalSale = ret.saleId ? DB.getSale(ret.saleId) : null;
 
     const retCode = ret.returnNo || ('RET-' + ret.id);
@@ -7699,8 +7747,21 @@ Views.returns = {
                 <span>නව භාණ්ඩ එකතුව (Exchange Total):</span>
                 <span>${fmt(exchangeTotal)}</span>
               </div>
+              ${deliveryFee > 0 ? `
+                <div class="receipt-totals-row" style="color:#92400e; font-weight:700; margin-top:2px;">
+                  <span>🚚 ප්‍රවාහන ගාස්තු (Delivery Fee):</span>
+                  <span>${fmt(deliveryFee)}</span>
+                </div>
+              ` : ''}
             </div>
-          ` : ''}
+          ` : (deliveryFee > 0 ? `
+            <div style="border-top:1px dashed #000; padding-top:2px; margin-top:4px; width:100%; box-sizing:border-box;">
+              <div class="receipt-totals-row" style="color:#92400e; font-weight:700;">
+                <span>🚚 ප්‍රවාහන ගාස්තු (Delivery Fee):</span>
+                <span>${fmt(deliveryFee)}</span>
+              </div>
+            </div>
+          ` : '')}
 
           <!-- 3. SETTLEMENT -->
           <div style="border-top:2px dashed #000; margin-top:6px; padding-top:4px;">
