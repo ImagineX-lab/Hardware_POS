@@ -147,7 +147,8 @@ module.exports = {
             balance REAL,
             createdAt INTEGER,
             customerType TEXT DEFAULT 'customer',
-            discountPercent REAL DEFAULT 0
+            discountPercent REAL DEFAULT 0,
+            image TEXT
         )`);
         await run(`CREATE TABLE IF NOT EXISTS customer_ledger (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -175,6 +176,7 @@ module.exports = {
 
         try { await run(`ALTER TABLE customers ADD COLUMN customerType TEXT DEFAULT 'customer'`); } catch(e) {}
         try { await run(`ALTER TABLE customers ADD COLUMN discountPercent REAL DEFAULT 0`); } catch(e) {}
+        try { await run(`ALTER TABLE customers ADD COLUMN image TEXT`); } catch(e) {}
         try { await run(`ALTER TABLE sales ADD COLUMN amountPaid REAL DEFAULT 0`); } catch(e) {}
         try { await run(`ALTER TABLE sales ADD COLUMN changeAmount REAL DEFAULT 0`); } catch(e) {}
         try { await run(`ALTER TABLE sales ADD COLUMN barcode TEXT DEFAULT ''`); } catch(e) {}
@@ -431,9 +433,11 @@ module.exports = {
 
         const type = c.customerType || 'customer';
         const discount = Number(c.discountPercent) || 0;
-        const res = await run(`INSERT INTO customers (name, phone, address, nic, creditLimit, balance, createdAt, customerType, discountPercent) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-            [c.name.trim(), phoneVal.value, c.address?.trim()||"", nicVal.value, Number(c.creditLimit)||0, 0, Date.now(), type, discount]);
-        return { id: res.lastID, ...c, phone: phoneVal.value, nic: nicVal.value, customerType: type, discountPercent: discount, balance: 0, ledger: [] };
+        const image = (c.image || '').trim();
+        try { await run(`ALTER TABLE customers ADD COLUMN image TEXT`); } catch(e) {}
+        const res = await run(`INSERT INTO customers (name, phone, address, nic, creditLimit, balance, createdAt, customerType, discountPercent, image) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [c.name.trim(), phoneVal.value, c.address?.trim()||"", nicVal.value, Number(c.creditLimit)||0, 0, Date.now(), type, discount, image]);
+        return { id: res.lastID, ...c, phone: phoneVal.value, nic: nicVal.value, customerType: type, discountPercent: discount, balance: 0, image, ledger: [] };
     },
     updateCustomer: async (id, patch) => {
         const c = await get(`SELECT * FROM customers WHERE id = ?`, [id]);
@@ -453,8 +457,9 @@ module.exports = {
         }
 
         const merged = { ...c, ...patch };
-        await run(`UPDATE customers SET name=?, phone=?, address=?, nic=?, creditLimit=?, balance=?, customerType=?, discountPercent=? WHERE id=?`,
-            [merged.name, merged.phone, merged.address, merged.nic, merged.creditLimit, merged.balance, merged.customerType || 'customer', Number(merged.discountPercent)||0, id]);
+        try { await run(`ALTER TABLE customers ADD COLUMN image TEXT`); } catch(e) {}
+        await run(`UPDATE customers SET name=?, phone=?, address=?, nic=?, creditLimit=?, balance=?, customerType=?, discountPercent=?, image=? WHERE id=?`,
+            [merged.name, merged.phone, merged.address, merged.nic, merged.creditLimit, merged.balance, merged.customerType || 'customer', Number(merged.discountPercent)||0, merged.image || '', id]);
         return merged;
     },
     deleteCustomer: async (id) => {
@@ -953,8 +958,9 @@ module.exports = {
         }
         if(data.customers && Array.isArray(data.customers)) {
             for(let c of data.customers) {
-                await run(`INSERT INTO customers (id, name, phone, address, nic, creditLimit, balance, createdAt, customerType, discountPercent) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-                [c.id, c.name, c.phone, c.address, c.nic, c.creditLimit, c.balance, c.createdAt, c.customerType || 'customer', c.discountPercent || 0]);
+                try { await run(`ALTER TABLE customers ADD COLUMN image TEXT`); } catch(e) {}
+                await run(`INSERT INTO customers (id, name, phone, address, nic, creditLimit, balance, createdAt, customerType, discountPercent, image) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                [c.id, c.name, c.phone, c.address, c.nic, c.creditLimit, c.balance, c.createdAt, c.customerType || 'customer', c.discountPercent || 0, c.image || '']);
                 if(c.ledger && Array.isArray(c.ledger)) {
                     for(let l of c.ledger) {
                         await run(`INSERT INTO customer_ledger (id, customerId, date, type, amount, note, saleId) VALUES (?, ?, ?, ?, ?, ?, ?)`,

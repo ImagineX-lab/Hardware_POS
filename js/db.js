@@ -27,6 +27,9 @@ const DB = {
       this.data.sales = await salesRes.json();
       this.data.purchases = await purchasesRes.json();
       this.data.returns = await returnsRes.json();
+      if (typeof Singlish !== 'undefined' && Array.isArray(this.data.items)) {
+        Singlish.preIndexAll(this.data.items);
+      }
       this.invalidateItemsCache();
     } catch(err) {
       console.error("Failed to load data", err);
@@ -35,8 +38,10 @@ const DB = {
   },
 
   _sortedItemsCache: null,
+  _searchCache: new Map(),
   invalidateItemsCache() {
     this._sortedItemsCache = null;
+    this._searchCache.clear();
   },
 
   async reload() {
@@ -51,6 +56,9 @@ const DB = {
       body: JSON.stringify(item)
     });
     const newItem = await res.json();
+    if (typeof Singlish !== 'undefined') {
+      Singlish.indexItem(newItem);
+    }
     this.data.items.push(newItem);
     this.invalidateItemsCache();
     return newItem;
@@ -63,6 +71,10 @@ const DB = {
     });
     if(res.ok) {
       const updated = await res.json();
+      if (typeof Singlish !== 'undefined') {
+        delete updated._searchIdx;
+        Singlish.indexItem(updated);
+      }
       const idx = this.data.items.findIndex(i => i.id === id);
       if(idx !== -1) this.data.items[idx] = updated;
       this.invalidateItemsCache();
@@ -73,7 +85,7 @@ const DB = {
   async deleteItem(id){
     await fetch(`/api/items/${id}`, { method: 'DELETE' });
     this.data.items = this.data.items.filter(i => Number(i.id) !== Number(id));
-    // No full reload needed — item already removed from local cache
+    this.invalidateItemsCache();
   },
   getItem(id){ return this.data.items.find(i=>i.id===id); },
   getItemByBarcode(barcode){
@@ -88,23 +100,68 @@ const DB = {
     }
     return this._sortedItemsCache;
   },
-  searchItems(query, category = 'All') {
-    let items = this.allItems();
-    if (category && category !== 'All' && category !== 'all') {
-      if (category === 'වෙනත්') {
-        items = items.filter(i => !i.category || (i.category || '').trim() === 'වෙනත්' || (i.category || '').trim() === '');
+  searchItems(query, category = 'All', limit = 0) {
+    const q = (query || '').trim();
+    const cat = category || 'All';
+    const max = limit > 0 ? limit : 0;
+    const cacheKey = `${cat}|${max}|${q.toLowerCase()}`;
+
+    if (this._searchCache.has(cacheKey)) {
+      return this._searchCache.get(cacheKey);
+    }
+
+    const items = this.allItems();
+    const isFilteredCat = cat && cat !== 'All' && cat !== 'all';
+    const isOtherCat = cat === 'වෙනත්';
+
+    if (!q) {
+      let res = items;
+      if (isFilteredCat) {
+        if (isOtherCat) {
+          res = items.filter(i => !i.category || (i.category || '').trim() === 'වෙනත්' || (i.category || '').trim() === '');
+        } else {
+          res = items.filter(i => (i.category || '').trim() === cat);
+        }
+      }
+      if (max > 0 && res.length > max) res = res.slice(0, max);
+      return res;
+    }
+
+    const results = [];
+    const prepared = typeof Singlish !== 'undefined' ? Singlish.prepareQuery(q) : null;
+    const qLower = q.toLowerCase();
+
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i];
+
+      // Fast category exclusion
+      if (isFilteredCat) {
+        const itemCat = (item.category || '').trim();
+        if (isOtherCat) {
+          if (itemCat && itemCat !== 'වෙනත්') continue;
+        } else {
+          if (itemCat !== cat) continue;
+        }
+      }
+
+      let isMatch = false;
+      if (prepared) {
+        isMatch = Singlish.matchPrepared(item, prepared);
       } else {
-        items = items.filter(i => (i.category || '').trim() === category);
+        isMatch = (item.name || '').toLowerCase().includes(qLower) || (item.barcode || '').toLowerCase().includes(qLower);
+      }
+
+      if (isMatch) {
+        results.push(item);
+        if (max > 0 && results.length >= max) break;
       }
     }
-    const q = (query || '').trim();
-    if (!q) return items;
-    if (typeof Singlish !== 'undefined') {
-      const prepared = Singlish.prepareQuery(q);
-      return items.filter(i => Singlish.matchPrepared(i, prepared));
+
+    if (this._searchCache.size > 300) {
+      this._searchCache.clear();
     }
-    const qLower = q.toLowerCase();
-    return items.filter(i => (i.name || '').toLowerCase().includes(qLower) || (i.barcode || '').toLowerCase().includes(qLower));
+    this._searchCache.set(cacheKey, results);
+    return results;
   },
   lowStockItems(){ return this.allItems().filter(i=>i.qty <= i.reorderLevel); },
 

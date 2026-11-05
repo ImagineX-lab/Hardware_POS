@@ -62,9 +62,19 @@ const App = {
     this.updateTitles();
     document.querySelectorAll('.nav-btn').forEach(btn=>{
       btn.addEventListener('click', ()=>{
+        if (this.currentView === 'settings' && btn.dataset.view !== 'settings') {
+          if (typeof Views !== 'undefined' && Views.settings) Views.settings.salesUnlocked = false;
+        }
         this.currentView = btn.dataset.view;
         this.render();
       });
+    });
+
+    // Auto-lock when window or tab loses visibility
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden && typeof Views !== 'undefined' && Views.settings) {
+        Views.settings.salesUnlocked = false;
+      }
     });
 
     document.addEventListener('focusin', (e) => {
@@ -285,10 +295,25 @@ const App = {
     setInterval(update, 1000);
   },
 
+  navigate(viewName){
+    if (viewName && typeof Views !== 'undefined' && Views[viewName]) {
+      if (viewName !== 'settings' && Views.settings) {
+        Views.settings.salesUnlocked = false;
+      }
+      this.currentView = viewName;
+      this.render();
+    }
+  },
+
   render(){
     // Save current sale session before navigating away from sale view
     if (this.currentView !== 'sale' && Views.sale && Views.sale.saveSession) {
       try { Views.sale.saveSession(); } catch(e) {}
+    }
+
+    // Auto-lock sales when navigating away from settings
+    if (this.currentView !== 'settings' && typeof Views !== 'undefined' && Views.settings) {
+      Views.settings.salesUnlocked = false;
     }
 
     document.querySelectorAll('.nav-btn').forEach(b=>{

@@ -304,18 +304,34 @@ const Singlish = {
     const catPhonetic = this.toPhonetic(cat);
     const descPhonetic = this.toPhonetic(desc);
 
-    // Fast indexed composite string
+    // Fast indexed composite string + fast-lookup properties
+    item._nameLower = name;
+    item._barcodeLower = barcode;
+    item._catLower = cat;
     item._searchIdx = `${name} ${barcode} ${cat} ${subCat} ${desc} ${nameStripped} ${namePhonetic} ${nameNorm} ${catPhonetic} ${descPhonetic}`;
     return item._searchIdx;
   },
+
+  preIndexAll(items) {
+    if (!Array.isArray(items)) return;
+    for (let i = 0; i < items.length; i++) {
+      this.indexItem(items[i]);
+    }
+  },
+
+  _memoQuery: new Map(),
 
   prepareQuery(query) {
     if (!query) return null;
     const q = String(query).trim().toLowerCase();
     if (!q) return null;
 
+    if (this._memoQuery.has(q)) {
+      return this._memoQuery.get(q);
+    }
+
     const words = q.split(/\s+/).filter(Boolean);
-    return words.map(w => {
+    const prepared = words.map(w => {
       const wSinhala = this.toSinhala(w);
       const wStripped = this.stripSinhalaStrokes(wSinhala);
       const wNorm = this.normalize(w);
@@ -326,15 +342,28 @@ const Singlish = {
         norm: wNorm
       };
     });
+
+    if (this._memoQuery.size > 500) this._memoQuery.clear();
+    this._memoQuery.set(q, prepared);
+    return prepared;
   },
 
   matchPrepared(item, preparedWords) {
     if (!preparedWords || !preparedWords.length) return true;
     if (!item) return false;
+
+    // Fast path: check direct name / barcode substring before checking full composite index
+    const name = item._nameLower !== undefined ? item._nameLower : String(item.name || '').toLowerCase();
+    const barcode = item._barcodeLower !== undefined ? item._barcodeLower : String(item.barcode || '').toLowerCase();
     const idx = item._searchIdx || this.indexItem(item);
 
     for (let i = 0; i < preparedWords.length; i++) {
       const w = preparedWords[i];
+      // 1. Direct match on item name or barcode (majority of queries hit here instantly)
+      if (name.includes(w.raw) || (barcode && barcode.includes(w.raw))) continue;
+      // 2. Direct Sinhala transliteration in name
+      if (w.sinhala && name.includes(w.sinhala)) continue;
+      // 3. Fallback to full composite indexed text
       if (idx.includes(w.raw)) continue;
       if (w.sinhala && idx.includes(w.sinhala)) continue;
       if (w.stripped && idx.includes(w.stripped)) continue;

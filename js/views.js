@@ -372,7 +372,8 @@ Views.sale = {
     }
     const q = (document.getElementById('saleSearch')?.value || '').trim();
     if (q) {
-      items = DB.searchItems(q, Views.sale.currentCategory).slice(0, 60);
+      // Use limit=60 so searchItems stops early — no extra slice needed
+      items = DB.searchItems(q, Views.sale.currentCategory, 60);
     }
     if (!items.length) {
       return `<div class="empty-state" style="grid-column:1/-1; padding:40px 20px;"><div class="em-ico"><i class="ph ph-package"></i></div><h3>${t('sale_no_matches') || 'No items'}</h3></div>`;
@@ -911,8 +912,9 @@ Views.sale = {
         if (!q) {
           suggestBox.innerHTML = '';
         } else {
-          // Check if query matches a Bill Barcode
-          const billSale = DB.findSaleByBarcode ? DB.findSaleByBarcode(q) : null;
+          // Guard: only call findSaleByBarcode for barcode-like patterns (avoid full sales scan on every keystroke)
+          const looksLikeBarcode = /^(?:bill|inv|#)/i.test(q) || (q.length >= 3 && /d/.test(q) && !/[඀-෿]/.test(q));
+          const billSale = (looksLikeBarcode && DB.findSaleByBarcode) ? DB.findSaleByBarcode(q) : null;
           if (billSale) {
             suggestBox.innerHTML = `
               <div class="search-suggest">
@@ -935,7 +937,7 @@ Views.sale = {
               Views.sale.showReceipt(billSale);
             });
           } else {
-            const matches = DB.searchItems(q, Views.sale.currentCategory).slice(0, 8);
+            const matches = DB.searchItems(q, Views.sale.currentCategory, 8);
             if (!matches.length) {
               suggestBox.innerHTML = `<div class="search-suggest"><div class="suggest-row text-muted">${t('sale_no_matches')}</div></div>`;
             } else {
@@ -970,7 +972,7 @@ Views.sale = {
           }
         }
 
-        // 2. Debounce background grid rendering (80ms) so typing never stutters
+        // 2. Debounce background grid rendering (200ms) so typing feels instant — no stutter
         clearTimeout(gridDebounceTimer);
         gridDebounceTimer = setTimeout(() => {
           const grid = document.getElementById('posItemGrid');
@@ -978,7 +980,7 @@ Views.sale = {
             grid.innerHTML = Views.sale.posGridHTML();
             Views.sale.bindGrid();
           }
-        }, 80);
+        }, 200);
       });
 
       searchInp.addEventListener('keydown', (e) => {
@@ -2376,6 +2378,7 @@ Views.sale = {
       name: l.name,
       barcode: l.barcode || (DB.getItem(l.itemId)?.barcode || ''),
       unit: l.unit,
+      costPrice: (l.costPrice !== undefined && Number(l.costPrice) > 0) ? Number(l.costPrice) : (Number(DB.getItem(l.itemId)?.costPrice) || 0),
       qty: l.qty,
       unitPrice: l.unitPrice,
       originalPrice: (l.originalPrice !== undefined && l.originalPrice > 0) ? l.originalPrice : l.unitPrice,
@@ -3323,7 +3326,7 @@ Views.items = {
           document.getElementById('itemsTableWrap').innerHTML = Views.items.tableHTML();
           Views.items.bindRowActions();
           Views.items.bindCategoryRowClicks();
-        }, 40);
+        }, 100);
       });
       setTimeout(() => search.focus(), 100);
     }
@@ -3730,7 +3733,7 @@ Views.stock = {
             document.getElementById('itemsTableWrap').innerHTML = Views.stock.itemsTableHTML();
             Views.stock.bindRowActions();
             Views.stock.bindCategoryRowClicks();
-          }, 40);
+          }, 100);
         });
         setTimeout(() => search.focus(), 100);
       }
@@ -3893,20 +3896,35 @@ Views.customers = {
               <th>${t('cust_address')}</th>
               ${Views.customers.activeTab === 'hardwares' ? `<th>${t('cust_hardware_discount_badge')}</th>` : ''}
               <th class="num">${t('cust_due')}</th>
-              <th></th>
+              <th style="text-align:right;">ක්‍රියා</th>
             </tr>
           </thead>
           <tbody>
             ${list.map(c => `
               <tr>
-                <td><b>${escapeHTML(c.name)}</b></td>
+                <td style="vertical-align:middle;">
+                  <div style="display:flex; align-items:center; gap:10px;">
+                    ${c.image ? `
+                      <img src="${c.image}" class="cust-avatar-img" data-cust-fullimg="${c.id}" style="width:38px; height:38px; border-radius:50%; object-fit:cover; border:2px solid #cbd5e1; cursor:pointer; flex-shrink:0; box-shadow:0 1px 3px rgba(0,0,0,0.1);" title="පින්තූරය විශාල කර බලන්න">
+                    ` : `
+                      <div style="width:38px; height:38px; border-radius:50%; background:#f1f5f9; border:1.5px solid #cbd5e1; display:flex; align-items:center; justify-content:center; color:#64748b; font-size:18px; flex-shrink:0;">
+                        <i class="ph ph-user"></i>
+                      </div>
+                    `}
+                    <div>
+                      <div style="font-weight:700; color:var(--charcoal);">${escapeHTML(c.name)}</div>
+                      ${c.customerType === 'hardware' ? `<span class="pill pill-warn" style="font-size:10px; padding:1px 5px;"><i class="ph ph-wrench"></i> Hardware</span>` : ''}
+                    </div>
+                  </div>
+                </td>
                 <td>${c.nic ? `<span class="pill pill-outline" style="font-family:monospace; font-weight:600;">🆔 ${escapeHTML(c.nic)}</span>` : '-'}</td>
                 <td>${escapeHTML(c.phone) || '-'}</td>
                 <td class="text-muted">${escapeHTML(c.address) || '-'}</td>
                 ${Views.customers.activeTab === 'hardwares' ? `<td><span class="pill pill-ok">${c.discountPercent || 0}% Discount</span></td>` : ''}
                 <td class="num">${c.balance > 0 ? `<span style="color:var(--danger); font-weight:700">${fmt(c.balance)}</span>` : `<span class="pill pill-ok">${t('cust_zero')}</span>`}</td>
-                <td>
-                  <button class="btn btn-sm btn-outline" data-view-cust="${c.id}">${t('cust_details')}</button>
+                <td style="white-space:nowrap; text-align:right;">
+                  <button class="btn btn-sm btn-outline" data-view-cust-items="${c.id}" style="color:var(--primary-dark); font-weight:700; border-color:var(--primary); padding:3px 8px; font-size:11.5px; display:inline-flex; align-items:center; gap:4px; margin-right:4px;" title="ණයට ගත් භාණ්ඩ ලැයිස්තුව"><i class="ph ph-package"></i> ණයට ගත් බඩු</button>
+                  <button class="btn btn-sm btn-outline" data-view-cust="${c.id}" style="padding:3px 8px; font-size:11.5px;" title="${t('cust_details')}"><i class="ph ph-eye"></i> ${t('cust_details')}</button>
                   <button class="icon-btn" data-edit-cust="${c.id}" title="${t('items_edit')}"><i class="ph ph-pencil-simple"></i></button>
                   <button class="icon-btn" data-del-cust="${c.id}" title="${t('delete')}"><i class="ph ph-trash"></i></button>
                 </td>
@@ -3959,6 +3977,30 @@ Views.customers = {
           <input class="input" id="c_nic" placeholder="e.g. 199012345678 / 901234567V">
           <div class="field-error-msg" id="c_nic_err"></div>
         </div>
+        <div class="field" style="margin-bottom:8px;">
+          <label class="field-label" style="display:flex; justify-content:space-between; align-items:center;">
+            <span><i class="ph ph-camera"></i> පාරිභෝගිකයාගේ පින්තූරය (Customer Photo - විකල්පයි):</span>
+            <span class="pill pill-ok" style="font-size:10px;">Optional</span>
+          </label>
+          <div style="display:flex; align-items:center; gap:14px; background:#f8fafc; border:1px dashed #cbd5e1; border-radius:8px; padding:10px 14px;">
+            <div id="c_img_preview_wrap" style="width:64px; height:64px; border-radius:50%; background:#e2e8f0; border:2px solid #cbd5e1; display:flex; align-items:center; justify-content:center; overflow:hidden; flex-shrink:0;">
+              <i class="ph ph-user" style="font-size:30px; color:#94a3b8;"></i>
+            </div>
+            <div style="flex:1;">
+              <input type="file" id="c_image_file" accept="image/*" style="display:none;">
+              <input type="hidden" id="c_image" value="">
+              <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+                <button type="button" class="btn btn-sm btn-outline" id="c_choose_img_btn" style="font-size:12px; font-weight:700; display:inline-flex; align-items:center; gap:5px;">
+                  <i class="ph ph-upload-simple"></i> පින්තූරයක් තෝරන්න
+                </button>
+                <button type="button" class="btn btn-sm btn-outline" id="c_remove_img_btn" style="display:none; color:var(--danger); border-color:#fca5a5; font-size:12px;">
+                  <i class="ph ph-trash"></i> ඉවත් කරන්න
+                </button>
+              </div>
+              <div class="small text-muted" style="font-size:11px; margin-top:4px;">JPG, PNG හෝ WebP (ස්වයංක්‍රීයව ප්‍රමාණය සකසයි)</div>
+            </div>
+          </div>
+        </div>
       `,
       footHTML: `<button class="btn btn-outline" data-close>${t('cancel')}</button><button class="btn btn-primary" id="saveCustBtn">${t('confirm')}</button>`,
       onMount: (wrap) => {
@@ -3990,6 +4032,49 @@ Views.customers = {
         });
         if (discInp) discInp.addEventListener('input', () => clearInputError(discInp, discErr));
         if (limitInp) limitInp.addEventListener('input', () => clearInputError(limitInp, limitErr));
+
+        // Customer Photo Handling
+        const cFileInput = wrap.querySelector('#c_image_file');
+        const cHiddenImg = wrap.querySelector('#c_image');
+        const cPreviewWrap = wrap.querySelector('#c_img_preview_wrap');
+        const cRemoveImgBtn = wrap.querySelector('#c_remove_img_btn');
+        const cChooseImgBtn = wrap.querySelector('#c_choose_img_btn');
+
+        cChooseImgBtn?.addEventListener('click', () => cFileInput?.click());
+        cRemoveImgBtn?.addEventListener('click', () => {
+          if (cHiddenImg) cHiddenImg.value = '';
+          if (cFileInput) cFileInput.value = '';
+          if (cPreviewWrap) cPreviewWrap.innerHTML = '<i class="ph ph-user" style="font-size:30px; color:#94a3b8;"></i>';
+          if (cRemoveImgBtn) cRemoveImgBtn.style.display = 'none';
+        });
+
+        cFileInput?.addEventListener('change', () => {
+          const file = cFileInput.files && cFileInput.files[0];
+          if (!file) return;
+          const reader = new FileReader();
+          reader.onload = (e) => {
+            const img = new Image();
+            img.onload = () => {
+              const maxDim = 400;
+              let w = img.width, h = img.height;
+              if (w > maxDim || h > maxDim) {
+                if (w > h) { h = Math.round((h * maxDim) / w); w = maxDim; }
+                else { w = Math.round((w * maxDim) / h); h = maxDim; }
+              }
+              const canvas = document.createElement('canvas');
+              canvas.width = w;
+              canvas.height = h;
+              const ctx = canvas.getContext('2d');
+              ctx.drawImage(img, 0, 0, w, h);
+              const resizedBase64 = canvas.toDataURL('image/jpeg', 0.75);
+              if (cHiddenImg) cHiddenImg.value = resizedBase64;
+              if (cPreviewWrap) cPreviewWrap.innerHTML = `<img src="${resizedBase64}" style="width:100%; height:100%; object-fit:cover;">`;
+              if (cRemoveImgBtn) cRemoveImgBtn.style.display = 'inline-flex';
+            };
+            img.src = e.target.result;
+          };
+          reader.readAsDataURL(file);
+        });
 
         wrap.querySelector('#saveCustBtn').addEventListener('click', async () => {
           // 1. Validate Name
@@ -4040,6 +4125,7 @@ Views.customers = {
             }
           }
 
+          const imageVal = wrap.querySelector('#c_image')?.value || '';
           await DB.addCustomer({
             name: nameVal.value,
             phone: phoneVal.value,
@@ -4047,7 +4133,8 @@ Views.customers = {
             address: wrap.querySelector('#c_address').value.trim(),
             creditLimit,
             customerType: typeSelect.value,
-            discountPercent: discount
+            discountPercent: discount,
+            image: imageVal
           });
 
           closeModal();
@@ -4101,6 +4188,30 @@ Views.customers = {
           <input class="input" id="ce_nic" value="${escapeHTML(c.nic || '')}" placeholder="e.g. 199012345678 / 901234567V">
           <div class="field-error-msg" id="ce_nic_err"></div>
         </div>
+        <div class="field" style="margin-bottom:8px;">
+          <label class="field-label" style="display:flex; justify-content:space-between; align-items:center;">
+            <span><i class="ph ph-camera"></i> පාරිභෝගිකයාගේ පින්තූරය (Customer Photo):</span>
+            <span class="pill pill-ok" style="font-size:10px;">Optional</span>
+          </label>
+          <div style="display:flex; align-items:center; gap:14px; background:#f8fafc; border:1px dashed #cbd5e1; border-radius:8px; padding:10px 14px;">
+            <div id="ce_img_preview_wrap" style="width:64px; height:64px; border-radius:50%; background:#e2e8f0; border:2px solid #cbd5e1; display:flex; align-items:center; justify-content:center; overflow:hidden; flex-shrink:0;">
+              ${c.image ? `<img src="${c.image}" style="width:100%; height:100%; object-fit:cover;">` : `<i class="ph ph-user" style="font-size:30px; color:#94a3b8;"></i>`}
+            </div>
+            <div style="flex:1;">
+              <input type="file" id="ce_image_file" accept="image/*" style="display:none;">
+              <input type="hidden" id="ce_image" value="${c.image ? escapeHTML(c.image) : ''}">
+              <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+                <button type="button" class="btn btn-sm btn-outline" id="ce_choose_img_btn" style="font-size:12px; font-weight:700; display:inline-flex; align-items:center; gap:5px;">
+                  <i class="ph ph-upload-simple"></i> ${c.image ? 'පින්තූරය වෙනස් කරන්න' : 'පින්තූරයක් තෝරන්න'}
+                </button>
+                <button type="button" class="btn btn-sm btn-outline" id="ce_remove_img_btn" style="display:${c.image ? 'inline-flex' : 'none'}; color:var(--danger); border-color:#fca5a5; font-size:12px;">
+                  <i class="ph ph-trash"></i> ඉවත් කරන්න
+                </button>
+              </div>
+              <div class="small text-muted" style="font-size:11px; margin-top:4px;">JPG, PNG හෝ WebP (ස්වයංක්‍රීයව ප්‍රමාණය සකසයි)</div>
+            </div>
+          </div>
+        </div>
       `,
       footHTML: `<button class="btn btn-outline" data-close>${t('cancel')}</button><button class="btn btn-primary" id="updateCustBtn">${t('confirm')}</button>`,
       onMount: (wrap) => {
@@ -4132,6 +4243,49 @@ Views.customers = {
         });
         if (discInp) discInp.addEventListener('input', () => clearInputError(discInp, discErr));
         if (limitInp) limitInp.addEventListener('input', () => clearInputError(limitInp, limitErr));
+
+        // Customer Photo Handling (Edit)
+        const ceFileInput = wrap.querySelector('#ce_image_file');
+        const ceHiddenImg = wrap.querySelector('#ce_image');
+        const cePreviewWrap = wrap.querySelector('#ce_img_preview_wrap');
+        const ceRemoveImgBtn = wrap.querySelector('#ce_remove_img_btn');
+        const ceChooseImgBtn = wrap.querySelector('#ce_choose_img_btn');
+
+        ceChooseImgBtn?.addEventListener('click', () => ceFileInput?.click());
+        ceRemoveImgBtn?.addEventListener('click', () => {
+          if (ceHiddenImg) ceHiddenImg.value = '';
+          if (ceFileInput) ceFileInput.value = '';
+          if (cePreviewWrap) cePreviewWrap.innerHTML = '<i class="ph ph-user" style="font-size:30px; color:#94a3b8;"></i>';
+          if (ceRemoveImgBtn) ceRemoveImgBtn.style.display = 'none';
+        });
+
+        ceFileInput?.addEventListener('change', () => {
+          const file = ceFileInput.files && ceFileInput.files[0];
+          if (!file) return;
+          const reader = new FileReader();
+          reader.onload = (e) => {
+            const img = new Image();
+            img.onload = () => {
+              const maxDim = 400;
+              let w = img.width, h = img.height;
+              if (w > maxDim || h > maxDim) {
+                if (w > h) { h = Math.round((h * maxDim) / w); w = maxDim; }
+                else { w = Math.round((w * maxDim) / h); h = maxDim; }
+              }
+              const canvas = document.createElement('canvas');
+              canvas.width = w;
+              canvas.height = h;
+              const ctx = canvas.getContext('2d');
+              ctx.drawImage(img, 0, 0, w, h);
+              const resizedBase64 = canvas.toDataURL('image/jpeg', 0.75);
+              if (ceHiddenImg) ceHiddenImg.value = resizedBase64;
+              if (cePreviewWrap) cePreviewWrap.innerHTML = `<img src="${resizedBase64}" style="width:100%; height:100%; object-fit:cover;">`;
+              if (ceRemoveImgBtn) ceRemoveImgBtn.style.display = 'inline-flex';
+            };
+            img.src = e.target.result;
+          };
+          reader.readAsDataURL(file);
+        });
 
         wrap.querySelector('#updateCustBtn').addEventListener('click', async () => {
           // 1. Validate Name
@@ -4182,6 +4336,7 @@ Views.customers = {
             }
           }
 
+          const imageVal = wrap.querySelector('#ce_image')?.value || '';
           await DB.updateCustomer(id, {
             name: nameVal.value,
             phone: phoneVal.value,
@@ -4189,7 +4344,8 @@ Views.customers = {
             address: wrap.querySelector('#ce_address').value.trim(),
             creditLimit,
             customerType: typeSelect.value,
-            discountPercent: discount
+            discountPercent: discount,
+            image: imageVal
           });
 
           closeModal();
@@ -4339,20 +4495,32 @@ Views.customers = {
         <!-- Compact Customer Info & Financial Stats -->
         <div style="background:var(--paper); border:1px solid var(--border); border-radius:10px; padding:12px 16px; margin-bottom:12px;">
           <div style="display:flex; justify-content:space-between; align-items:center; gap:16px; flex-wrap:wrap;">
-            <!-- Left: Contact Details -->
-            <div style="display:flex; flex-direction:column; gap:4px; min-width:240px;">
-              <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap; font-size:13px;">
-                <span style="font-weight:700; color:var(--charcoal); display:inline-flex; align-items:center; gap:5px;">
-                  <i class="ph ph-phone" style="color:var(--steel);"></i> ${escapeHTML(c.phone) || '-'}
-                </span>
-                ${c.nic ? `<span style="color:var(--border-dark, #cbd5e1);">|</span><span style="display:inline-flex; align-items:center; gap:4px; color:var(--charcoal); font-weight:500;"><i class="ph ph-identification-card" style="color:var(--steel);"></i> ${escapeHTML(c.nic)}</span>` : ''}
-              </div>
-              ${c.address ? `<div style="font-size:12px; color:var(--steel); display:inline-flex; align-items:center; gap:4px;"><i class="ph ph-map-pin"></i> ${escapeHTML(c.address)}</div>` : ''}
-              <div style="margin-top:2px;">
-                <span class="pill ${c.customerType === 'hardware' ? 'pill-warn' : 'pill-ok'}" style="font-size:11px; padding:2px 8px;">
-                  <i class="ph ${c.customerType === 'hardware' ? 'ph-wrench' : 'ph-user'}"></i>
-                  ${c.customerType === 'hardware' ? `${t('cust_type_hardware')} (${c.discountPercent || 0}% discount)` : t('cust_type_retail')}
-                </span>
+            <!-- Left: Avatar + Contact Details -->
+            <div style="display:flex; align-items:center; gap:14px; min-width:240px;">
+              ${c.image ? `
+                <img src="${c.image}" class="cust-detail-avatar-preview" data-cust-fullimg="${c.id}" style="width:64px; height:64px; border-radius:50%; object-fit:cover; border:2.5px solid var(--primary); cursor:pointer; box-shadow:0 2px 6px rgba(0,0,0,0.12); flex-shrink:0;" title="පින්තූරය විශාල කර බලන්න">
+              ` : `
+                <div style="width:64px; height:64px; border-radius:50%; background:#e2e8f0; border:2px solid #cbd5e1; display:flex; align-items:center; justify-content:center; color:#64748b; font-size:30px; flex-shrink:0;">
+                  <i class="ph ph-user"></i>
+                </div>
+              `}
+              <div style="display:flex; flex-direction:column; gap:3px;">
+                <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap; font-size:13px;">
+                  <span style="font-weight:700; color:var(--charcoal); display:inline-flex; align-items:center; gap:5px;">
+                    <i class="ph ph-phone" style="color:var(--steel);"></i> ${escapeHTML(c.phone) || '-'}
+                  </span>
+                  ${c.nic ? `<span style="color:var(--border-dark, #cbd5e1);">|</span><span style="display:inline-flex; align-items:center; gap:4px; color:var(--charcoal); font-weight:500;"><i class="ph ph-identification-card" style="color:var(--steel);"></i> ${escapeHTML(c.nic)}</span>` : ''}
+                </div>
+                ${c.address ? `<div style="font-size:12px; color:var(--steel); display:inline-flex; align-items:center; gap:4px;"><i class="ph ph-map-pin"></i> ${escapeHTML(c.address)}</div>` : ''}
+                <div style="margin-top:3px; display:flex; gap:6px; align-items:center; flex-wrap:wrap;">
+                  <span class="pill ${c.customerType === 'hardware' ? 'pill-warn' : 'pill-ok'}" style="font-size:11px; padding:2px 8px;">
+                    <i class="ph ${c.customerType === 'hardware' ? 'ph-wrench' : 'ph-user'}"></i>
+                    ${c.customerType === 'hardware' ? `${t('cust_type_hardware')} (${c.discountPercent || 0}% discount)` : t('cust_type_retail')}
+                  </span>
+                  <button type="button" class="btn btn-xs btn-outline" id="viewCustCreditItemsBtn" style="font-size:11px; font-weight:700; color:var(--primary-dark); border-color:var(--primary); padding:2px 8px; display:inline-flex; align-items:center; gap:3px; background:#eff6ff;" title="ණයට ගත් සියලු භාණ්ඩ බලන්න">
+                    <i class="ph ph-package"></i> ණයට ගත් බඩු ලැයිස්තුව
+                  </button>
+                </div>
               </div>
             </div>
 
@@ -4486,6 +4654,14 @@ Views.customers = {
       `,
       footHTML: `<button class="btn btn-outline" data-close>${t('close')}</button>`,
       onMount: (wrap) => {
+        wrap.querySelector('#viewCustCreditItemsBtn')?.addEventListener('click', () => {
+          Views.customers.openCreditItemsModal(c.id);
+        });
+
+        wrap.querySelector('#viewCustCreditItemsBtn')?.addEventListener('click', () => {
+          Views.customers.openCreditItemsModal(c.id);
+        });
+
         // Quick Pay Half Due Button
         wrap.querySelector('#payHalfDueBtn')?.addEventListener('click', () => {
           const amtInp = wrap.querySelector('#paymentAmt');
@@ -4610,6 +4786,329 @@ Views.customers = {
     });
   },
 
+
+  openCreditItemsModal(id) {
+    const c = DB.getCustomer(id);
+    if (!c) return;
+
+    // Gather credit sales
+    const custSaleIds = new Set();
+    (c.ledger || []).forEach(l => {
+      if (l.type === 'sale') {
+        if (l.saleId) custSaleIds.add(Number(l.saleId));
+        else if (l.note) {
+          const m = l.note.match(/#(\d+)/);
+          if (m) custSaleIds.add(Number(m[1]));
+        }
+      }
+    });
+
+    const allSales = DB.allSales();
+    const custSales = allSales.filter(s => {
+      const matchId = Number(s.customerId) === Number(id);
+      const inLedger = custSaleIds.has(Number(s.id));
+      const matchPayment = s.paymentType === 'credit';
+      return (matchId && matchPayment) || inLedger;
+    });
+
+    // Also collect exchange items taken on credit from returns if any
+    const allReturns = (typeof DB.allReturns === 'function' ? DB.allReturns() : (DB.data.returns || []));
+    const custReturnsWithExchange = allReturns.filter(r => 
+      Number(r.customerId) === Number(id) && Array.isArray(r.exchangeItems) && r.exchangeItems.length > 0 &&
+      (r.settlementType === 'credit_added' || (c.ledger || []).some(l => l.note && l.note.includes(r.returnNo || 'Return')))
+    );
+
+    const creditItemsList = [];
+    custSales.forEach(s => {
+      const lines = Array.isArray(s.lines) ? s.lines : [];
+      lines.forEach(line => {
+        const lineTotal = Math.round((Number(line.qty) * Number(line.unitPrice)) * 100) / 100;
+        const qtyText = line.looseInfo 
+          ? `${line.looseInfo.looseQty} ${escapeHTML(line.looseInfo.looseUnit || '')}` 
+          : `${line.qty} ${escapeHTML(line.unit || 'pcs')}`;
+        const unitPriceVal = (line.looseInfo && line.looseInfo.looseQty > 0)
+          ? (line.looseInfo.customLooseUnitPrice ? Number(line.looseInfo.customLooseUnitPrice) : (lineTotal / line.looseInfo.looseQty))
+          : line.unitPrice;
+
+        creditItemsList.push({
+          source: 'sale',
+          date: s.date,
+          billNo: s.id,
+          name: line.name,
+          qty: line.qty,
+          unit: line.unit || 'pcs',
+          looseInfo: line.looseInfo,
+          qtyText,
+          unitPrice: unitPriceVal,
+          lineTotal
+        });
+      });
+    });
+
+    custReturnsWithExchange.forEach(r => {
+      (r.exchangeItems || []).forEach(it => {
+        const lineTotal = it.lineTotal || Math.round((it.qty * it.unitPrice) * 100) / 100;
+        const qtyText = it.looseInfo 
+          ? `${it.looseInfo.looseQty} ${escapeHTML(it.looseInfo.looseUnit || '')}` 
+          : `${it.qty} ${escapeHTML(it.unit || 'pcs')}`;
+        creditItemsList.push({
+          source: 'exchange',
+          date: r.date,
+          billNo: r.returnNo || ('RET-' + r.id),
+          name: it.name + ' (මාරු කළ භාණ්ඩ)',
+          qty: it.qty,
+          unit: it.unit || 'pcs',
+          looseInfo: it.looseInfo,
+          qtyText,
+          unitPrice: it.unitPrice,
+          lineTotal
+        });
+      });
+    });
+
+    creditItemsList.sort((a, b) => (b.date || 0) - (a.date || 0));
+
+    const totalCreditItemsValue = Math.round(creditItemsList.reduce((sum, it) => sum + (Number(it.lineTotal) || 0), 0) * 100) / 100;
+    const totalPaid = Math.round((c.ledger || []).filter(l => l.type === 'payment').reduce((sum, l) => sum + (Number(l.amount) || 0), 0) * 100) / 100;
+    const currentDue = c.balance;
+
+    const renderItemsTableRows = (items) => {
+      if (!items.length) {
+        return `<tr><td colspan="6" style="text-align:center; padding:20px; color:var(--steel);">ණයට ගත් භාණ්ඩ හමු නොවීය</td></tr>`;
+      }
+      return items.map((it, idx) => `
+        <tr style="border-bottom:1px solid var(--border);">
+          <td style="padding:8px 10px; font-size:12px; color:var(--steel); white-space:nowrap;">${fmtDate(it.date)}</td>
+          <td style="padding:8px 10px; font-size:12px; font-weight:700;">
+            <span class="pill pill-muted" style="font-size:11px;">#${it.billNo}</span>
+          </td>
+          <td style="padding:8px 10px; font-weight:600; font-size:12.5px; color:var(--charcoal);">
+            ${escapeHTML(it.name)}
+            ${it.looseInfo ? `<span class="pill pill-ok" style="font-size:10px; padding:1px 5px; margin-left:4px;">⚖️ ${escapeHTML(it.looseInfo.shortText || 'ලිහිල්')}</span>` : ''}
+          </td>
+          <td class="num" style="padding:8px 10px; font-weight:700; font-size:12.5px;">${it.qtyText}</td>
+          <td class="num" style="padding:8px 10px; font-size:12.5px;">${fmt(it.unitPrice)}</td>
+          <td class="num" style="padding:8px 10px; font-weight:800; color:var(--danger); font-size:13px;">${fmt(it.lineTotal)}</td>
+        </tr>
+      `).join('');
+    };
+
+    openModal({
+      title: `📦 ණයට ගත් භාණ්ඩ - ${escapeHTML(c.name)}`,
+      wide: true,
+      bodyHTML: `
+        <!-- Customer Top Card -->
+        <div style="background:var(--paper); border:1px solid var(--border); border-radius:10px; padding:12px 16px; margin-bottom:14px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; gap:14px; flex-wrap:wrap;">
+            <div style="display:flex; align-items:center; gap:12px;">
+              ${c.image ? `
+                <img src="${c.image}" style="width:56px; height:56px; border-radius:50%; object-fit:cover; border:2px solid var(--primary); box-shadow:0 1px 4px rgba(0,0,0,0.12);">
+              ` : `
+                <div style="width:56px; height:56px; border-radius:50%; background:#e2e8f0; display:flex; align-items:center; justify-content:center; color:#64748b; font-size:26px;">
+                  <i class="ph ph-user"></i>
+                </div>
+              `}
+              <div>
+                <div style="font-size:16px; font-weight:800; color:var(--charcoal);">${escapeHTML(c.name)}</div>
+                <div style="font-size:12px; color:var(--steel); margin-top:2px;">
+                  ${c.phone ? `📞 ${escapeHTML(c.phone)}` : ''} ${c.nic ? ` | 🆔 ${escapeHTML(c.nic)}` : ''}
+                </div>
+              </div>
+            </div>
+
+            <!-- 3 Stat Badges -->
+            <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
+              <div style="padding:6px 12px; background:#fff; border-radius:8px; border:1px solid var(--border); border-left:4px solid var(--orange);">
+                <div class="small text-muted" style="font-size:10.5px;">ණයට ගත් මුළු එකතුව</div>
+                <div style="font-size:15px; font-weight:800; color:var(--orange-dark); margin-top:1px;">${fmt(totalCreditItemsValue)}</div>
+              </div>
+              <div style="padding:6px 12px; background:#fff; border-radius:8px; border:1px solid var(--border); border-left:4px solid #16a34a;">
+                <div class="small text-muted" style="font-size:10.5px;">මුළු ගෙවූ මුදල</div>
+                <div style="font-size:15px; font-weight:800; color:#16a34a; margin-top:1px;">${fmt(totalPaid)}</div>
+              </div>
+              <div style="padding:6px 14px; background:#fff; border-radius:8px; border:1px solid var(--border); border-left:4px solid ${currentDue > 0 ? 'var(--danger)' : 'var(--success)'};">
+                <div class="small text-muted" style="font-size:10.5px;">වත්මන් හිඟ ණය</div>
+                <div style="font-size:17px; font-weight:900; color:${currentDue > 0 ? 'var(--danger)' : 'var(--success)'}; margin-top:1px;">${fmt(currentDue)}</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Search Bar -->
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; gap:10px; flex-wrap:wrap;">
+          <div style="position:relative; width:280px;">
+            <input class="input" id="creditItemsSearchInp" placeholder="🔍 භාණ්ඩයේ නමින් සොයන්න..." style="height:34px; font-size:12.5px; padding-left:32px;">
+            <i class="ph ph-magnifying-glass" style="position:absolute; left:10px; top:50%; transform:translateY(-50%); color:var(--steel); font-size:15px;"></i>
+          </div>
+          <div style="font-size:12.5px; color:var(--steel); font-weight:600;">
+            මුළු භාණ්ඩ පෙළ: <b id="creditItemsCountLbl" style="color:var(--charcoal);">${creditItemsList.length}</b>
+          </div>
+        </div>
+
+        <!-- Items Table -->
+        <div class="table-wrap" style="max-height:360px; overflow-y:auto; border:1px solid var(--border); border-radius:8px;">
+          <table style="width:100%; border-collapse:collapse;">
+            <thead style="position:sticky; top:0; background:var(--paper); z-index:2; border-bottom:2px solid var(--border);">
+              <tr>
+                <th style="padding:8px 10px; font-size:12px; width:110px;">දිනය</th>
+                <th style="padding:8px 10px; font-size:12px; width:90px;">බිල් අංකය</th>
+                <th style="padding:8px 10px; font-size:12px;">භාණ්ඩයේ නම</th>
+                <th class="num" style="padding:8px 10px; font-size:12px; width:110px;">ප්‍රමාණය</th>
+                <th class="num" style="padding:8px 10px; font-size:12px; width:110px;">මිල (රු.)</th>
+                <th class="num" style="padding:8px 10px; font-size:12px; width:120px;">එකතුව (රු.)</th>
+              </tr>
+            </thead>
+            <tbody id="creditItemsTableBody">
+              ${renderItemsTableRows(creditItemsList)}
+            </tbody>
+            <tfoot style="position:sticky; bottom:0; background:#f8fafc; border-top:2px solid var(--border); font-weight:800;">
+              <tr>
+                <td colspan="5" style="padding:8px 10px; text-align:right; font-size:13px;">ණයට ගත් භාණ්ඩවල මුළු එකතුව:</td>
+                <td class="num" style="padding:8px 10px; font-size:14px; color:var(--danger);" id="creditItemsTotalFooter">${fmt(totalCreditItemsValue)}</td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      `,
+      footHTML: `
+        <button class="btn btn-outline" data-close>${t('close')}</button>
+        <button class="btn btn-primary" id="printCreditItemsStmtBtn" style="display:inline-flex; align-items:center; gap:6px;">
+          <i class="ph ph-printer" style="font-size:17px;"></i> බඩු ලැයිස්තුව Print කරන්න
+        </button>
+      `,
+      onMount: (wrap) => {
+        const searchInp = wrap.querySelector('#creditItemsSearchInp');
+        const tbody = wrap.querySelector('#creditItemsTableBody');
+        const countLbl = wrap.querySelector('#creditItemsCountLbl');
+
+        searchInp?.addEventListener('input', () => {
+          const q = searchInp.value.trim().toLowerCase();
+          const filtered = q 
+            ? creditItemsList.filter(it => it.name.toLowerCase().includes(q) || String(it.billNo).includes(q))
+            : creditItemsList;
+          if (tbody) tbody.innerHTML = renderItemsTableRows(filtered);
+          if (countLbl) countLbl.textContent = filtered.length;
+        });
+
+        wrap.querySelector('#printCreditItemsStmtBtn')?.addEventListener('click', () => {
+          Views.customers.printCreditItemsStatement({
+            customer: c,
+            items: creditItemsList,
+            totalValue: totalCreditItemsValue,
+            totalPaid,
+            currentDue
+          });
+        });
+      }
+    });
+  },
+
+  printCreditItemsStatement({ customer, items, totalValue, totalPaid, currentDue }) {
+    const s = DB.data.settings || {};
+    const shopName = s.shopName || 'HardwarePOS';
+    const shopDesc = s.shopDescription || '';
+    const logo = s.logo || '';
+    const rawLogoSize = Number(s.logoSize) || 50;
+    const logoSize = Math.min(Math.max(rawLogoSize * 1.8, 85), 150);
+    const formattedDate = new Date().toLocaleDateString('en-GB') + ' ' + new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+
+    openModal({
+      title: 'ණයට ගත් බඩු ලැයිස්තුව (Print Statement)',
+      wide: false,
+      bodyHTML: `
+        <div class="receipt" id="printArea">
+          ${logo ? `<div style="text-align:center; margin-bottom:6px;"><img class="receipt-logo" src="${logo}" alt="Logo" style="height:${logoSize}px; max-height:140px; max-width:250px; object-fit:contain; margin:0 auto; display:block;"></div>` : ''}
+          <h2>${escapeHTML(shopName)}</h2>
+          ${shopDesc ? `<div class="r-center" style="font-size:9.5px; color:#222; margin-bottom:3px; white-space:pre-line;">${escapeHTML(shopDesc)}</div>` : ''}
+
+          <div style="text-align:center; font-weight:800; font-size:12px; margin:6px 0 3px 0; border-top:1px dashed #000; border-bottom:1px dashed #000; padding:3px 0;">
+            ණයට ගත් භාණ්ඩ ලැයිස්තුව (CREDIT ITEMS STATEMENT)
+          </div>
+
+          <div style="font-size:9.5px; margin:4px 0; border-bottom:1px dashed #000; padding-bottom:4px;">
+            <div>පාරිභෝගිකයා: <b>${escapeHTML(customer.name)}</b></div>
+            ${customer.phone ? `<div>දුරකථනය: <b>${escapeHTML(customer.phone)}</b></div>` : ''}
+            ${customer.nic ? `<div>ජා.හැ. අංකය: <b>${escapeHTML(customer.nic)}</b></div>` : ''}
+            <div>දිනය: ${formattedDate}</div>
+          </div>
+
+          <table style="width:100%; border-collapse:collapse; margin:4px 0; font-size:9px; table-layout:fixed;">
+            <thead>
+              <tr style="border-bottom:1px dashed #000;">
+                <th style="text-align:left; width:45%; padding:2px 0;">විස්තරය</th>
+                <th style="text-align:center; width:20%; padding:2px 0;">ප්‍රමාණය</th>
+                <th style="text-align:right; width:17%; padding:2px 0;">මිල</th>
+                <th style="text-align:right; width:18%; padding:2px 0;">එකතුව</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${items.map(it => `
+                <tr>
+                  <td colspan="4" style="padding-top:2px; font-weight:700; color:#000; font-size:9.5px; word-break:break-word;">
+                    ${escapeHTML(it.name)} <span style="font-size:8px; color:#555;">(#${it.billNo})</span>
+                  </td>
+                </tr>
+                <tr style="border-bottom:1px dotted #ccc;">
+                  <td style="padding-bottom:2px; font-size:8.5px; color:#555;">${fmtDate(it.date)}</td>
+                  <td style="text-align:center; padding-bottom:2px; font-size:9px; white-space:nowrap;">${it.qtyText}</td>
+                  <td style="text-align:right; padding-bottom:2px; font-size:9px; white-space:nowrap;">${fmt(it.unitPrice)}</td>
+                  <td style="text-align:right; padding-bottom:2px; font-weight:700; font-size:9px; white-space:nowrap;">${fmt(it.lineTotal)}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+
+          <div style="border-top:1.5px dashed #000; margin-top:4px; padding-top:4px;">
+            <div class="receipt-totals-row" style="font-weight:700; font-size:10px;">
+              <span>ණයට ගත් මුළු එකතුව:</span>
+              <span>${fmt(totalValue)}</span>
+            </div>
+            <div class="receipt-totals-row" style="font-size:9.5px;">
+              <span>මුළු ගෙවූ මුදල (Paid):</span>
+              <span>${fmt(totalPaid)}</span>
+            </div>
+            <div class="receipt-totals-row grand" style="font-size:11.5px; font-weight:900; color:#b91c1c; border-top:1px dashed #000; margin-top:2px; padding-top:2px;">
+              <span>වත්මන් හිඟ ණය මුදල:</span>
+              <span>${fmt(currentDue)}</span>
+            </div>
+          </div>
+
+          <div style="margin-top:24px; display:flex; justify-content:space-between; font-size:9px; border-top:1px dotted #888; padding-top:4px;">
+            <div>පාරිභෝගික අත්සන</div>
+            <div>වෙළඳසැල් අත්සන</div>
+          </div>
+
+          <div style="text-align:center; margin-top:10px; font-size:8.5px; color:#666;">
+            ස්තූතියි! නැවත එන්න.
+          </div>
+        </div>
+      `,
+      footHTML: `
+        <button class="btn btn-outline" data-close>${t('close')}</button>
+        <button class="btn btn-primary" id="doPrintCreditItemsBtn"><i class="ph ph-printer"></i> Print කරන්න</button>
+      `,
+      onMount: (wrap) => {
+        wrap.querySelector('#doPrintCreditItemsBtn')?.addEventListener('click', () => {
+          window.print();
+        });
+      }
+    });
+  },
+
+  showImageModal(imgSrc, title) {
+    if (!imgSrc) return;
+    openModal({
+      title: title ? `📷 ${escapeHTML(title)}` : '📷 පින්තූරය',
+      wide: false,
+      bodyHTML: `
+        <div style="text-align:center; padding:8px;">
+          <img src="${imgSrc}" alt="${escapeHTML(title || '')}" style="max-width:100%; max-height:450px; border-radius:8px; object-fit:contain; box-shadow:0 4px 12px rgba(0,0,0,0.15);">
+        </div>
+      `,
+      footHTML: `<button class="btn btn-outline" data-close>${t('close')}</button>`
+    });
+  },
+
   bind() {
     document.getElementById('addCustBtn').addEventListener('click', Views.customers.openAddModal);
 
@@ -4637,6 +5136,26 @@ Views.customers = {
   bindRowActions() {
     document.querySelectorAll('[data-view-cust]').forEach(b => {
       b.addEventListener('click', () => Views.customers.openDetailModal(Number(b.dataset.viewCust)));
+    });
+    document.querySelectorAll('[data-view-cust-items]').forEach(b => {
+      b.addEventListener('click', () => Views.customers.openCreditItemsModal(Number(b.dataset.viewCustItems)));
+    });
+    document.querySelectorAll('[data-cust-fullimg]').forEach(b => {
+      b.addEventListener('click', () => {
+        const id = Number(b.dataset.custFullimg);
+        const c = DB.getCustomer(id);
+        if (c && c.image) Views.customers.showImageModal(c.image, c.name);
+      });
+    });
+    document.querySelectorAll('[data-view-cust-items]').forEach(b => {
+      b.addEventListener('click', () => Views.customers.openCreditItemsModal(Number(b.dataset.viewCustItems)));
+    });
+    document.querySelectorAll('[data-cust-fullimg]').forEach(b => {
+      b.addEventListener('click', () => {
+        const id = Number(b.dataset.custFullimg);
+        const c = DB.getCustomer(id);
+        if (c && c.image) Views.customers.showImageModal(c.image, c.name);
+      });
     });
     document.querySelectorAll('[data-edit-cust]').forEach(b => {
       b.addEventListener('click', () => Views.customers.openEditModal(Number(b.dataset.editCust)));
@@ -4856,11 +5375,11 @@ Views.settings = {
     const currentPass = s.salesPassword || '1234';
 
     openModal({
-      title: 'විකුණුම් මුරපදය වෙනස් කිරීම (Change Sales Password)',
+      title: 'ආරක්ෂක මුරපදය වෙනස් කිරීම (Change Security PIN)',
       wide: false,
       bodyHTML: `
         <div style="margin-bottom:14px; font-size:13px; color:var(--steel);">
-          අද දවසේ විකුණුම් (Today's Sales) ආරක්ෂිතව බැලීම සඳහා මුරපදය සකසන්න.
+          පද්ධති සත්‍යාපනය සඳහා මුරපදය (Security PIN) සකසන්න.
         </div>
         <div class="field">
           <label class="field-label">දැනට පවතින මුරපදය (Current Password) *</label>
@@ -4922,31 +5441,48 @@ Views.settings = {
     const todayCredit = today.filter(s => s.paymentType === 'credit').reduce((s, x) => s + x.total, 0);
     const todayDiscounts = today.reduce((s, x) => s + (x.discount || 0), 0);
 
+    let todaySalesRevenue = 0;
+    let todayCost = 0;
+    today.forEach(s => {
+      const sub = Number(s.subtotal) || (s.lines || []).reduce((acc, l) => acc + (Number(l.qty) * Number(l.unitPrice)), 0);
+      const disc = Number(s.discount) || 0;
+      todaySalesRevenue += Math.max(0, sub - disc);
+
+      (s.lines || []).forEach(l => {
+        let itemCost = 0;
+        if (l.costPrice !== undefined && l.costPrice !== null && Number(l.costPrice) > 0) {
+          itemCost = Number(l.costPrice);
+        } else if (l.itemId) {
+          const it = DB.getItem(l.itemId);
+          if (it && it.costPrice) itemCost = Number(it.costPrice);
+        }
+        todayCost += (itemCost * (Number(l.qty) || 0));
+      });
+    });
+    const todayProfit = Math.round((todaySalesRevenue - todayCost) * 100) / 100;
+
     let salesCardHtml = '';
     if (!Views.settings.salesUnlocked) {
       salesCardHtml = `
-        <!-- Locked Sales Card -->
-        <div class="card" style="border-left: 4px solid var(--orange); margin-bottom: 20px; background: #fff;">
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; flex-wrap: wrap; gap: 8px;">
+        <!-- Disguised Security Card -->
+        <div class="card" style="border: 1px solid var(--border); border-radius: 8px; margin-bottom: 20px; background: #fff; padding: 14px 18px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; flex-wrap: wrap; gap: 8px;">
             <div>
-              <div class="card-title" style="margin-bottom: 2px; display: inline-flex; align-items: center; gap: 6px; color: var(--charcoal);">
-                <i class="ph ph-lock-key" style="color: var(--orange); font-size: 18px;"></i> ${t('dash_today_sales')} (Today's Sales)
+              <div class="card-title" style="margin-bottom: 2px; display: inline-flex; align-items: center; gap: 6px; color: var(--charcoal); font-size: 13.5px;">
+                <i class="ph ph-shield-check" style="color: var(--steel); font-size: 18px;"></i> පද්ධති සත්‍යාපනය (System Verification)
               </div>
-              <div class="card-sub" style="font-size: 12px; margin-bottom: 0;">අද දවසේ විකුණුම් විස්තර බැලීමට මුරපදය (Password) ඇතුළත් කරන්න</div>
+              <div class="card-sub" style="font-size: 11.5px; margin-bottom: 0; color: var(--steel);">ඉදිරියට යාමට ඔබගේ මුරපදය (PIN) ඇතුළත් කරන්න</div>
             </div>
-            <button class="btn btn-xs btn-outline" id="settingsChangePassBtn" style="font-size: 11px; padding: 4px 10px;">
+            <button class="btn btn-xs btn-outline" id="settingsChangePassBtn" style="font-size: 11px; padding: 3px 8px; color: var(--steel);">
               <i class="ph ph-key"></i> මුරපදය වෙනස් කරන්න
             </button>
           </div>
 
-          <div style="display: flex; align-items: center; gap: 10px; max-width: 440px; margin-top: 12px;">
-            <input type="password" id="salesPasswordInput" class="input" placeholder="මුරපදය ඇතුළත් කරන්න..." style="height: 38px; font-size: 14px; flex: 1;">
-            <button class="btn btn-primary" id="unlockSalesBtn" style="height: 38px; padding: 0 16px; font-size: 13px; font-weight: 700; display: inline-flex; align-items: center; gap: 6px;">
-              <i class="ph ph-lock-open"></i> Unlock
+          <div style="display: flex; align-items: center; gap: 10px; max-width: 380px; margin-top: 10px;">
+            <input type="password" id="salesPasswordInput" class="input" placeholder="මුරපදය / PIN ඇතුළත් කරන්න..." style="height: 36px; font-size: 13px; flex: 1;">
+            <button class="btn btn-primary" id="unlockSalesBtn" style="height: 36px; padding: 0 16px; font-size: 12.5px; font-weight: 700; display: inline-flex; align-items: center; gap: 6px;">
+              <i class="ph ph-lock-key-open"></i> Unlock
             </button>
-          </div>
-          <div class="small text-muted" style="margin-top: 8px; font-size: 11px;">
-            <i class="ph ph-info"></i> මුරපදය සකසා නොමැති නම් සාමාන්‍ය මුරපදය (Default): <b>1234</b>
           </div>
         </div>
       `;
@@ -4974,23 +5510,36 @@ Views.settings = {
             </div>
           </div>
 
-          <div style="display: flex; align-items: baseline; gap: 8px; margin-bottom: 14px;">
-            <div style="font-size: 28px; font-weight: 800; color: var(--success);">${fmt(todayTotal)}</div>
-            <div style="font-size: 13px; font-weight: 600; color: var(--steel);">(${today.length} ${t('dash_bills')})</div>
+          <div style="display: flex; justify-content: space-between; align-items: baseline; flex-wrap: wrap; gap: 12px; margin-bottom: 14px;">
+            <div style="display: flex; align-items: baseline; gap: 8px;">
+              <span style="font-size: 13px; font-weight: 700; color: var(--steel);">මුළු විකුණුම්:</span>
+              <div style="font-size: 26px; font-weight: 800; color: var(--success);">${fmt(todayTotal)}</div>
+              <div style="font-size: 12.5px; font-weight: 600; color: var(--steel);">(${today.length} ${t('dash_bills')})</div>
+            </div>
+            <div style="display: flex; align-items: center; gap: 8px; background: #ecfdf5; border: 1.5px solid #a7f3d0; border-radius: 8px; padding: 6px 14px;">
+              <span style="font-size: 12.5px; font-weight: 700; color: #065f46;">💰 අද ශුද්ධ ලාභය (Net Profit):</span>
+              <span style="font-size: 20px; font-weight: 900; color: ${todayProfit >= 0 ? '#047857' : '#dc2626'};">${fmt(todayProfit)}</span>
+            </div>
           </div>
 
-          <div class="grid grid-3 gap-8">
-            <div style="padding: 10px 12px; background: var(--paper); border-radius: 8px; border: 1px solid var(--border); border-left: 3px solid #16a34a;">
+          <div class="grid grid-4 gap-8">
+            <div style="padding: 10px 12px; background: var(--paper); border-radius: 8px; border: 1px solid var(--border); border-left: 3.5px solid #16a34a;">
               <div class="small text-muted" style="font-size: 11px;">💵 මුදල් (Cash)</div>
               <div style="font-size: 15px; font-weight: 700; color: #16a34a; margin-top: 2px;">${fmt(todayCash)}</div>
             </div>
-            <div style="padding: 10px 12px; background: var(--paper); border-radius: 8px; border: 1px solid var(--border); border-left: 3px solid var(--orange);">
+            <div style="padding: 10px 12px; background: var(--paper); border-radius: 8px; border: 1px solid var(--border); border-left: 3.5px solid var(--orange);">
               <div class="small text-muted" style="font-size: 11px;">💳 ණයට (Credit)</div>
               <div style="font-size: 15px; font-weight: 700; color: var(--orange-dark); margin-top: 2px;">${fmt(todayCredit)}</div>
             </div>
-            <div style="padding: 10px 12px; background: var(--paper); border-radius: 8px; border: 1px solid var(--border); border-left: 3px solid var(--steel);">
+            <div style="padding: 10px 12px; background: var(--paper); border-radius: 8px; border: 1px solid var(--border); border-left: 3.5px solid var(--steel);">
               <div class="small text-muted" style="font-size: 11px;">🏷️ වට්ටම් (Discounts)</div>
               <div style="font-size: 15px; font-weight: 700; color: var(--charcoal); margin-top: 2px;">${fmt(todayDiscounts)}</div>
+            </div>
+            <div style="padding: 10px 12px; background: #f0fdf4; border-radius: 8px; border: 1.5px solid #86efac; border-left: 4px solid #15803d;">
+              <div class="small" style="font-size: 11px; font-weight: 700; color: #15803d;">📈 දවසේ ලාභය (Profit)</div>
+              <div style="font-size: 15px; font-weight: 800; color: ${todayProfit >= 0 ? '#15803d' : '#dc2626'}; margin-top: 2px;">
+                ${todayProfit >= 0 ? fmt(todayProfit) : ('- ' + fmt(Math.abs(todayProfit)))}
+              </div>
             </div>
           </div>
         </div>
@@ -5137,6 +5686,7 @@ Views.settings = {
 
     // Navigate to sales history from today's sales button
     document.getElementById('settingsViewTodaySalesBtn')?.addEventListener('click', () => {
+      Views.settings.salesUnlocked = false;
       App.navigate('history');
     });
 
@@ -7384,7 +7934,7 @@ Views.returns = {
           exchangeSearch.addEventListener('input', () => {
             const q = exchangeSearch.value.trim();
             if (!q) { exchangeSuggest.classList.remove('open'); return; }
-            const items = DB.searchItems(q).slice(0, 8);
+            const items = DB.searchItems(q, 'All', 8);
             if (!items.length) {
               exchangeSuggest.innerHTML = '<div style="padding:8px 12px; font-size:12px; color:var(--steel);">භාණ්ඩ හමු නොවීය</div>';
               exchangeSuggest.classList.add('open');
